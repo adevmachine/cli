@@ -1,0 +1,31 @@
+.gitignore
+  s_cab674f14f5e3f::t_733b141d4526c7 1-8
+Makefile
+  s_cab674f14f5e3f::t_aecc748b69f658 1-19
+README.md
+  s_cab674f14f5e3f::t_82390b0a810b34 1-69
+cmd/devmachine/main.go
+  s_cab674f14f5e3f::t_b9eaed043ffe5a 1-12
+go.mod
+  s_cab674f14f5e3f::t_355d59acdfed88 1-3
+internal/commands/root.go
+  s_cab674f14f5e3f::t_18f75f9c802bb0 1-47
+internal/commands/root_test.go
+  s_cab674f14f5e3f::t_84f840cecd5496 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "db13880c2a852726f0c6808a9a4d4b0c03dde6d9",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
