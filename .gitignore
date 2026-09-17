@@ -1,0 +1,8 @@
+/dist/
+/devmachine
+/coverage.out
+
+# Specs, plans and design notes live in the operator's private repo, never here.
+/docs/superpowers/
+/plans/
+CLAUDE.local.md
