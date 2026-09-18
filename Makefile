@@ -1,10 +1,15 @@
 BINARY := devmachine
 VERSION ?= dev
 
-.PHONY: build test test-vps vps-up vps-down fmt lint run
+.PHONY: build surface test test-vps vps-up vps-down fmt lint run
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BINARY) ./cmd/devmachine
+
+# SURFACE.txt is committed, so a change to the command surface shows up in a
+# diff rather than passing unnoticed.
+surface:
+	go run ./cmd/surface > SURFACE.txt
 
 test:
 	go test -race ./...

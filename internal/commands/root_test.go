@@ -345,3 +345,89 @@ func TestDNSStatusReportsANameThatDoesNotResolve(t *testing.T) {
 		t.Fatalf("the later steps should be skipped, not failed: %q", out)
 	}
 }
+
+func TestHelpJSONListsEveryCommand(t *testing.T) {
+	out, err := execute(t, "help", "--json")
+	if err != nil {
+		t.Fatalf("help --json returned %v", err)
+	}
+
+	var got surfaceJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output was not JSON: %v (%q)", err, out)
+	}
+
+	names := map[string]bool{}
+	for _, c := range got.Commands {
+		names[c.Name] = true
+	}
+	for _, want := range []string{"config", "doctor", "stats", "dns", "secrets", "setup", "machines", "ssh", "mosh", "run"} {
+		if !names[want] {
+			t.Fatalf("%q is missing from help --json", want)
+		}
+	}
+}
+
+func TestHelpJSONCarriesSubcommandsAndFlags(t *testing.T) {
+	out, _ := execute(t, "help", "--json")
+
+	var got surfaceJSON
+	json.Unmarshal([]byte(out), &got)
+
+	for _, c := range got.Commands {
+		if c.Name != "config" {
+			continue
+		}
+		sub := map[string]bool{}
+		for _, s := range c.Sub {
+			sub[s.Name] = true
+		}
+		if !sub["path"] || !sub["show"] {
+			t.Fatalf("config's subcommands are missing: %#v", c.Sub)
+		}
+		return
+	}
+	t.Fatal("config is not in the surface")
+}
+
+func TestHelpJSONDoesNotOfferCobrasCompletionCommand(t *testing.T) {
+	out, _ := execute(t, "help", "--json")
+
+	var got surfaceJSON
+	json.Unmarshal([]byte(out), &got)
+
+	for _, c := range got.Commands {
+		if c.Name == "completion" {
+			t.Fatal("completion is cobra's, not part of what this CLI offers")
+		}
+	}
+}
+
+func TestHelpJSONCarriesTheGlobalFlags(t *testing.T) {
+	out, _ := execute(t, "help", "--json")
+
+	var got surfaceJSON
+	json.Unmarshal([]byte(out), &got)
+
+	names := map[string]bool{}
+	for _, f := range got.Flags {
+		names[f.Name] = true
+	}
+	for _, want := range []string{"config", "format", "machine"} {
+		if !names[want] {
+			t.Fatalf("the global flag %q is missing: %#v", want, got.Flags)
+		}
+	}
+}
+
+func TestTheSurfaceListsEveryCommandPath(t *testing.T) {
+	out := &bytes.Buffer{}
+	if err := WriteSurface(out); err != nil {
+		t.Fatalf("WriteSurface returned %v", err)
+	}
+	for _, want := range []string{"devmachine", "devmachine config path", "devmachine machines list", "devmachine secrets set"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("the surface is missing %q:\n%s", want, out)
+		}
+	}
+}

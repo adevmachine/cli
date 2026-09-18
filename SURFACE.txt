@@ -1,0 +1,20 @@
+devmachine
+devmachine config
+devmachine config path
+devmachine config show
+devmachine dns
+devmachine dns status
+devmachine doctor
+devmachine help
+devmachine machines
+devmachine machines list
+devmachine mosh
+devmachine run
+devmachine secrets
+devmachine secrets list
+devmachine secrets rm
+devmachine secrets set
+devmachine setup
+devmachine ssh
+devmachine stats
+devmachine version
