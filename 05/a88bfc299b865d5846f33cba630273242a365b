@@ -1,0 +1,37 @@
+internal/commands/root.go
+  s_cab674f14f5e3f::t_8d387008e603d1 59-67
+internal/commands/shell.go
+  s_cab674f14f5e3f::t_5e8edd8084051b 1-141
+internal/commands/shell_test.go
+  s_cab674f14f5e3f::t_998ce5d6d1979f 1-123
+internal/commands/stats.go
+  s_cab674f14f5e3f::t_2cce0868c0292b 1-65
+internal/stats/stats.go
+  s_cab674f14f5e3f::t_c9b5c8c0375d9b 1-142
+internal/stats/stats_test.go
+  s_cab674f14f5e3f::t_f3f6b84dd91031 1-150
+internal/stats/testdata/df.txt
+  s_cab674f14f5e3f::t_7ff3ac771e2c4d 1-2
+internal/stats/testdata/free.txt
+  s_cab674f14f5e3f::t_c44adf47fb9b42 1-3
+internal/stats/testdata/loadavg.txt
+  s_cab674f14f5e3f::t_4e50ff56bd6ad4 1
+internal/stats/testdata/nproc.txt
+  s_cab674f14f5e3f::t_8555c291e77aa3 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "05a88bfc299b865d5846f33cba630273242a365b",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
