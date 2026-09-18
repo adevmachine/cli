@@ -319,3 +319,29 @@ func TestSecretsSetReadsTheValueFromStandardInput(t *testing.T) {
 		t.Fatalf("the secret was not stored: %q", listed)
 	}
 }
+
+func TestDNSStatusNeedsAHostOrAConfiguredDomain(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	_, err := execute(t, "--config", dir, "dns", "status")
+	if err == nil {
+		t.Fatal("expected an error with no host and no domain")
+	}
+	if !strings.Contains(err.Error(), "domain") {
+		t.Fatalf("the error does not say what is missing: %v", err)
+	}
+}
+
+func TestDNSStatusReportsANameThatDoesNotResolve(t *testing.T) {
+	// .invalid never resolves, by standard. No network is needed for that.
+	out, err := execute(t, "dns", "status", "nothing.invalid")
+	if err == nil {
+		t.Fatal("expected an error for a name that does not serve")
+	}
+	if !strings.Contains(out, "fail") || !strings.Contains(out, "dns") {
+		t.Fatalf("the report does not say DNS failed: %q", out)
+	}
+	if !strings.Contains(out, "skip") {
+		t.Fatalf("the later steps should be skipped, not failed: %q", out)
+	}
+}
