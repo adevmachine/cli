@@ -33,6 +33,9 @@ cd cli && make build && ./devmachine help
 The manual is in [`docs/`](docs/index.md): getting started, the concepts, how
 the awkward parts really work, a command reference and troubleshooting.
 
+Working on the CLI itself: [development](docs/development.md) and
+[releasing](docs/releasing.md).
+
 ## The model
 
 Two ideas carry everything.

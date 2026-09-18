@@ -1,12 +1,30 @@
 # Releasing
 
-A release is a tag. GoReleaser builds the binaries, publishes them, and updates
-the Homebrew formula.
+A release is a tag. Everything else is automatic.
 
 ```
-git tag v0.1.0
+git tag vX.Y.Z
 git push --tags
+gh run watch          # follow the release workflow
 ```
+
+Before tagging: `main` clean and pushed, CI green, and `make test-vps` green
+against a real machine.
+
+GoReleaser then builds the binaries, publishes them and updates the Homebrew
+formula.
+
+## The credential in place today
+
+A GitHub App called `devmachine-release`, owned by the `adevmachine`
+organisation, installed on `homebrew-tap` only, with `Contents: Read and write`
+and no other permission. Its App ID and private key are already stored as
+secrets on `adevmachine/cli`, and neither expires.
+
+Regenerate the private key only if it leaks: the original download cannot be
+repeated, but a new key can be generated and the old one revoked.
+
+The rest of this page is how to rebuild that from scratch.
 
 ## One-time setup: the tap credential
 
