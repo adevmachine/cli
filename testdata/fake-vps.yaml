@@ -1,0 +1,51 @@
+# A throwaway VPS for testing the CLI.
+#
+# Reproduces a freshly bought VPS: root reachable over SSH with a password and
+# no key installed. That is the hardest bootstrap path and the one a stranger
+# hits, so it is the one worth testing.
+#
+# The root password is public on purpose. This VM sits behind the host's NAT,
+# holds no data, and exists to be destroyed and recreated.
+#
+# Driven by scripts/fake-vps.sh, which is the supported way to use it:
+#
+#   scripts/fake-vps.sh up         # start it and authorize a throwaway key
+#   scripts/fake-vps.sh port       # print the forwarded SSH port
+#   scripts/fake-vps.sh down       # destroy it
+
+vmType: vz
+os: Linux
+arch: aarch64
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+cpus: 2
+memory: "4GiB"
+disk: "20GiB"
+
+# The VM gets its own address, reachable from the host on port 22, so the CLI
+# talks to it exactly as it would talk to a real VPS.
+networks:
+  - vzNAT: true
+
+# No shared folders. A real VPS has none, and a mount would let a test pass for
+# the wrong reason.
+mounts: []
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux
+      echo "root:devmachine" | chpasswd
+      # The cloud image ships 60-cloudimg-settings.conf with PasswordAuthentication
+      # no. In sshd_config the FIRST value of a key wins, so this file must sort
+      # before it — a 99- prefix silently does nothing.
+      printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' \
+        > /etc/ssh/sshd_config.d/01-fake-vps.conf
+      # A fresh VPS has no key installed for root. Lima keeps its own access
+      # through the unprivileged user, which is untouched.
+      rm -f /root/.ssh/authorized_keys
+      systemctl restart ssh
