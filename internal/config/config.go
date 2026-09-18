@@ -53,10 +53,14 @@ func (h *Host) UnmarshalYAML(value *yaml.Node) error {
 type Config struct {
 	// Hosts are tried in order, so the first is the preferred path and the
 	// rest are fallbacks.
-	Hosts       []Host `yaml:"hosts"`
-	Domain      string `yaml:"domain"`
-	User        string `yaml:"user"`
-	Port        int    `yaml:"port"`
+	Hosts  []Host `yaml:"hosts"`
+	Domain string `yaml:"domain"`
+	User   string `yaml:"user"`
+	Port   int    `yaml:"port"`
+	// Key is a private key on disk. Left empty, the SSH agent serves the
+	// keys instead, which is how a 1Password-style agent is supported
+	// without this package knowing such a thing exists.
+	Key         string `yaml:"key"`
 	DNSProvider string `yaml:"dns_provider"`
 }
 

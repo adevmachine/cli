@@ -163,3 +163,24 @@ func TestValidateAcceptsAMinimalConfig(t *testing.T) {
 		t.Fatalf("Validate returned %v", err)
 	}
 }
+
+func TestLoadReadsThePrivateKeyPath(t *testing.T) {
+	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\nkey: /home/alice/.ssh/id_ed25519\n")
+
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load returned %v", err)
+	}
+	if c.Key != "/home/alice/.ssh/id_ed25519" {
+		t.Fatalf("key = %q", c.Key)
+	}
+}
+
+func TestLoadLeavesTheKeyEmptyWhenTheAgentIsMeantToServe(t *testing.T) {
+	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\n")
+
+	c, _ := Load(dir)
+	if c.Key != "" {
+		t.Fatalf("key = %q, want empty so the agent is used", c.Key)
+	}
+}
