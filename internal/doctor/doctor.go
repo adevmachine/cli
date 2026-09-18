@@ -1,0 +1,160 @@
+// Package doctor answers one question: can this CLI do its job right now, and
+// if not, which step is broken.
+package doctor
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/remote"
+)
+
+// The status of one check.
+const (
+	StatusPass = "pass"
+	StatusFail = "fail"
+	// StatusSkip means the check could not run because an earlier one failed.
+	// It is not a pass and not a failure: reporting it as either would lie.
+	StatusSkip = "skip"
+)
+
+// The checks, in the order they run.
+const (
+	CheckConfiguration   = "configuration"
+	CheckConnection      = "connection"
+	CheckOperatingSystem = "operating system"
+	CheckAnsible         = "ansible"
+)
+
+// The commands the remote checks run. They are constants so a test can answer
+// them without guessing at the wording.
+const (
+	osReleaseCommand = "cat /etc/os-release"
+	ansibleCommand   = "command -v ansible-playbook"
+)
+
+// supportedIDs are the distributions this CLI claims to support. Anything else
+// is reported plainly instead of half-working and failing partway through.
+var supportedIDs = map[string]bool{
+	"ubuntu": true,
+	"debian": true,
+}
+
+// Check is one question and its answer.
+type Check struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// Dialer opens a connection to the machine. It is a parameter so the tests do
+// not need one.
+type Dialer func(context.Context, config.Config) (remote.Client, string, error)
+
+// Run performs every check and returns them in order. It never returns an
+// error: a failed check is the result, not an exception.
+func Run(ctx context.Context, dir string, dial Dialer) []Check {
+	cfg, err := loadAndValidate(dir)
+	if err != nil {
+		return append(
+			[]Check{{Name: CheckConfiguration, Status: StatusFail, Detail: err.Error()}},
+			skipRest("the configuration is not usable")...,
+		)
+	}
+
+	checks := []Check{{
+		Name:   CheckConfiguration,
+		Status: StatusPass,
+		Detail: fmt.Sprintf("%d host(s), user %s, port %d", len(cfg.Hosts), cfg.User, cfg.Port),
+	}}
+
+	client, address, err := dial(ctx, cfg)
+	if err != nil {
+		checks = append(checks, Check{Name: CheckConnection, Status: StatusFail, Detail: err.Error()})
+		return append(checks, skipRest("the machine is unreachable")...)
+	}
+	defer client.Close()
+
+	checks = append(checks, Check{
+		Name:   CheckConnection,
+		Status: StatusPass,
+		Detail: fmt.Sprintf("connected through %s", address),
+	})
+	return append(checks, remoteChecks(ctx, client)...)
+}
+
+func loadAndValidate(dir string) (config.Config, error) {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return cfg, err
+	}
+	return cfg, cfg.Validate()
+}
+
+func skipRest(reason string) []Check {
+	names := []string{CheckConnection, CheckOperatingSystem, CheckAnsible}
+	out := make([]Check, 0, len(names))
+	for _, n := range names {
+		out = append(out, Check{Name: n, Status: StatusSkip, Detail: reason})
+	}
+	return out
+}
+
+func remoteChecks(ctx context.Context, client remote.Client) []Check {
+	var out []Check
+
+	release, err := client.Run(ctx, osReleaseCommand)
+	switch {
+	case err != nil:
+		out = append(out, Check{Name: CheckOperatingSystem, Status: StatusFail, Detail: err.Error()})
+	default:
+		id := osReleaseID(release)
+		if supportedIDs[id] {
+			out = append(out, Check{Name: CheckOperatingSystem, Status: StatusPass, Detail: id})
+		} else {
+			out = append(out, Check{
+				Name:   CheckOperatingSystem,
+				Status: StatusFail,
+				Detail: fmt.Sprintf("%q is not supported yet: this CLI supports debian and ubuntu", id),
+			})
+		}
+	}
+
+	path, err := client.Run(ctx, ansibleCommand)
+	if err != nil {
+		out = append(out, Check{
+			Name:   CheckAnsible,
+			Status: StatusFail,
+			Detail: "ansible-playbook is not on the machine; `devmachine setup` installs it",
+		})
+	} else {
+		out = append(out, Check{Name: CheckAnsible, Status: StatusPass, Detail: strings.TrimSpace(path)})
+	}
+	return out
+}
+
+// osReleaseID reads ID from an os-release file. ID_LIKE is deliberately not
+// used as a fallback: claiming support because a distribution says it is "like"
+// debian is how a run gets most of the way and then breaks.
+func osReleaseID(body string) string {
+	for _, line := range strings.Split(body, "\n") {
+		value, ok := strings.CutPrefix(strings.TrimSpace(line), "ID=")
+		if !ok {
+			continue
+		}
+		return strings.Trim(strings.TrimSpace(value), `"`)
+	}
+	return "unknown"
+}
+
+// OK reports whether every check passed or was skipped.
+func OK(checks []Check) bool {
+	for _, c := range checks {
+		if c.Status == StatusFail {
+			return false
+		}
+	}
+	return true
+}
