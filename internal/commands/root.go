@@ -64,6 +64,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(
 		newVersionCmd(),
 		newConfigCmd(opts),
+		newMachinesCmd(opts),
 		newDoctorCmd(opts),
 		newStatsCmd(opts),
 		newSSHCmd(opts),

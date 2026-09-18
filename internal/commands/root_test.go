@@ -156,3 +156,78 @@ func TestConfigShowReportsAnInvalidConfig(t *testing.T) {
 		t.Fatalf("the error does not say what to fix: %v", err)
 	}
 }
+
+func TestMachinesListShowsEachMachineAndItsWorkspaces(t *testing.T) {
+	dir := writeConfigDir(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: sandbox
+    hosts: [198.51.100.7]
+    port: 2222
+workspaces:
+  - name: alice
+    machine: main
+  - name: bob
+    machine: sandbox
+`)
+
+	out, err := execute(t, "--config", dir, "machines", "list")
+	if err != nil {
+		t.Fatalf("machines list returned %v", err)
+	}
+	for _, want := range []string{"main", "sandbox", "alice", "bob", "2222"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output is missing %q: %q", want, out)
+		}
+	}
+}
+
+func TestMachinesListSaysWhenAMachineHasNoWorkspace(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	out, err := execute(t, "--config", dir, "machines", "list")
+	if err != nil {
+		t.Fatalf("machines list returned %v", err)
+	}
+	if !strings.Contains(out, "none") {
+		t.Fatalf("an empty machine should say so: %q", out)
+	}
+}
+
+func TestMachinesListAsJSONKeepsTheWorkspaceMapping(t *testing.T) {
+	dir := writeConfigDir(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: sandbox
+    hosts: [198.51.100.7]
+workspaces:
+  - name: bob
+    machine: sandbox
+`)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "machines", "list")
+	if err != nil {
+		t.Fatalf("machines list returned %v", err)
+	}
+	var got []machineJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output was not JSON: %v (%q)", err, out)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d machines", len(got))
+	}
+	for _, m := range got {
+		switch m.Name {
+		case "main":
+			if len(m.Workspaces) != 0 {
+				t.Fatalf("main should have no workspace: %#v", m)
+			}
+		case "sandbox":
+			if len(m.Workspaces) != 1 || m.Workspaces[0] != "bob" {
+				t.Fatalf("sandbox should hold bob: %#v", m)
+			}
+		}
+	}
+}
