@@ -56,7 +56,15 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.format, "format", formatTable,
 		"output format: table or json")
 
-	root.AddCommand(newVersionCmd(), newConfigCmd(opts), newDoctorCmd(opts))
+	root.AddCommand(
+		newVersionCmd(),
+		newConfigCmd(opts),
+		newDoctorCmd(opts),
+		newStatsCmd(opts),
+		newSSHCmd(opts),
+		newMoshCmd(opts),
+		newRunCmd(opts),
+	)
 	return root
 }
 
