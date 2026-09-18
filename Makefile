@@ -1,7 +1,7 @@
 BINARY := devmachine
 VERSION ?= dev
 
-.PHONY: build surface test test-vps vps-up vps-down fmt lint run
+.PHONY: build surface test test-vps vps-up vps-down fmt lint docs run
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BINARY) ./cmd/devmachine
@@ -30,6 +30,10 @@ fmt:
 
 lint:
 	golangci-lint run
+
+# Every link resolves, and every page is reachable from the index.
+docs:
+	scripts/check-docs.sh
 
 run: build
 	./$(BINARY) $(ARGS)

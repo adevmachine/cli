@@ -37,6 +37,9 @@ jobs:
           go run ./cmd/surface > /tmp/surface.txt
           diff -u SURFACE.txt /tmp/surface.txt
 
+      - name: Check the documentation holds together
+        run: ./scripts/check-docs.sh
+
       # The pattern list lives outside the repo, so this passes on a runner and
       # bites on the maintainer's machine, which is where the risk is.
       - name: Check for real data

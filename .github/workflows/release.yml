@@ -18,12 +18,23 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The token GitHub injects can only write to this repository, so it
+      # cannot publish the Homebrew formula, which lives in another one. A
+      # GitHub App mints a short-lived token scoped to that repository alone —
+      # and unlike a personal token it does not expire, so a release cannot
+      # break a year from now because nobody remembered to rotate it.
+      - uses: actions/create-github-app-token@v2
+        id: tap-token
+        with:
+          app-id: ${{ secrets.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # A token that can write to the tap repository. Without it the
-          # release still publishes; only the formula is not updated.
-          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ steps.tap-token.outputs.token }}

@@ -15,6 +15,15 @@ if [ ! -r "$LIST" ]; then
   exit 0
 fi
 
+# Two paths are exempt, for reasons that are not laziness.
+#
+# LICENSE carries a copyright notice, and a copyright notice names a real
+# person by law. It is the one place where that belongs.
+#
+# This script quotes the patterns it looks for in order to explain itself, so
+# scanning it finds itself every time.
+EXEMPT='^(LICENSE|scripts/check-no-real-data\.sh)$'
+
 hits=0
 while IFS= read -r pattern; do
   [ -z "$pattern" ] && continue
@@ -23,7 +32,8 @@ while IFS= read -r pattern; do
   # A word boundary is required. Without it a short pattern matches inside an
   # ordinary English word — "agno" lives inside "diagnostics" — and the guard
   # cries wolf until somebody stops reading it.
-  if out=$(git ls-files -z | xargs -0 grep -HnIiE -- "\\b${pattern}\\b" 2>/dev/null); then
+  if out=$(git ls-files | grep -Ev "$EXEMPT" | tr '\n' '\0' \
+    | xargs -0 grep -HnIiE -- "\\b${pattern}\\b" 2>/dev/null); then
     printf '%s\n' "$out"
     hits=1
   fi

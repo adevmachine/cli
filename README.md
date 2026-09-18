@@ -28,6 +28,11 @@ git clone https://github.com/adevmachine/cli.git
 cd cli && make build && ./devmachine help
 ```
 
+## Documentation
+
+The manual is in [`docs/`](docs/index.md): getting started, the concepts, how
+the awkward parts really work, a command reference and troubleshooting.
+
 ## The model
 
 Two ideas carry everything.
