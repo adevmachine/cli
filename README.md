@@ -9,50 +9,97 @@ everything generic lives in here.
 
 ## Status
 
-Very early. The repository holds the skeleton only — `version` and `help`. The
-commands below are the plan, not a promise.
+Early. Everything here reads; nothing writes to a machine yet. Provisioning
+(`sync`), workspaces and DNS records come next.
 
 ## Install
 
-Not published yet. To build from source:
+```
+brew install adevmachine/tap/devmachine
+devmachine --help
+```
+
+The tap installs `advm` as a short alias of the same binary.
+
+From source:
 
 ```
 git clone https://github.com/adevmachine/cli.git
-cd cli
-make build
-./devmachine help
+cd cli && make build && ./devmachine help
 ```
 
-## Planned commands
+## The model
+
+Two ideas carry everything.
+
+A **machine** is a server the CLI can reach. There can be several.
+
+A **workspace** is an environment: normally one Linux user on one machine. It is
+what you work in and what you name in a command. Where it runs is a property of
+the workspace, so you never type an address.
+
+```yaml
+machines:
+  - name: main
+    hosts:
+      - tailscale:vps        # tried first
+      - 203.0.113.10         # the fallback
+  - name: sandbox
+    hosts: [198.51.100.7]
+    port: 2222
+    key: /keys/sandbox
+
+workspaces:
+  - name: alice
+    machine: main
+  - name: bob
+    machine: sandbox         # runs somewhere else entirely
+
+domain: example.com
+```
+
+Then `devmachine ssh bob` lands on the sandbox and `devmachine ssh alice` on the
+main server, and neither command mentions a host.
+
+A workspace's Linux account is its own name, unless `user:` says otherwise.
+`machine:` may be left out when there is only one machine.
+
+## What works today
 
 ```
-devmachine setup                      wizard: address, domain, key, bootstrap
-devmachine doctor                     config, SSH, VPS and DNS checks
-devmachine config path|show|set       the effective configuration
-devmachine secrets set|list|rm        provider tokens in the OS keychain
-
-devmachine sync [--check] [--tags x]  converge the machine
-devmachine ssh | mosh | run           reach the machine
-devmachine stats                      memory, CPU, disk, sessions
-
-devmachine users list|new|edit|rm     context users, with presets
-devmachine dns status|list|add|rm     DNS through the configured provider
-devmachine site list|add|rm           expose a port as a subdomain
+devmachine setup                     write the configuration by answering a few questions
+devmachine doctor [--machine m]      is the config usable, is the machine reachable and ready
+devmachine config path|show          which configuration is in effect, and what it says
+devmachine machines list             the machines and the workspaces on each
+devmachine stats [--machine m]       memory, swap, disk, load
+devmachine ssh|mosh [workspace]      an interactive session
+devmachine run --workspace w "cmd"   one command, as that workspace
+devmachine dns status [host]         DNS, TLS and one request, checked from outside
+devmachine secrets set|list|rm       provider tokens in the OS keychain
+devmachine help --json               the whole command surface, for a script or an agent
 ```
 
-Rules that hold for every command: JSON output is the stable contract, stdout is
-data and stderr is diagnostics, anything that writes supports `--check` and
-`--yes`, and `--help` exists everywhere.
+Rules that hold everywhere: `--format json` is the stable contract, stdout is
+data and stderr is diagnostics, and `--help` exists on every command. A command
+that would act on a server nobody named asks instead of guessing.
+
+## Coming next
+
+`sync` (provisioning through embedded Ansible), `workspaces new|rm`, DNS
+providers and subdomains, the first-contact bootstrap for a brand new server,
+and creating a machine locally for people who have no server at all.
 
 ## Design
 
-- **Ansible is the convergence engine, the CLI is in charge.** The playbooks are
-  embedded in the binary, copied to the machine and run there, so nothing has to
-  be installed locally beyond this binary and `ssh`.
-- **Your configuration is yours.** It lives in a directory (by default
-  `~/.config/devmachine`, overridable) and is never part of this repository.
-- **No vendor in the core.** DNS sits behind an interface with several
-  providers; a manual provider always works.
+- **Ansible converges; the CLI is in charge.** Ansible already handles several
+  machines through its inventory. What it has no idea of is a workspace, so the
+  CLI owns that model and generates the inventory from it. The playbooks will be
+  embedded in the binary and run on the machine, so nothing has to be installed
+  locally beyond this binary and `ssh`.
+- **Your configuration is yours.** It lives in a directory you choose and is
+  never part of this repository.
+- **No vendor in the core.** DNS sits behind an interface; a manual provider
+  always works.
 - **Nothing runs on the machine.** No agent, no daemon. The CLI is a client.
 
 ## Development
@@ -66,4 +113,4 @@ make lint      # golangci-lint
 
 ## Licence
 
-To be decided.
+MIT. See [LICENSE](LICENSE).

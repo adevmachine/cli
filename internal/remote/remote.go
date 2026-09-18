@@ -189,7 +189,9 @@ func dialContext(ctx context.Context, target string, cfg *ssh.ClientConfig) (*ss
 	}
 	c, chans, reqs, err := ssh.NewClientConn(conn, target, cfg)
 	if err != nil {
-		conn.Close()
+		// The handshake already failed; whether the socket closed cleanly
+		// changes nothing anyone can act on.
+		_ = conn.Close()
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil

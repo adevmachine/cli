@@ -10,7 +10,7 @@
 //
 // A workspace is an environment: normally one Linux user on one machine. It is
 // what a person works in, and what they name in a command. Where it runs is a
-// property of the workspace, so `devmachine ssh a8c` needs no address and no
+// property of the workspace, so `devmachine ssh alice` needs no address and no
 // machine: the mapping already says which server that is.
 package config
 

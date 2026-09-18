@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Check the formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      # The tests that need a machine skip when there is none, so this runs the
+      # whole suite without a VM. The integration tests run locally through
+      # `make test-vps`.
+      - name: Test
+        run: go test -race ./...
+
+      - name: Check the command surface is up to date
+        run: |
+          go run ./cmd/surface > /tmp/surface.txt
+          diff -u SURFACE.txt /tmp/surface.txt
+
+      # The pattern list lives outside the repo, so this passes on a runner and
+      # bites on the maintainer's machine, which is where the risk is.
+      - name: Check for real data
+        run: ./scripts/check-no-real-data.sh
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest

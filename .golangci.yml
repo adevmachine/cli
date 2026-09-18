@@ -1,0 +1,46 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+
+  settings:
+    errcheck:
+      # Closing a reader, or failing to print to a stream that is already
+      # broken, gives an error nothing useful can be done with. Listing them
+      # here says so once, instead of scattering `_ =` through the code.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (github.com/adevmachine/cli/internal/remote.Client).Close
+        - (*golang.org/x/crypto/ssh.Client).Close
+        - (*golang.org/x/crypto/ssh.Session).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - os.Remove
+
+  exclusions:
+    rules:
+      # A test asserts on what it cares about. Making it check every return
+      # value it deliberately ignores would bury what each test is proving.
+      - path: _test\.go
+        linters: [errcheck, revive]
+      # An http.HandlerFunc and a cobra RunE both have a fixed signature; an
+      # unused parameter in one is the signature, not an oversight.
+      - source: "func\\(w http.ResponseWriter"
+        linters: [revive]
+      - source: "func\\(cmd \\*cobra.Command"
+        linters: [revive]
+      - source: "func\\(_ \\*cobra.Command"
+        linters: [revive]
+
+formatters:
+  enable:
+    - gofmt
