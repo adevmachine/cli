@@ -1,0 +1,25 @@
+internal/commands/doctor.go
+  s_cab674f14f5e3f::t_304a9702860b8e 1-46
+internal/commands/root.go
+  s_cab674f14f5e3f::t_7ee5b76f91d654 59
+internal/doctor/doctor.go
+  s_cab674f14f5e3f::t_417efeae1c8b3a 1-160
+internal/doctor/doctor_test.go
+  s_cab674f14f5e3f::t_00cda7d2f02339 1-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "757424a7fe39a0f06f755d9f64e82dbefb5b8509",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
