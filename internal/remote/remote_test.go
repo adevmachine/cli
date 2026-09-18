@@ -2,14 +2,44 @@ package remote
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"golang.org/x/crypto/ssh"
 )
+
+// throwawayKey writes a private key nothing will ever authenticate with.
+//
+// A test about which addresses were tried must not depend on whether the
+// machine running it happens to have an SSH agent. Without this it passes on a
+// developer's laptop and fails on a runner, for a reason that has nothing to do
+// with what it is checking.
+func throwawayKey(t *testing.T) string {
+	t.Helper()
+
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := ssh.MarshalPrivateKey(private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "id_ed25519")
+	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
 func TestResolveKeepsALiteralAddress(t *testing.T) {
 	m := config.Machine{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}}
@@ -196,6 +226,7 @@ func TestDialSaysEveryAddressFailed(t *testing.T) {
 		Hosts: []config.Host{{Address: "203.0.113.1"}, {Address: "203.0.113.2"}},
 		User:  "root",
 		Port:  22,
+		Key:   throwawayKey(t),
 	}
 
 	_, _, err := Dial(context.Background(), m, "")
@@ -254,5 +285,44 @@ func TestDialTellsARefusedLoginApartFromAnUnreachableMachine(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("the error does not say %q: %v", want, err)
 		}
+	}
+}
+
+func TestDialSaysWhatToDoWithNoKeyAndNoAgent(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+
+	m := config.Machine{
+		Name:  "main",
+		Hosts: []config.Host{{Address: "203.0.113.1"}},
+		User:  "root",
+		Port:  22,
+	}
+
+	_, _, err := Dial(context.Background(), m, "")
+	if err == nil {
+		t.Fatal("expected an error with nothing to authenticate with")
+	}
+	for _, want := range []string{"key", "agent"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not say what is missing (%q): %v", want, err)
+		}
+	}
+}
+
+func TestDialRejectsAKeyItCannotRead(t *testing.T) {
+	m := config.Machine{
+		Name:  "main",
+		Hosts: []config.Host{{Address: "203.0.113.1"}},
+		User:  "root",
+		Port:  22,
+		Key:   filepath.Join(t.TempDir(), "absent"),
+	}
+
+	_, _, err := Dial(context.Background(), m, "")
+	if err == nil {
+		t.Fatal("expected an error for a key file that does not exist")
+	}
+	if !strings.Contains(err.Error(), "absent") {
+		t.Fatalf("the error does not name the file: %v", err)
 	}
 }
