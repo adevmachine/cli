@@ -41,8 +41,8 @@ func loadConfig(opts *options) (config.Config, error) {
 
 // firstAddress is the address an interactive session should use. It is the
 // same order Dial tries, without opening a connection first.
-func firstAddress(cfg config.Config) (string, error) {
-	addresses, err := remote.Resolve(cfg)
+func firstAddress(m config.Machine) (string, error) {
+	addresses, err := remote.Resolve(m)
 	if err != nil {
 		return "", err
 	}
@@ -51,9 +51,11 @@ func firstAddress(cfg config.Config) (string, error) {
 
 func newSSHCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "ssh [user]",
-		Short: "Open an interactive session on the machine",
-		Long: "Opens a session with the system ssh, so the terminal, the agent " +
+		Use:   "ssh [workspace]",
+		Short: "Open an interactive session in a workspace",
+		Long: "Names a workspace to land in that environment, wherever it runs. " +
+			"With no name it opens a session on the machine itself, as its admin.\n\n" +
+			"The session runs through the system ssh, so the terminal, the agent " +
 			"and tmux behave exactly as they do when you run ssh yourself.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,7 +66,7 @@ func newSSHCmd(opts *options) *cobra.Command {
 
 func newMoshCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "mosh [user]",
+		Use:   "mosh [workspace]",
 		Short: "Open an interactive session over mosh",
 		Long: "mosh survives a link that drops or roams, where ssh gives a " +
 			"broken pipe. It needs mosh on both sides.",
@@ -76,11 +78,15 @@ func newMoshCmd(opts *options) *cobra.Command {
 }
 
 func interactive(opts *options, binary string, args []string) error {
-	cfg, err := loadConfig(opts)
+	var name string
+	if len(args) == 1 {
+		name = args[0]
+	}
+	tgt, err := workspaceTarget(opts, name)
 	if err != nil {
 		return err
 	}
-	address, err := firstAddress(cfg)
+	address, err := firstAddress(tgt.machine)
 	if err != nil {
 		return err
 	}
@@ -88,25 +94,22 @@ func interactive(opts *options, binary string, args []string) error {
 		return fmt.Errorf("%s is not installed on this machine", binary)
 	}
 
-	user := cfg.User
-	if len(args) == 1 {
-		user = args[0]
-	}
+	m, user := tgt.machine, tgt.login()
 
 	var argv []string
 	switch binary {
 	case "mosh":
 		// mosh takes the remote ssh command as one string, which is where the
 		// port and the key have to go.
-		ssh := "ssh -p " + strconv.Itoa(cfg.Port)
-		if cfg.Key != "" {
-			ssh += " -i " + cfg.Key
+		ssh := "ssh -p " + strconv.Itoa(m.Port)
+		if m.Key != "" {
+			ssh += " -i " + m.Key
 		}
 		argv = []string{"--ssh=" + ssh, user + "@" + address}
 	default:
-		argv = []string{"-p", strconv.Itoa(cfg.Port)}
-		if cfg.Key != "" {
-			argv = append(argv, "-i", cfg.Key, "-o", "IdentitiesOnly=yes")
+		argv = []string{"-p", strconv.Itoa(m.Port)}
+		if m.Key != "" {
+			argv = append(argv, "-i", m.Key, "-o", "IdentitiesOnly=yes")
 		}
 		argv = append(argv, user+"@"+address)
 	}
@@ -114,16 +117,20 @@ func interactive(opts *options, binary string, args []string) error {
 }
 
 func newRunCmd(opts *options) *cobra.Command {
-	return &cobra.Command{
+	var workspace string
+
+	c := &cobra.Command{
 		Use:   "run <command>",
-		Short: "Run one command on the machine and print its output",
-		Args:  cobra.ExactArgs(1),
+		Short: "Run one command and print its output",
+		Long: "Runs as the machine's admin by default, or inside a workspace " +
+			"with --workspace.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(opts)
+			tgt, err := workspaceTarget(opts, workspace)
 			if err != nil {
 				return err
 			}
-			client, _, err := remote.Dial(cmd.Context(), cfg)
+			client, _, err := remote.Dial(cmd.Context(), tgt.machine, tgt.user)
 			if err != nil {
 				return err
 			}
@@ -138,4 +145,6 @@ func newRunCmd(opts *options) *cobra.Command {
 			return err
 		},
 	}
+	c.Flags().StringVar(&workspace, "workspace", "", "run inside this workspace instead of as the machine's admin")
+	return c
 }

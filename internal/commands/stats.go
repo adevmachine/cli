@@ -14,11 +14,11 @@ func newStatsCmd(opts *options) *cobra.Command {
 		Short: "Report what the machine is spending",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(opts)
+			tgt, err := machineTarget(opts)
 			if err != nil {
 				return err
 			}
-			client, address, err := remote.Dial(cmd.Context(), cfg)
+			client, address, err := remote.Dial(cmd.Context(), tgt.machine, "")
 			if err != nil {
 				return err
 			}
@@ -33,7 +33,7 @@ func newStatsCmd(opts *options) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), s)
 			}
 
-			cmd.Printf("host    %s\n", address)
+			cmd.Printf("machine %s (%s)\n", tgt.machine.Name, address)
 			cmd.Printf("cpus    %d, load %.2f %.2f %.2f\n", s.CPUs, s.Load1, s.Load5, s.Load15)
 			cmd.Printf("memory  %s used of %s, %s available\n",
 				humanBytes(s.MemUsedBytes), humanBytes(s.MemTotalBytes), humanBytes(s.MemAvailableBytes))

@@ -12,9 +12,9 @@ import (
 )
 
 func TestResolveKeepsALiteralAddress(t *testing.T) {
-	c := config.Config{Hosts: []config.Host{{Address: "203.0.113.10"}}}
+	m := config.Machine{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}}
 
-	got, err := Resolve(c)
+	got, err := Resolve(m)
 	if err != nil {
 		t.Fatalf("Resolve returned %v", err)
 	}
@@ -24,12 +24,12 @@ func TestResolveKeepsALiteralAddress(t *testing.T) {
 }
 
 func TestResolveKeepsTheConfiguredOrder(t *testing.T) {
-	c := config.Config{Hosts: []config.Host{
+	m := config.Machine{Name: "main", Hosts: []config.Host{
 		{Address: "100.64.0.5"},
 		{Address: "203.0.113.10"},
 	}}
 
-	got, _ := Resolve(c)
+	got, _ := Resolve(m)
 	if len(got) != 2 || got[0] != "100.64.0.5" || got[1] != "203.0.113.10" {
 		t.Fatalf("the order was not preserved: %#v", got)
 	}
@@ -39,12 +39,12 @@ func TestResolveDropsTailscaleWhenTheBinaryIsMissing(t *testing.T) {
 	lookPath = func(string) (string, error) { return "", errors.New("not found") }
 	t.Cleanup(func() { lookPath = realLookPath })
 
-	c := config.Config{Hosts: []config.Host{
+	m := config.Machine{Name: "main", Hosts: []config.Host{
 		{Address: "tailscale:vps"},
 		{Address: "203.0.113.10"},
 	}}
 
-	got, err := Resolve(c)
+	got, err := Resolve(m)
 	if err != nil {
 		t.Fatalf("Resolve returned %v", err)
 	}
@@ -58,9 +58,9 @@ func TestResolveExpandsTailscaleWhenItIsAvailable(t *testing.T) {
 	tailscaleIP = func(string) (string, error) { return "100.64.0.5", nil }
 	t.Cleanup(func() { lookPath = realLookPath; tailscaleIP = realTailscaleIP })
 
-	c := config.Config{Hosts: []config.Host{{Address: "tailscale:vps"}}}
+	m := config.Machine{Name: "main", Hosts: []config.Host{{Address: "tailscale:vps"}}}
 
-	got, _ := Resolve(c)
+	got, _ := Resolve(m)
 	if len(got) != 1 || got[0] != "100.64.0.5" {
 		t.Fatalf("got %#v", got)
 	}
@@ -71,12 +71,12 @@ func TestResolveDropsTailscaleWhenThePeerIsUnknown(t *testing.T) {
 	tailscaleIP = func(string) (string, error) { return "", errors.New("no such peer") }
 	t.Cleanup(func() { lookPath = realLookPath; tailscaleIP = realTailscaleIP })
 
-	c := config.Config{Hosts: []config.Host{
+	m := config.Machine{Name: "main", Hosts: []config.Host{
 		{Address: "tailscale:vps"},
 		{Address: "203.0.113.10"},
 	}}
 
-	got, _ := Resolve(c)
+	got, _ := Resolve(m)
 	if len(got) != 1 || got[0] != "203.0.113.10" {
 		t.Fatalf("got %#v", got)
 	}
@@ -86,9 +86,9 @@ func TestResolveFailsWhenEveryAddressWasDropped(t *testing.T) {
 	lookPath = func(string) (string, error) { return "", errors.New("not found") }
 	t.Cleanup(func() { lookPath = realLookPath })
 
-	c := config.Config{Hosts: []config.Host{{Address: "tailscale:vps"}}}
+	m := config.Machine{Name: "main", Hosts: []config.Host{{Address: "tailscale:vps"}}}
 
-	_, err := Resolve(c)
+	_, err := Resolve(m)
 	if err == nil {
 		t.Fatal("expected an error when nothing is left to try")
 	}
@@ -98,9 +98,9 @@ func TestResolveFailsWhenEveryAddressWasDropped(t *testing.T) {
 }
 
 // testMachine describes the throwaway VPS from scripts/fake-vps.sh. Without it
-// the integration tests skip, so `go test ./...` still works on a machine with
-// no VM.
-func testMachine(t *testing.T) config.Config {
+// the integration tests skip, so `go test ./...` still works where there is no
+// VM.
+func testMachine(t *testing.T) config.Machine {
 	t.Helper()
 
 	host := os.Getenv("DEVMACHINE_TEST_HOST")
@@ -118,7 +118,8 @@ func testMachine(t *testing.T) config.Config {
 	if user == "" {
 		user = "root"
 	}
-	return config.Config{
+	return config.Machine{
+		Name:  "sandbox",
 		Hosts: []config.Host{{Address: host}},
 		User:  user,
 		Port:  n,
@@ -127,23 +128,23 @@ func testMachine(t *testing.T) config.Config {
 }
 
 func TestDialReachesTheTestMachine(t *testing.T) {
-	c := testMachine(t)
+	m := testMachine(t)
 
-	client, address, err := Dial(context.Background(), c)
+	client, address, err := Dial(context.Background(), m, "")
 	if err != nil {
 		t.Fatalf("Dial returned %v", err)
 	}
 	defer client.Close()
 
-	if address != c.Hosts[0].Address {
-		t.Fatalf("connected through %q, want %q", address, c.Hosts[0].Address)
+	if address != m.Hosts[0].Address {
+		t.Fatalf("connected through %q, want %q", address, m.Hosts[0].Address)
 	}
 }
 
 func TestRunReturnsTheCommandOutput(t *testing.T) {
-	c := testMachine(t)
+	m := testMachine(t)
 
-	client, _, err := Dial(context.Background(), c)
+	client, _, err := Dial(context.Background(), m, "")
 	if err != nil {
 		t.Fatalf("Dial returned %v", err)
 	}
@@ -153,15 +154,15 @@ func TestRunReturnsTheCommandOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned %v", err)
 	}
-	if strings.TrimSpace(out) != c.User {
-		t.Fatalf("got %q, want %q", strings.TrimSpace(out), c.User)
+	if strings.TrimSpace(out) != m.User {
+		t.Fatalf("got %q, want %q", strings.TrimSpace(out), m.User)
 	}
 }
 
 func TestRunReportsACommandThatFailed(t *testing.T) {
-	c := testMachine(t)
+	m := testMachine(t)
 
-	client, _, err := Dial(context.Background(), c)
+	client, _, err := Dial(context.Background(), m, "")
 	if err != nil {
 		t.Fatalf("Dial returned %v", err)
 	}
@@ -173,12 +174,12 @@ func TestRunReportsACommandThatFailed(t *testing.T) {
 }
 
 func TestDialFallsBackToTheNextAddress(t *testing.T) {
-	c := testMachine(t)
+	m := testMachine(t)
 	// An address in the documentation range never answers, so the fallback is
 	// the only way this can succeed.
-	c.Hosts = append([]config.Host{{Address: "203.0.113.1"}}, c.Hosts...)
+	m.Hosts = append([]config.Host{{Address: "203.0.113.1"}}, m.Hosts...)
 
-	client, address, err := Dial(context.Background(), c)
+	client, address, err := Dial(context.Background(), m, "")
 	if err != nil {
 		t.Fatalf("Dial returned %v", err)
 	}
@@ -190,19 +191,68 @@ func TestDialFallsBackToTheNextAddress(t *testing.T) {
 }
 
 func TestDialSaysEveryAddressFailed(t *testing.T) {
-	c := config.Config{
+	m := config.Machine{
+		Name:  "main",
 		Hosts: []config.Host{{Address: "203.0.113.1"}, {Address: "203.0.113.2"}},
 		User:  "root",
 		Port:  22,
 	}
 
-	_, _, err := Dial(context.Background(), c)
+	_, _, err := Dial(context.Background(), m, "")
 	if err == nil {
 		t.Fatal("expected an error when no address answers")
 	}
 	for _, want := range []string{"203.0.113.1", "203.0.113.2"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("the error does not name %q: %v", want, err)
+		}
+	}
+}
+
+func TestDialLogsInAsTheUserItIsGiven(t *testing.T) {
+	m := testMachine(t)
+
+	// An account that does not exist cannot authenticate. Failing here is what
+	// proves the override reached the server instead of being ignored in
+	// favour of the machine's admin login, which would have succeeded.
+	if _, _, err := Dial(context.Background(), m, "nobody-here"); err == nil {
+		t.Fatal("Dial succeeded as a user that does not exist on the machine")
+	}
+}
+
+func TestDialFallsBackToTheAdminUserWhenGivenNone(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatalf("Dial returned %v", err)
+	}
+	defer client.Close()
+
+	out, err := client.Run(context.Background(), "id -un")
+	if err != nil {
+		t.Fatalf("Run returned %v", err)
+	}
+	if strings.TrimSpace(out) != m.User {
+		t.Fatalf("logged in as %q, want the machine's admin user %q", strings.TrimSpace(out), m.User)
+	}
+}
+
+func TestDialTellsARefusedLoginApartFromAnUnreachableMachine(t *testing.T) {
+	m := testMachine(t)
+
+	_, _, err := Dial(context.Background(), m, "nobody-here")
+	if err == nil {
+		t.Fatal("Dial succeeded as a user that does not exist")
+	}
+	// The machine answered; only the login failed. Saying "no address
+	// answered" would send someone to check the network for nothing.
+	if strings.Contains(err.Error(), "no address answered") {
+		t.Fatalf("a refused login was reported as an unreachable machine: %v", err)
+	}
+	for _, want := range []string{"refused the login", "nobody-here"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not say %q: %v", want, err)
 		}
 	}
 }

@@ -33,7 +33,7 @@ func configWith(t *testing.T, body string) string {
 
 func TestSSHUsesTheConfiguredUserPortAndKey(t *testing.T) {
 	got := captureInteractive(t)
-	dir := configWith(t, "hosts:\n  - 203.0.113.10\nuser: alice\nport: 2222\nkey: /keys/id_ed25519\n")
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    user: alice\n    port: 2222\n    key: /keys/id_ed25519\n")
 
 	if _, err := execute(t, "--config", dir, "ssh"); err != nil {
 		t.Fatalf("ssh returned %v", err)
@@ -49,7 +49,7 @@ func TestSSHUsesTheConfiguredUserPortAndKey(t *testing.T) {
 
 func TestSSHTakesAUserFromTheArgument(t *testing.T) {
 	got := captureInteractive(t)
-	dir := configWith(t, "hosts:\n  - 203.0.113.10\nuser: root\n")
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    user: root\nworkspaces:\n  - name: bob\n")
 
 	if _, err := execute(t, "--config", dir, "ssh", "bob"); err != nil {
 		t.Fatalf("ssh returned %v", err)
@@ -63,7 +63,7 @@ func TestSSHTakesAUserFromTheArgument(t *testing.T) {
 
 func TestMoshPassesThePortThroughItsSSHOption(t *testing.T) {
 	got := captureInteractive(t)
-	dir := configWith(t, "hosts:\n  - 203.0.113.10\nport: 2222\nkey: /keys/id_ed25519\n")
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    port: 2222\n    key: /keys/id_ed25519\n")
 
 	if _, err := execute(t, "--config", dir, "mosh"); err != nil {
 		t.Fatalf("mosh returned %v", err)
@@ -84,7 +84,7 @@ func TestAnInteractiveCommandSaysWhenTheBinaryIsMissing(t *testing.T) {
 	lookPath = func(string) (string, error) { return "", errors.New("not found") }
 	t.Cleanup(func() { runInteractive = realExecCommand; lookPath = realLookPath })
 
-	dir := configWith(t, "hosts:\n  - 203.0.113.10\n")
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
 
 	_, err := execute(t, "--config", dir, "mosh")
 	if err == nil {
@@ -119,5 +119,127 @@ func TestHumanBytesReadsLikeAPersonWouldWriteIt(t *testing.T) {
 		if got := humanBytes(in); got != want {
 			t.Fatalf("humanBytes(%d) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+const twoMachineConfig = `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    port: 22
+  - name: sandbox
+    hosts: [198.51.100.7]
+    port: 2222
+    key: /keys/sandbox
+workspaces:
+  - name: alice
+    machine: main
+  - name: bob
+    machine: sandbox
+    user: bob-dev
+`
+
+func TestSSHSendsAWorkspaceToItsOwnMachine(t *testing.T) {
+	got := captureInteractive(t)
+	dir := configWith(t, twoMachineConfig)
+
+	if _, err := execute(t, "--config", dir, "ssh", "bob"); err != nil {
+		t.Fatalf("ssh returned %v", err)
+	}
+
+	line := strings.Join(*got, " ")
+	// bob lives on sandbox, so its address, port, key and Linux account are
+	// the ones that have to appear — never main's.
+	for _, want := range []string{"-p 2222", "-i /keys/sandbox", "bob-dev@198.51.100.7"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("the command is missing %q: %q", want, line)
+		}
+	}
+	if strings.Contains(line, "203.0.113.10") {
+		t.Fatalf("it reached the wrong machine: %q", line)
+	}
+}
+
+func TestTwoWorkspacesReachDifferentMachines(t *testing.T) {
+	dir := configWith(t, twoMachineConfig)
+
+	got := captureInteractive(t)
+	if _, err := execute(t, "--config", dir, "ssh", "alice"); err != nil {
+		t.Fatalf("ssh alice returned %v", err)
+	}
+	alice := strings.Join(*got, " ")
+
+	got = captureInteractive(t)
+	if _, err := execute(t, "--config", dir, "ssh", "bob"); err != nil {
+		t.Fatalf("ssh bob returned %v", err)
+	}
+	bob := strings.Join(*got, " ")
+
+	if !strings.Contains(alice, "alice@203.0.113.10") {
+		t.Fatalf("alice did not land on main: %q", alice)
+	}
+	if !strings.Contains(bob, "bob-dev@198.51.100.7") {
+		t.Fatalf("bob did not land on sandbox: %q", bob)
+	}
+}
+
+func TestSSHWithNoWorkspaceNeedsAMachineWhenThereAreSeveral(t *testing.T) {
+	got := captureInteractive(t)
+	dir := configWith(t, twoMachineConfig)
+
+	_, err := execute(t, "--config", dir, "ssh")
+	if err == nil {
+		t.Fatal("expected an error rather than a guess between two machines")
+	}
+	if !strings.Contains(err.Error(), "--machine") {
+		t.Fatalf("the error does not say how to choose: %v", err)
+	}
+	if len(*got) != 0 {
+		t.Fatalf("it opened a session on a machine nobody named: %v", *got)
+	}
+}
+
+func TestSSHWithNoWorkspaceUsesTheMachineFlag(t *testing.T) {
+	got := captureInteractive(t)
+	dir := configWith(t, twoMachineConfig)
+
+	if _, err := execute(t, "--config", dir, "--machine", "sandbox", "ssh"); err != nil {
+		t.Fatalf("ssh returned %v", err)
+	}
+
+	line := strings.Join(*got, " ")
+	if !strings.Contains(line, "root@198.51.100.7") {
+		t.Fatalf("it did not use the named machine's admin login: %q", line)
+	}
+}
+
+func TestAnUnknownWorkspaceListsTheOnesThatExist(t *testing.T) {
+	got := captureInteractive(t)
+	dir := configWith(t, twoMachineConfig)
+
+	_, err := execute(t, "--config", dir, "ssh", "carol")
+	if err == nil {
+		t.Fatal("expected an error for an unknown workspace")
+	}
+	for _, want := range []string{"alice", "bob"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not list %q: %v", want, err)
+		}
+	}
+	if len(*got) != 0 {
+		t.Fatalf("it opened a session for a workspace that does not exist: %v", *got)
+	}
+}
+
+func TestAWorkspaceUsesItsNameAsTheLinuxAccount(t *testing.T) {
+	got := captureInteractive(t)
+	dir := configWith(t, twoMachineConfig)
+
+	if _, err := execute(t, "--config", dir, "ssh", "alice"); err != nil {
+		t.Fatalf("ssh returned %v", err)
+	}
+
+	if line := strings.Join(*got, " "); !strings.Contains(line, "alice@") {
+		t.Fatalf("the workspace name was not used as the account: %q", line)
 	}
 }

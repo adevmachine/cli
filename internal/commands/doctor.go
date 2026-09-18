@@ -20,7 +20,7 @@ func newDoctorCmd(opts *options) *cobra.Command {
 				return err
 			}
 
-			checks := doctor.Run(cmd.Context(), dir, remote.Dial)
+			checks := doctor.Run(cmd.Context(), dir, opts.machine, remote.Dial)
 
 			if opts.format == formatJSON {
 				if err := writeJSON(cmd.OutOrStdout(), struct {

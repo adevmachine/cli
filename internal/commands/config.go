@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -39,49 +41,96 @@ func newConfigPathCmd(opts *options) *cobra.Command {
 func newConfigShowCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
-		Short: "Print the effective configuration",
+		Short: "Print the machines and workspaces this run would use",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dir, _, err := config.Dir(opts.configDir)
+			cfg, err := loadConfig(opts)
 			if err != nil {
 				return err
-			}
-			c, err := config.Load(dir)
-			if err != nil {
-				return err
-			}
-			// Validation runs here rather than in Load: reading a file and
-			// judging its contents are different failures, and only this one
-			// can tell the user what to change.
-			if err := c.Validate(); err != nil {
-				return err
-			}
-
-			addresses := make([]string, 0, len(c.Hosts))
-			for _, h := range c.Hosts {
-				addresses = append(addresses, h.Address)
 			}
 
 			if opts.format == formatJSON {
-				return writeJSON(cmd.OutOrStdout(), struct {
-					Hosts       []string `json:"hosts"`
-					Domain      string   `json:"domain"`
-					User        string   `json:"user"`
-					Port        int      `json:"port"`
-					DNSProvider string   `json:"dns_provider"`
-				}{addresses, c.Domain, c.User, c.Port, c.DNSProvider})
+				return writeJSON(cmd.OutOrStdout(), asJSON(cfg))
 			}
 
-			for i, a := range addresses {
-				cmd.Printf("host %d  %s\n", i+1, a)
+			for _, m := range cfg.Machines {
+				addresses := make([]string, 0, len(m.Hosts))
+				for _, h := range m.Hosts {
+					addresses = append(addresses, h.Address)
+				}
+				cmd.Printf("machine %s\n", m.Name)
+				cmd.Printf("  hosts      %s\n", strings.Join(addresses, ", "))
+				cmd.Printf("  admin      %s\n", m.User)
+				cmd.Printf("  port       %d\n", m.Port)
+				if m.Key != "" {
+					cmd.Printf("  key        %s\n", m.Key)
+				}
+				for _, w := range cfg.WorkspacesOn(m.Name) {
+					cmd.Printf("  workspace  %s (user %s)\n", w.Name, w.LinuxUser())
+				}
 			}
-			cmd.Printf("domain  %s\n", c.Domain)
-			cmd.Printf("user    %s\n", c.User)
-			cmd.Printf("port    %d\n", c.Port)
-			if c.DNSProvider != "" {
-				cmd.Printf("dns     %s\n", c.DNSProvider)
+			if cfg.Domain != "" {
+				cmd.Printf("domain  %s\n", cfg.Domain)
+			}
+			if cfg.DNSProvider != "" {
+				cmd.Printf("dns     %s\n", cfg.DNSProvider)
 			}
 			return nil
 		},
 	}
+}
+
+// machineJSON and workspaceJSON are the output contract. They are separate
+// from the configuration structs so a change to how config.yml is written does
+// not silently change what every consumer reads.
+type machineJSON struct {
+	Name       string   `json:"name"`
+	Hosts      []string `json:"hosts"`
+	AdminUser  string   `json:"admin_user"`
+	Port       int      `json:"port"`
+	Key        string   `json:"key,omitempty"`
+	Workspaces []string `json:"workspaces"`
+}
+
+type configJSON struct {
+	Machines    []machineJSON   `json:"machines"`
+	Workspaces  []workspaceJSON `json:"workspaces"`
+	Domain      string          `json:"domain,omitempty"`
+	DNSProvider string          `json:"dns_provider,omitempty"`
+}
+
+type workspaceJSON struct {
+	Name    string `json:"name"`
+	Machine string `json:"machine"`
+	User    string `json:"user"`
+}
+
+func asJSON(cfg config.Config) configJSON {
+	out := configJSON{Domain: cfg.Domain, DNSProvider: cfg.DNSProvider}
+
+	for _, m := range cfg.Machines {
+		addresses := make([]string, 0, len(m.Hosts))
+		for _, h := range m.Hosts {
+			addresses = append(addresses, h.Address)
+		}
+		names := []string{}
+		for _, w := range cfg.WorkspacesOn(m.Name) {
+			names = append(names, w.Name)
+		}
+		out.Machines = append(out.Machines, machineJSON{
+			Name: m.Name, Hosts: addresses, AdminUser: m.User,
+			Port: m.Port, Key: m.Key, Workspaces: names,
+		})
+	}
+
+	for _, w := range cfg.Workspaces {
+		machine := w.Machine
+		if machine == "" && len(cfg.Machines) == 1 {
+			machine = cfg.Machines[0].Name
+		}
+		out.Workspaces = append(out.Workspaces, workspaceJSON{
+			Name: w.Name, Machine: machine, User: w.LinuxUser(),
+		})
+	}
+	return out
 }

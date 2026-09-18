@@ -17,6 +17,9 @@ func SetVersion(v string) { version = v }
 type options struct {
 	configDir string
 	format    string
+	// machine names which machine a machine-level command acts on. Empty
+	// means the only configured one; with several it is an error, not a guess.
+	machine string
 }
 
 // Execute runs the CLI and turns an error into an exit code.
@@ -55,6 +58,8 @@ func NewRootCmd() *cobra.Command {
 		"configuration directory (default: $DEVMACHINE_CONFIG, then $XDG_CONFIG_HOME/devmachine, then ~/.config/devmachine)")
 	root.PersistentFlags().StringVar(&opts.format, "format", formatTable,
 		"output format: table or json")
+	root.PersistentFlags().StringVar(&opts.machine, "machine", "",
+		"which machine to act on (default: the only one configured)")
 
 	root.AddCommand(
 		newVersionCmd(),

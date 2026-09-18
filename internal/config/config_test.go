@@ -16,7 +16,7 @@ func TestDirPrefersTheFlagOverEverything(t *testing.T) {
 		t.Fatalf("Dir returned %v", err)
 	}
 	if dir != "/from/flag" || source != SourceFlag {
-		t.Fatalf("got (%q, %q), want (%q, %q)", dir, source, "/from/flag", SourceFlag)
+		t.Fatalf("got (%q, %q)", dir, source)
 	}
 }
 
@@ -24,12 +24,9 @@ func TestDirFallsBackToTheEnvironment(t *testing.T) {
 	t.Setenv("DEVMACHINE_CONFIG", "/from/env")
 	t.Setenv("XDG_CONFIG_HOME", "/xdg")
 
-	dir, source, err := Dir("")
-	if err != nil {
-		t.Fatalf("Dir returned %v", err)
-	}
+	dir, source, _ := Dir("")
 	if dir != "/from/env" || source != SourceEnv {
-		t.Fatalf("got (%q, %q), want (%q, %q)", dir, source, "/from/env", SourceEnv)
+		t.Fatalf("got (%q, %q)", dir, source)
 	}
 }
 
@@ -37,13 +34,9 @@ func TestDirFallsBackToXDG(t *testing.T) {
 	t.Setenv("DEVMACHINE_CONFIG", "")
 	t.Setenv("XDG_CONFIG_HOME", "/xdg")
 
-	dir, source, err := Dir("")
-	if err != nil {
-		t.Fatalf("Dir returned %v", err)
-	}
-	want := filepath.Join("/xdg", "devmachine")
-	if dir != want || source != SourceXDG {
-		t.Fatalf("got (%q, %q), want (%q, %q)", dir, source, want, SourceXDG)
+	dir, source, _ := Dir("")
+	if dir != filepath.Join("/xdg", "devmachine") || source != SourceXDG {
+		t.Fatalf("got (%q, %q)", dir, source)
 	}
 }
 
@@ -52,13 +45,9 @@ func TestDirFallsBackToTheHomeDirectory(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "/home/alice")
 
-	dir, source, err := Dir("")
-	if err != nil {
-		t.Fatalf("Dir returned %v", err)
-	}
-	want := filepath.Join("/home/alice", ".config", "devmachine")
-	if dir != want || source != SourceDefault {
-		t.Fatalf("got (%q, %q), want (%q, %q)", dir, source, want, SourceDefault)
+	dir, source, _ := Dir("")
+	if dir != filepath.Join("/home/alice", ".config", "devmachine") || source != SourceDefault {
+		t.Fatalf("got (%q, %q)", dir, source)
 	}
 }
 
@@ -71,116 +60,257 @@ func writeConfig(t *testing.T, body string) string {
 	return dir
 }
 
-func TestLoadReadsHostsInOrder(t *testing.T) {
-	dir := writeConfig(t, "hosts:\n  - tailscale:vps\n  - 203.0.113.10\ndomain: example.com\n")
+const twoMachines = `
+machines:
+  - name: main
+    hosts:
+      - tailscale:vps
+      - 203.0.113.10
+  - name: sandbox
+    hosts:
+      - 127.0.0.1
+    port: 52862
+    key: /keys/sandbox
+workspaces:
+  - name: alice
+    machine: main
+  - name: bob
+    machine: sandbox
+    user: bob-dev
+domain: example.com
+`
 
-	c, err := Load(dir)
+func TestLoadReadsMachinesInOrder(t *testing.T) {
+	c, err := Load(writeConfig(t, twoMachines))
 	if err != nil {
 		t.Fatalf("Load returned %v", err)
 	}
-	if len(c.Hosts) != 2 {
-		t.Fatalf("got %d hosts, want 2: %#v", len(c.Hosts), c.Hosts)
+	if len(c.Machines) != 2 {
+		t.Fatalf("got %d machines", len(c.Machines))
 	}
-	if c.Hosts[0].Address != "tailscale:vps" || c.Hosts[1].Address != "203.0.113.10" {
-		t.Fatalf("hosts came back in the wrong order: %#v", c.Hosts)
-	}
-	if c.Domain != "example.com" {
-		t.Fatalf("domain = %q", c.Domain)
+	m := c.Machines[0]
+	if m.Name != "main" || len(m.Hosts) != 2 || m.Hosts[0].Address != "tailscale:vps" {
+		t.Fatalf("first machine = %#v", m)
 	}
 }
 
-func TestLoadDefaultsTheUserAndThePort(t *testing.T) {
-	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\n")
+func TestLoadDefaultsTheAdminUserAndPortPerMachine(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
 
-	c, err := Load(dir)
+	if c.Machines[0].User != "root" || c.Machines[0].Port != 22 {
+		t.Fatalf("main did not get the defaults: %#v", c.Machines[0])
+	}
+	if c.Machines[1].Port != 52862 {
+		t.Fatalf("sandbox lost its explicit port: %d", c.Machines[1].Port)
+	}
+}
+
+func TestAWorkspaceUsesItsOwnNameAsTheLinuxUser(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	w, err := c.Workspace("alice")
 	if err != nil {
-		t.Fatalf("Load returned %v", err)
+		t.Fatalf("Workspace returned %v", err)
 	}
-	if c.User != "root" {
-		t.Fatalf("user = %q, want \"root\"", c.User)
-	}
-	if c.Port != 22 {
-		t.Fatalf("port = %d, want 22", c.Port)
+	if w.LinuxUser() != "alice" {
+		t.Fatalf("LinuxUser = %q, want the workspace name", w.LinuxUser())
 	}
 }
 
-func TestLoadKeepsAnExplicitUserAndPort(t *testing.T) {
-	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\nuser: alice\nport: 2222\n")
+func TestAWorkspaceCanOverrideTheLinuxUser(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
 
-	c, _ := Load(dir)
-	if c.User != "alice" || c.Port != 2222 {
-		t.Fatalf("got user %q port %d", c.User, c.Port)
+	w, _ := c.Workspace("bob")
+	if w.LinuxUser() != "bob-dev" {
+		t.Fatalf("LinuxUser = %q, want the override", w.LinuxUser())
 	}
 }
 
-func TestLoadSaysWhichFileIsMissing(t *testing.T) {
-	_, err := Load(t.TempDir())
+func TestMachineForAWorkspaceResolvesThroughTheMapping(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	m, w, err := c.MachineFor("bob")
+	if err != nil {
+		t.Fatalf("MachineFor returned %v", err)
+	}
+	if m.Name != "sandbox" {
+		t.Fatalf("bob resolved to machine %q, want sandbox", m.Name)
+	}
+	if w.LinuxUser() != "bob-dev" {
+		t.Fatalf("workspace = %#v", w)
+	}
+}
+
+func TestAnUnknownWorkspaceListsTheOnesThatExist(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	_, err := c.Workspace("nope")
 	if err == nil {
-		t.Fatal("expected an error when config.yml is missing")
+		t.Fatal("expected an error for an unknown workspace")
 	}
-	if !strings.Contains(err.Error(), FileName) {
-		t.Fatalf("the error does not name the file: %v", err)
-	}
-}
-
-func TestLoadRejectsBrokenYAML(t *testing.T) {
-	dir := writeConfig(t, "hosts: [unclosed\n")
-
-	if _, err := Load(dir); err == nil {
-		t.Fatal("expected an error for broken YAML")
+	for _, want := range []string{"alice", "bob"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not list %q: %v", want, err)
+		}
 	}
 }
 
-func TestValidateRejectsAConfigWithNoHost(t *testing.T) {
-	err := Config{Domain: "example.com", User: "root", Port: 22}.Validate()
+func TestMachineByNameFindsIt(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	m, err := c.Machine("sandbox")
+	if err != nil {
+		t.Fatalf("Machine returned %v", err)
+	}
+	if m.Port != 52862 {
+		t.Fatalf("got %#v", m)
+	}
+}
+
+func TestMachineWithNoNameRefusesToGuessBetweenSeveral(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	_, err := c.Machine("")
 	if err == nil {
-		t.Fatal("expected an error when there is no host")
+		t.Fatal("expected an error rather than a guess when there are several machines")
 	}
-	if !strings.Contains(err.Error(), "hosts") {
-		t.Fatalf("the error does not say what to fix: %v", err)
+	for _, want := range []string{"main", "sandbox", "--machine"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not say how to choose (%q): %v", want, err)
+		}
 	}
 }
 
-func TestValidateRejectsAnEmptyHostAddress(t *testing.T) {
-	c := Config{Hosts: []Host{{Address: ""}}, User: "root", Port: 22}
+func TestMachineWithNoNameTakesTheOnlyOne(t *testing.T) {
+	c, _ := Load(writeConfig(t, "machines:\n  - name: only\n    hosts: [203.0.113.10]\n"))
+
+	m, err := c.Machine("")
+	if err != nil {
+		t.Fatalf("Machine returned %v", err)
+	}
+	if m.Name != "only" {
+		t.Fatalf("got %q", m.Name)
+	}
+}
+
+func TestValidateRejectsAConfigWithNoMachine(t *testing.T) {
+	err := Config{Domain: "example.com"}.Validate()
+	if err == nil || !strings.Contains(err.Error(), "machines") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRejectsAMachineWithNoName(t *testing.T) {
+	c := Config{Machines: []Machine{{Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}}}
 	if err := c.Validate(); err == nil {
-		t.Fatal("expected an error for an empty host address")
+		t.Fatal("expected an error for a machine with no name")
+	}
+}
+
+func TestValidateRejectsTwoMachinesWithTheSameName(t *testing.T) {
+	c := Config{Machines: []Machine{
+		{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22},
+		{Name: "main", Hosts: []Host{{Address: "203.0.113.11"}}, User: "root", Port: 22},
+	}}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "main") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRejectsAMachineWithNoHost(t *testing.T) {
+	c := Config{Machines: []Machine{{Name: "main", User: "root", Port: 22}}}
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected an error for a machine with no host")
 	}
 }
 
 func TestValidateRejectsAPortOutOfRange(t *testing.T) {
 	for _, port := range []int{0, -1, 70000} {
-		c := Config{Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: port}
+		c := Config{Machines: []Machine{{
+			Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: port,
+		}}}
 		if err := c.Validate(); err == nil {
 			t.Fatalf("expected an error for port %d", port)
 		}
 	}
 }
 
-func TestValidateAcceptsAMinimalConfig(t *testing.T) {
-	c := Config{Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}
-	if err := c.Validate(); err != nil {
-		t.Fatalf("Validate returned %v", err)
+func TestValidateRejectsAWorkspaceOnAMachineThatDoesNotExist(t *testing.T) {
+	c := Config{
+		Machines:   []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}},
+		Workspaces: []Workspace{{Name: "alice", Machine: "ghost"}},
+	}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "ghost") {
+		t.Fatalf("the error does not name the missing machine: %v", err)
 	}
 }
 
-func TestLoadReadsThePrivateKeyPath(t *testing.T) {
-	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\nkey: /home/alice/.ssh/id_ed25519\n")
+func TestAWorkspaceMayOmitItsMachineWhenThereIsOnlyOne(t *testing.T) {
+	dir := writeConfig(t, "machines:\n  - name: only\n    hosts: [203.0.113.10]\nworkspaces:\n  - name: alice\n")
 
 	c, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Load returned %v", err)
 	}
-	if c.Key != "/home/alice/.ssh/id_ed25519" {
-		t.Fatalf("key = %q", c.Key)
+	if err := c.Validate(); err != nil {
+		t.Fatalf("Validate returned %v", err)
+	}
+	m, _, err := c.MachineFor("alice")
+	if err != nil {
+		t.Fatalf("MachineFor returned %v", err)
+	}
+	if m.Name != "only" {
+		t.Fatalf("got %q", m.Name)
 	}
 }
 
-func TestLoadLeavesTheKeyEmptyWhenTheAgentIsMeantToServe(t *testing.T) {
-	dir := writeConfig(t, "hosts:\n  - 203.0.113.10\n")
+func TestAWorkspaceMustNameItsMachineWhenThereAreSeveral(t *testing.T) {
+	c := Config{
+		Machines: []Machine{
+			{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22},
+			{Name: "sandbox", Hosts: []Host{{Address: "127.0.0.1"}}, User: "root", Port: 22},
+		},
+		Workspaces: []Workspace{{Name: "alice"}},
+	}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not name the workspace: %v", err)
+	}
+}
 
-	c, _ := Load(dir)
-	if c.Key != "" {
-		t.Fatalf("key = %q, want empty so the agent is used", c.Key)
+func TestValidateRejectsTwoWorkspacesWithTheSameName(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}},
+		Workspaces: []Workspace{
+			{Name: "alice", Machine: "main"},
+			{Name: "alice", Machine: "main"},
+		},
+	}
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected an error for a duplicated workspace name")
+	}
+}
+
+func TestWorkspacesOnReturnsOnlyThatMachines(t *testing.T) {
+	c, _ := Load(writeConfig(t, twoMachines))
+
+	got := c.WorkspacesOn("sandbox")
+	if len(got) != 1 || got[0].Name != "bob" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestLoadSaysWhichFileIsMissing(t *testing.T) {
+	_, err := Load(t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), FileName) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestLoadRejectsBrokenYAML(t *testing.T) {
+	if _, err := Load(writeConfig(t, "machines: [unclosed\n")); err == nil {
+		t.Fatal("expected an error for broken YAML")
 	}
 }

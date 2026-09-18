@@ -52,13 +52,13 @@ type Client interface {
 // An address that cannot be resolved is dropped rather than fatal: the entries
 // after it are the fallbacks it exists for. Only an empty result is an error,
 // and it says what was dropped.
-func Resolve(c config.Config) ([]string, error) {
+func Resolve(m config.Machine) ([]string, error) {
 	var (
 		out     []string
 		dropped []string
 	)
 
-	for _, h := range c.Hosts {
+	for _, h := range m.Hosts {
 		name, isTailscale := strings.CutPrefix(h.Address, tailscalePrefix)
 		if !isTailscale {
 			out = append(out, h.Address)
@@ -80,7 +80,7 @@ func Resolve(c config.Config) ([]string, error) {
 		if len(dropped) > 0 {
 			return nil, fmt.Errorf("no address left to try: %s", strings.Join(dropped, "; "))
 		}
-		return nil, fmt.Errorf("no host configured")
+		return nil, fmt.Errorf("machine %q has no address", m.Name)
 	}
 	return out, nil
 }
@@ -119,20 +119,26 @@ type peer struct {
 	TailscaleIPs []string `json:"TailscaleIPs"`
 }
 
-// Dial tries each resolved address in order and returns the first client that
-// answered, along with the address it answered on.
-func Dial(ctx context.Context, c config.Config) (Client, string, error) {
-	addresses, err := Resolve(c)
+// Dial tries each of a machine's addresses in order and returns the first
+// client that answered, along with the address it answered on.
+//
+// user is who to log in as. Empty means the machine's administrative login;
+// a workspace passes its own Linux account instead.
+func Dial(ctx context.Context, m config.Machine, user string) (Client, string, error) {
+	addresses, err := Resolve(m)
 	if err != nil {
 		return nil, "", err
 	}
-	auth, err := authMethods(c)
+	auth, err := authMethods(m)
 	if err != nil {
 		return nil, "", err
+	}
+	if user == "" {
+		user = m.User
 	}
 
 	cfg := &ssh.ClientConfig{
-		User: c.User,
+		User: user,
 		Auth: auth,
 		// The CLI reaches a machine the operator already owns, over a path
 		// they chose. Pinning a host key would need a store the CLI does not
@@ -142,17 +148,37 @@ func Dial(ctx context.Context, c config.Config) (Client, string, error) {
 		Timeout:         dialTimeout,
 	}
 
-	var failures []string
+	var (
+		failures []string
+		authErr  error
+	)
 	for _, address := range addresses {
-		target := net.JoinHostPort(address, fmt.Sprint(c.Port))
+		target := net.JoinHostPort(address, fmt.Sprint(m.Port))
 		conn, err := dialContext(ctx, target, cfg)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%v)", address, err))
-			continue
+		if err == nil {
+			return &sshClient{conn: conn}, address, nil
 		}
-		return &sshClient{conn: conn}, address, nil
+		// A machine that answers and then refuses the login is a different
+		// problem from one that never answered, and the fix is different too.
+		// Reporting both as "nothing answered" sends people to check the
+		// network when the account or the key is what is wrong.
+		if isAuthFailure(err) && authErr == nil {
+			authErr = fmt.Errorf("machine %q answered on %s but refused the login for %q: %w",
+				m.Name, address, user, err)
+		}
+		failures = append(failures, fmt.Sprintf("%s (%v)", address, err))
 	}
-	return nil, "", fmt.Errorf("no address answered: %s", strings.Join(failures, "; "))
+	if authErr != nil {
+		return nil, "", authErr
+	}
+	return nil, "", fmt.Errorf("machine %q: no address answered: %s", m.Name, strings.Join(failures, "; "))
+}
+
+// isAuthFailure reports whether the connection was made and the login was
+// then refused.
+func isAuthFailure(err error) bool {
+	return strings.Contains(err.Error(), "unable to authenticate") ||
+		strings.Contains(err.Error(), "no supported methods remain")
 }
 
 func dialContext(ctx context.Context, target string, cfg *ssh.ClientConfig) (*ssh.Client, error) {
@@ -171,15 +197,15 @@ func dialContext(ctx context.Context, target string, cfg *ssh.ClientConfig) (*ss
 
 // authMethods offers the key from the configuration when there is one, and the
 // agent otherwise. Never both: offering everything is what trips MaxAuthTries.
-func authMethods(c config.Config) ([]ssh.AuthMethod, error) {
-	if c.Key != "" {
-		body, err := os.ReadFile(c.Key)
+func authMethods(m config.Machine) ([]ssh.AuthMethod, error) {
+	if m.Key != "" {
+		body, err := os.ReadFile(m.Key)
 		if err != nil {
-			return nil, fmt.Errorf("reading the private key %s: %w", c.Key, err)
+			return nil, fmt.Errorf("reading the private key %s: %w", m.Key, err)
 		}
 		signer, err := ssh.ParsePrivateKey(body)
 		if err != nil {
-			return nil, fmt.Errorf("parsing the private key %s: %w", c.Key, err)
+			return nil, fmt.Errorf("parsing the private key %s: %w", m.Key, err)
 		}
 		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
 	}

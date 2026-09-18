@@ -103,7 +103,7 @@ func writeConfigDir(t *testing.T, body string) string {
 }
 
 func TestConfigShowPrintsTheEffectiveValues(t *testing.T) {
-	dir := writeConfigDir(t, "hosts:\n  - 203.0.113.10\ndomain: example.com\n")
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\ndomain: example.com\n")
 
 	out, err := execute(t, "--config", dir, "config", "show")
 	if err != nil {
@@ -117,25 +117,25 @@ func TestConfigShowPrintsTheEffectiveValues(t *testing.T) {
 }
 
 func TestConfigShowAsJSONCarriesEveryHost(t *testing.T) {
-	dir := writeConfigDir(t, "hosts:\n  - tailscale:vps\n  - 203.0.113.10\n")
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [tailscale:vps, 203.0.113.10]\n")
 
 	out, err := execute(t, "--config", dir, "--format", "json", "config", "show")
 	if err != nil {
 		t.Fatalf("config show returned %v", err)
 	}
-	var got struct {
-		Hosts []string `json:"hosts"`
-		User  string   `json:"user"`
-		Port  int      `json:"port"`
-	}
+	var got configJSON
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("output was not JSON: %v (%q)", err, out)
 	}
-	if len(got.Hosts) != 2 || got.Hosts[0] != "tailscale:vps" {
-		t.Fatalf("hosts = %#v", got.Hosts)
+	if len(got.Machines) != 1 {
+		t.Fatalf("machines = %#v", got.Machines)
 	}
-	if got.User != "root" || got.Port != 22 {
-		t.Fatalf("defaults were not applied: %#v", got)
+	m := got.Machines[0]
+	if len(m.Hosts) != 2 || m.Hosts[0] != "tailscale:vps" {
+		t.Fatalf("hosts = %#v", m.Hosts)
+	}
+	if m.AdminUser != "root" || m.Port != 22 {
+		t.Fatalf("defaults were not applied: %#v", m)
 	}
 }
 
@@ -150,9 +150,9 @@ func TestConfigShowReportsAnInvalidConfig(t *testing.T) {
 
 	_, err := execute(t, "--config", dir, "config", "show")
 	if err == nil {
-		t.Fatal("expected an error when there is no host")
+		t.Fatal("expected an error when there is no machine")
 	}
-	if !strings.Contains(err.Error(), "hosts") {
+	if !strings.Contains(err.Error(), "machines") {
 		t.Fatalf("the error does not say what to fix: %v", err)
 	}
 }

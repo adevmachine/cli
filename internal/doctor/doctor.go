@@ -49,13 +49,16 @@ type Check struct {
 	Detail string `json:"detail,omitempty"`
 }
 
-// Dialer opens a connection to the machine. It is a parameter so the tests do
+// Dialer opens a connection to a machine. It is a parameter so the tests do
 // not need one.
-type Dialer func(context.Context, config.Config) (remote.Client, string, error)
+type Dialer func(context.Context, config.Machine, string) (remote.Client, string, error)
 
-// Run performs every check and returns them in order. It never returns an
+// Run checks one machine and returns the results in order. It never returns an
 // error: a failed check is the result, not an exception.
-func Run(ctx context.Context, dir string, dial Dialer) []Check {
+//
+// machine names which one to check. Empty means the only configured machine,
+// and with several it is an error rather than a guess.
+func Run(ctx context.Context, dir, machine string, dial Dialer) []Check {
 	cfg, err := loadAndValidate(dir)
 	if err != nil {
 		return append(
@@ -63,14 +66,22 @@ func Run(ctx context.Context, dir string, dial Dialer) []Check {
 			skipRest("the configuration is not usable")...,
 		)
 	}
+	m, err := cfg.Machine(machine)
+	if err != nil {
+		return append(
+			[]Check{{Name: CheckConfiguration, Status: StatusFail, Detail: err.Error()}},
+			skipRest("there is no machine to check")...,
+		)
+	}
 
 	checks := []Check{{
 		Name:   CheckConfiguration,
 		Status: StatusPass,
-		Detail: fmt.Sprintf("%d host(s), user %s, port %d", len(cfg.Hosts), cfg.User, cfg.Port),
+		Detail: fmt.Sprintf("machine %q, %d address(es), admin %s, port %d, %d workspace(s)",
+			m.Name, len(m.Hosts), m.User, m.Port, len(cfg.WorkspacesOn(m.Name))),
 	}}
 
-	client, address, err := dial(ctx, cfg)
+	client, address, err := dial(ctx, m, "")
 	if err != nil {
 		checks = append(checks, Check{Name: CheckConnection, Status: StatusFail, Detail: err.Error()})
 		return append(checks, skipRest("the machine is unreachable")...)

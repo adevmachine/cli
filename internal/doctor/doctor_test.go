@@ -51,12 +51,12 @@ func find(t *testing.T, checks []Check, name string) Check {
 
 func TestAMissingConfigFailsAndSkipsTheRest(t *testing.T) {
 	dialled := false
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		dialled = true
 		return nil, "", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, ""), dial)
+	checks := Run(context.Background(), configDir(t, ""), "", dial)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusFail {
 		t.Fatalf("configuration = %q, want fail", got.Status)
@@ -71,12 +71,12 @@ func TestAMissingConfigFailsAndSkipsTheRest(t *testing.T) {
 
 func TestAConfigWithNoHostFailsBeforeDialling(t *testing.T) {
 	dialled := false
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		dialled = true
 		return nil, "", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "domain: example.com\n"), dial)
+	checks := Run(context.Background(), configDir(t, "domain: example.com\n"), "", dial)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusFail {
 		t.Fatalf("configuration = %q, want fail", got.Status)
@@ -87,11 +87,11 @@ func TestAConfigWithNoHostFailsBeforeDialling(t *testing.T) {
 }
 
 func TestAnUnreachableMachineSkipsTheRemoteChecks(t *testing.T) {
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return nil, "", errors.New("connection refused")
 	}
 
-	checks := Run(context.Background(), configDir(t, "hosts:\n  - 203.0.113.10\n"), dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusPass {
 		t.Fatalf("configuration = %q, want pass", got.Status)
@@ -113,11 +113,11 @@ func TestASupportedOperatingSystemPasses(t *testing.T) {
 		osReleaseCommand: "ID=ubuntu\nID_LIKE=debian\n",
 		ansibleCommand:   "/usr/bin/ansible-playbook\n",
 	}}
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "hosts:\n  - 203.0.113.10\n"), dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
 
 	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass {
 		t.Fatalf("operating system = %q (%s), want pass", got.Status, got.Detail)
@@ -132,11 +132,11 @@ func TestAnUnsupportedOperatingSystemFailsAndSaysWhichItIs(t *testing.T) {
 		osReleaseCommand: "ID=alpine\n",
 		ansibleCommand:   "/usr/bin/ansible-playbook\n",
 	}}
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "hosts:\n  - 203.0.113.10\n"), dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
 
 	got := find(t, checks, CheckOperatingSystem)
 	if got.Status != StatusFail {
@@ -152,11 +152,11 @@ func TestAMissingAnsibleFailsOnItsOwn(t *testing.T) {
 		out: map[string]string{osReleaseCommand: "ID=ubuntu\n"},
 		err: map[string]error{ansibleCommand: errors.New("exit status 1")},
 	}
-	dial := func(context.Context, config.Config) (remote.Client, string, error) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "hosts:\n  - 203.0.113.10\n"), dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
 
 	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass {
 		t.Fatalf("a missing ansible should not fail the OS check: %q", got.Status)
@@ -186,7 +186,7 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	body := "hosts:\n  - " + host + "\nport: " + port + "\nuser: root\nkey: " + key + "\n"
+	body := "machines:\n  - name: sandbox\n    hosts: [" + host + "]\n    port: " + port + "\n    user: root\n    key: " + key + "\n"
 	if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 		t.Fatalf("DEVMACHINE_TEST_PORT is not a number: %v", err)
 	}
 
-	checks := Run(context.Background(), dir, remote.Dial)
+	checks := Run(context.Background(), dir, "", remote.Dial)
 
 	if got := find(t, checks, CheckConnection); got.Status != StatusPass {
 		t.Fatalf("connection = %q (%s), want pass", got.Status, got.Detail)
@@ -206,5 +206,63 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 	// the point of the check, so this asserts the failure rather than hiding it.
 	if got := find(t, checks, CheckAnsible); got.Status != StatusFail {
 		t.Fatalf("ansible = %q, want fail on a machine that has none", got.Status)
+	}
+}
+
+func TestRunRefusesToGuessBetweenSeveralMachines(t *testing.T) {
+	dialled := false
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		dialled = true
+		return nil, "", nil
+	}
+	body := "machines:\n" +
+		"  - name: main\n    hosts: [203.0.113.10]\n" +
+		"  - name: sandbox\n    hosts: [203.0.113.11]\n"
+
+	checks := Run(context.Background(), configDir(t, body), "", dial)
+
+	got := find(t, checks, CheckConfiguration)
+	if got.Status != StatusFail {
+		t.Fatalf("configuration = %q, want fail", got.Status)
+	}
+	if !strings.Contains(got.Detail, "--machine") {
+		t.Fatalf("the detail does not say how to choose: %q", got.Detail)
+	}
+	if dialled {
+		t.Fatal("it connected to a machine nobody named")
+	}
+}
+
+func TestRunChecksTheMachineItWasGiven(t *testing.T) {
+	var got config.Machine
+	dial := func(_ context.Context, m config.Machine, _ string) (remote.Client, string, error) {
+		got = m
+		return fakeClient{out: map[string]string{
+			osReleaseCommand: "ID=ubuntu\n",
+			ansibleCommand:   "/usr/bin/ansible-playbook\n",
+		}}, m.Hosts[0].Address, nil
+	}
+	body := "machines:\n" +
+		"  - name: main\n    hosts: [203.0.113.10]\n" +
+		"  - name: sandbox\n    hosts: [203.0.113.11]\n"
+
+	Run(context.Background(), configDir(t, body), "sandbox", dial)
+
+	if got.Name != "sandbox" {
+		t.Fatalf("it checked machine %q, want sandbox", got.Name)
+	}
+}
+
+func TestTheConfigurationCheckCountsTheWorkspaces(t *testing.T) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("unreachable")
+	}
+	body := "machines:\n  - name: main\n    hosts: [203.0.113.10]\n" +
+		"workspaces:\n  - name: alice\n  - name: bob\n"
+
+	checks := Run(context.Background(), configDir(t, body), "", dial)
+
+	if got := find(t, checks, CheckConfiguration); !strings.Contains(got.Detail, "2 workspace") {
+		t.Fatalf("the detail does not count the workspaces: %q", got.Detail)
 	}
 }
