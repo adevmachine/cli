@@ -10,7 +10,10 @@ devmachine machines
 devmachine machines list
 devmachine mosh
 devmachine packages
+devmachine packages add
+devmachine packages list
 devmachine packages new
+devmachine packages rm
 devmachine packages schema
 devmachine packages validate
 devmachine run

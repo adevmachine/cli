@@ -111,10 +111,26 @@ shell history. `list` prints names only.
 ## packages
 
 ```
+devmachine packages list
+devmachine packages add <name> [--machine m | --workspace w] [--check] [--yes]
+devmachine packages rm  <name> [--machine m | --workspace w] [--check] [--yes]
 devmachine packages new <name> [--scope machine|workspace] [--into <dir>]
 devmachine packages validate <dir>
 devmachine packages schema [--json]
 ```
+
+`list` reads the recipes and the configuration together, so a package appears
+once with every machine and workspace that asks for it. A name a target asks
+for and nothing provides is listed as `missing`, rather than left out for
+`sync` to find.
+
+`add` and `rm` edit `config.yml` and touch no machine — `devmachine sync`
+applies the change. Pass one of `--machine` or `--workspace`; with neither, and
+one configured machine, that machine is the target. Adding a package a target
+already has changes nothing and says so.
+
+Comments in `config.yml` survive: only the package lists and the pin are
+rewritten, everything else is left as you wrote it.
 
 `new` writes a package that already passes `validate` and already installs
 something. It refuses to write over one that is there.

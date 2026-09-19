@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/packages"
 )
 
@@ -137,5 +138,239 @@ func TestPackagesSchemaAsATablePrintsTheFormatAndTheFields(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("the table leaves out %q: %s", want, out)
 		}
+	}
+}
+
+func configWithMachineAndWorkspace(t *testing.T) string {
+	t.Helper()
+	return configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nworkspaces:\n  - name: alice\n")
+}
+
+// writeLocalPackage puts a package in the operator's own directory, which is
+// where a configuration with no release pin finds everything it has.
+func writeLocalPackage(t *testing.T, configDir, name, scope string) {
+	t.Helper()
+	if err := packages.WriteSkeleton(filepath.Join(packages.LocalDir(configDir), name), name, scope); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func configWithPackagesInstalled(t *testing.T) string {
+	t.Helper()
+	dir := configWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [docker]
+workspaces:
+  - name: alice
+    packages: [claude-code]
+`)
+	writeLocalPackage(t, dir, "docker", packages.ScopeMachine)
+	writeLocalPackage(t, dir, "claude-code", packages.ScopeWorkspace)
+	writeLocalPackage(t, dir, "caddy", packages.ScopeMachine)
+	return dir
+}
+
+func TestPackagesAddPutsItOnTheNamedWorkspace(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	if _, err := execute(t, "--config", dir, "packages", "add", "claude-code", "--workspace", "alice", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Workspaces[0].Packages) != 1 || cfg.Workspaces[0].Packages[0] != "claude-code" {
+		t.Fatalf("got %#v", cfg.Workspaces[0].Packages)
+	}
+	if len(cfg.Machines[0].Packages) != 0 {
+		t.Fatalf("it also touched the machine: %#v", cfg.Machines[0].Packages)
+	}
+}
+
+func TestPackagesAddRefusesTwoTargets(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	_, err := execute(t, "--config", dir, "packages", "add", "docker", "--workspace", "alice", "--machine", "main", "--yes")
+	if err == nil {
+		t.Fatal("two targets were accepted")
+	}
+	if !strings.Contains(err.Error(), "--workspace") || !strings.Contains(err.Error(), "--machine") {
+		t.Fatalf("the error does not say what to choose between: %v", err)
+	}
+}
+
+func TestPackagesAddDefaultsToTheOnlyMachine(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	if _, err := execute(t, "--config", dir, "packages", "add", "docker", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	if len(cfg.Machines[0].Packages) != 1 || cfg.Machines[0].Packages[0] != "docker" {
+		t.Fatalf("got %#v", cfg.Machines[0].Packages)
+	}
+}
+
+func TestPackagesAddSaysNothingChangedWhenItIsAlreadyThere(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	if _, err := execute(t, "--config", dir, "packages", "add", "docker", "--machine", "main", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := execute(t, "--config", dir, "packages", "add", "docker", "--machine", "main", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "already") {
+		t.Fatalf("got %q", out)
+	}
+
+	cfg, _ := config.Load(dir)
+	if len(cfg.Machines[0].Packages) != 1 {
+		t.Fatalf("it was added twice: %#v", cfg.Machines[0].Packages)
+	}
+}
+
+func TestPackagesAddWithCheckChangesNothing(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	if _, err := execute(t, "--config", dir, "packages", "add", "docker", "--machine", "main", "--check"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	if len(cfg.Machines[0].Packages) != 0 {
+		t.Fatalf("a dry run wrote to the configuration: %#v", cfg.Machines[0].Packages)
+	}
+}
+
+func TestPackagesAddKeepsTheCommentsAroundIt(t *testing.T) {
+	dir := configWith(t, "# The main server.\nmachines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if _, err := execute(t, "--config", dir, "packages", "add", "docker", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, config.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# The main server.") {
+		t.Fatalf("the comment was lost:\n%s", body)
+	}
+}
+
+func TestPackagesRmTakesItOffTheTarget(t *testing.T) {
+	dir := configWithPackagesInstalled(t)
+
+	if _, err := execute(t, "--config", dir, "packages", "rm", "claude-code", "--workspace", "alice", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	if len(cfg.Workspaces[0].Packages) != 0 {
+		t.Fatalf("got %#v", cfg.Workspaces[0].Packages)
+	}
+}
+
+func TestPackagesRmSaysWhenItWasNotThere(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	out, err := execute(t, "--config", dir, "packages", "rm", "docker", "--machine", "main", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "not") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestPackagesAddNamesTheWorkspacesThatExist(t *testing.T) {
+	dir := configWithMachineAndWorkspace(t)
+
+	_, err := execute(t, "--config", dir, "packages", "add", "docker", "--workspace", "carol", "--yes")
+	if err == nil {
+		t.Fatal("an unknown workspace was accepted")
+	}
+	if !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not list the ones that exist: %v", err)
+	}
+}
+
+func TestPackagesListShowsWhereEachOneIsInstalled(t *testing.T) {
+	dir := configWithPackagesInstalled(t)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []struct {
+			Name      string   `json:"name"`
+			Scope     string   `json:"scope"`
+			Source    string   `json:"source"`
+			Installed []string `json:"installed_on"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	if len(got.Packages) != 3 {
+		t.Fatalf("got %#v", got.Packages)
+	}
+
+	where := map[string][]string{}
+	for _, p := range got.Packages {
+		where[p.Name] = p.Installed
+	}
+	if len(where["docker"]) != 1 || where["docker"][0] != "machine main" {
+		t.Fatalf("docker is installed on %#v", where["docker"])
+	}
+	if len(where["claude-code"]) != 1 || where["claude-code"][0] != "workspace alice" {
+		t.Fatalf("claude-code is installed on %#v", where["claude-code"])
+	}
+	if len(where["caddy"]) != 0 {
+		t.Fatalf("caddy is on nothing, and the list says %#v", where["caddy"])
+	}
+}
+
+func TestPackagesListAsATableNamesEachPackageOnce(t *testing.T) {
+	dir := configWithPackagesInstalled(t)
+
+	out, err := execute(t, "--config", dir, "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := 0
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "claude-code") {
+			rows++
+		}
+	}
+	if rows != 1 {
+		t.Fatalf("claude-code is on %d rows:\n%s", rows, out)
+	}
+	for _, want := range []string{"docker", "machine main", "workspace alice", "local"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the table leaves out %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestPackagesListMarksAConfiguredPackageThatDoesNotExist(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [ghost]\n")
+
+	out, err := execute(t, "--config", dir, "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Dropping it silently would leave `sync` to be the thing that finds out.
+	if !strings.Contains(out, "ghost") || !strings.Contains(out, "missing") {
+		t.Fatalf("a configured package nothing provides is not reported:\n%s", out)
 	}
 }
