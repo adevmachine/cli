@@ -29,6 +29,8 @@ when something behaves in a way that surprises you.
   instead of guessing which machine it runs against.
 - [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — what
   fetching every recipe buys, and the one thing it costs.
+- [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
+  never logged into becomes one the CLI owns, and why the order matters.
 
 ## Reference
 

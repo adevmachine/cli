@@ -17,16 +17,60 @@ git clone https://github.com/adevmachine/cli.git
 cd cli && make build && ./devmachine help
 ```
 
-## Point it at a machine
+## Get a machine
+
+Either buy a server — any provider, any distribution the CLI supports — or make
+one on this computer:
+
+```
+devmachine machines create-local dev
+```
+
+That needs [Lima](https://lima-vm.io) (`brew install lima`), which rules out
+Windows, and the machine it makes is not reachable from the internet, so DNS,
+TLS and public hostnames do not work on it. Everything else does.
+
+It leaves the machine **exactly as a bought server arrives**: root reachable
+over SSH with a password and no key. That is deliberate — it is the same
+starting point `setup` is built for, so the path you take is the path the tests
+take.
+
+## Take it over
 
 ```
 devmachine setup
 ```
 
-It asks for a name, an address, the administrative login and a port, then writes
-`config.yml`. It does not touch the machine: no key is installed, nothing is
-configured, nothing is hardened. Setting a machine up from scratch comes in a
-later version.
+This is the only step that needs anything by hand, and it needs it once.
+
+It asks where the machine is, who the administrative account is, and which key
+to use — a new one, a file you already have, or one your SSH agent is holding.
+Then it works out the rest:
+
+- If the key already works, it says so and moves on.
+- If it does not, it asks for the root password, installs the key, and **proves
+  it on a fresh connection** before trusting it.
+- Only once the key is proved does it turn password authentication off.
+- Finally it installs Ansible, which is the last thing done by hand.
+
+If the proof fails it stops and leaves password login on, so you can still get
+in. [The trust bootstrap](how-it-works/trust-bootstrap.md) explains why each of
+those steps is where it is.
+
+The password is used once and never stored.
+
+## Build the machine
+
+```
+devmachine doctor      # four checks: configuration, connection, OS, Ansible
+devmachine sync        # fetch the recipes, send them, converge
+```
+
+`sync` prints what it would do and asks before doing it. `--check` is a dry run
+and `--yes` skips the question.
+
+A second `sync` changes nothing. That is the point of it: it describes a state
+rather than a series of steps.
 
 ## Check that it works
 
