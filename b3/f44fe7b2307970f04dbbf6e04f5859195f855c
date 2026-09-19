@@ -1,0 +1,29 @@
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_2c7037f3b17d02 46-54
+internal/commands/setup.go
+  s_cab674f14f5e3f::t_6b9074cdda8354 25-30,47,275-280,282-285
+internal/commands/setup_test.go
+  s_cab674f14f5e3f::t_9402c08b570afa 52,84-87,506-548
+internal/doctor/doctor.go
+  s_cab674f14f5e3f::t_4da7cf0cdf2f94 34-36,140
+internal/remote/bootstrap.go
+  s_cab674f14f5e3f::t_7f0dd8c7fe7d27 6,159-232
+internal/remote/bootstrap_test.go
+  s_cab674f14f5e3f::t_1946f849ee52e2 331-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b3f44fe7b2307970f04dbbf6e04f5859195f855c",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
