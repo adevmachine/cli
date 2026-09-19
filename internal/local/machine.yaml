@@ -1,0 +1,45 @@
+# A machine on this computer, created by `devmachine machines create-local`.
+#
+# It reproduces a freshly bought server: root reachable over SSH with a
+# password and no key installed. That is the hardest bootstrap path and the one
+# a stranger hits, so it is the one the CLI is used and tested against.
+#
+# The root password is public on purpose. This VM sits behind the host's NAT,
+# holds no data, and exists to be destroyed and recreated.
+
+os: Linux
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+
+cpus: 2
+memory: "4GiB"
+disk: "20GiB"
+
+# No `vmType` and no `networks`: Lima picks what this computer can run, and
+# the SSH port it forwards is the whole address the CLI needs. Naming a
+# hypervisor here would tie a local machine to one operating system.
+
+# No shared folders. A real server has none, and a mount would let a test pass
+# for the wrong reason.
+mounts: []
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux
+      echo "root:devmachine" | chpasswd
+      # The cloud image ships 60-cloudimg-settings.conf with
+      # PasswordAuthentication no. In sshd_config the FIRST value of a key
+      # wins, so this file must sort before it — a 99- prefix silently does
+      # nothing.
+      printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' \
+        > /etc/ssh/sshd_config.d/01-devmachine-local.conf
+      # A fresh server has no key installed for root. Lima keeps its own access
+      # through the unprivileged user, which is untouched.
+      rm -f /root/.ssh/authorized_keys
+      systemctl restart ssh
