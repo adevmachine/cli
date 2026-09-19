@@ -22,11 +22,12 @@ import (
 // The bootstrap's steps, as seams, so every branch of the flow can be driven
 // without a machine to reach.
 var (
-	dialWith   = remote.DialWith
-	installKey = remote.InstallKey
-	proveAuth  = remote.ProveAuth
-	harden     = remote.Harden
-	agentKeys  = keys.FromAgent
+	dialWith       = remote.DialWith
+	installKey     = remote.InstallKey
+	proveAuth      = remote.ProveAuth
+	harden         = remote.Harden
+	installAnsible = remote.InstallAnsible
+	agentKeys      = keys.FromAgent
 )
 
 // setupOptions are the flags the flow reads.
@@ -43,7 +44,7 @@ func newSetupCmd(opts *options) *cobra.Command {
 		Short: "Take over a machine: write the configuration and get in by key",
 		Long: "Asks where the machine is and how to log in to it, then makes it " +
 			"the CLI's own: it installs a key, proves the key on a connection of " +
-			"its own, and only then turns password login off.\n\n" +
+			"its own, turns password login off, and installs Ansible.\n\n" +
 			"It never asks which situation you are in. A key that already works " +
 			"is found by trying it, and the root password is asked for only when " +
 			"that fails — many servers arrive with a key already pasted in, and " +
@@ -271,14 +272,17 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 
 	if noHarden {
 		fmt.Fprintf(out, "--no-harden: password login is left as it was.\n")
-		return nil
+	} else {
+		fmt.Fprintf(out, "turning password login off...\n")
+		if err := harden(ctx, client); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "password login is off; the key is the only way in.\n")
 	}
-	fmt.Fprintf(out, "turning password login off...\n")
-	if err := harden(ctx, client); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "password login is off; the key is the only way in.\n")
-	return nil
+
+	// The last thing done by hand. From here on everything is a play.
+	fmt.Fprintf(out, "installing Ansible...\n")
+	return installAnsible(ctx, client, out)
 }
 
 // installWithPassword is the branch for a machine as it was bought: a root

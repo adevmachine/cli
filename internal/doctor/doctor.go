@@ -31,7 +31,9 @@ const (
 // The commands the remote checks run. They are constants so a test can answer
 // them without guessing at the wording.
 const (
-	osReleaseCommand = "cat /etc/os-release"
+	// One reader for /etc/os-release, because a second one drifts from the
+	// first. remote owns it: that is where it is acted on.
+	osReleaseCommand = remote.OSReleaseCommand
 	ansibleCommand   = "command -v ansible-playbook"
 )
 
@@ -135,7 +137,7 @@ func remoteChecks(ctx context.Context, client remote.Client) []Check {
 	case err != nil:
 		out = append(out, Check{Name: CheckOperatingSystem, Status: StatusFail, Detail: err.Error()})
 	default:
-		id := osReleaseID(release)
+		id := remote.OSReleaseID(release)
 		if supportedIDs[id] {
 			out = append(out, Check{Name: CheckOperatingSystem, Status: StatusPass, Detail: id})
 		} else {
@@ -158,20 +160,6 @@ func remoteChecks(ctx context.Context, client remote.Client) []Check {
 		out = append(out, Check{Name: CheckAnsible, Status: StatusPass, Detail: strings.TrimSpace(path)})
 	}
 	return out
-}
-
-// osReleaseID reads ID from an os-release file. ID_LIKE is deliberately not
-// used as a fallback: claiming support because a distribution says it is "like"
-// debian is how a run gets most of the way and then breaks.
-func osReleaseID(body string) string {
-	for _, line := range strings.Split(body, "\n") {
-		value, ok := strings.CutPrefix(strings.TrimSpace(line), "ID=")
-		if !ok {
-			continue
-		}
-		return strings.Trim(strings.TrimSpace(value), `"`)
-	}
-	return "unknown"
 }
 
 // OK reports whether every check passed or was skipped.

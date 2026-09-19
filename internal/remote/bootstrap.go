@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
@@ -152,6 +153,80 @@ func Harden(ctx context.Context, c Client) error {
 
 	if _, err := c.Run(ctx, reloadScript); err != nil {
 		return fmt.Errorf("reloading sshd: %w", err)
+	}
+	return nil
+}
+
+// OSReleaseCommand reads the file that says which distribution a machine is.
+const OSReleaseCommand = "cat /etc/os-release"
+
+// OSReleaseID reads ID from an os-release file. ID_LIKE is deliberately not
+// consulted: "like debian" is a family, not a promise that a package of the
+// same name exists.
+func OSReleaseID(body string) string {
+	for _, line := range strings.Split(body, "\n") {
+		value, ok := strings.CutPrefix(strings.TrimSpace(line), "ID=")
+		if !ok {
+			continue
+		}
+		return strings.Trim(strings.TrimSpace(value), `"`)
+	}
+	return "unknown"
+}
+
+// aptInstallAnsible installs Ansible on a Debian or an Ubuntu.
+//
+// It installs `ansible`, not `ansible-core`: the core package carries no
+// community.general, the firewall package needs that collection, and the
+// failure only shows up much later, inside a play. This was found on a real
+// machine, not reasoned about.
+const aptInstallAnsible = `set -eu
+if command -v ansible-playbook >/dev/null 2>&1; then
+	echo "ansible is already installed"
+	exit 0
+fi
+export DEBIAN_FRONTEND=noninteractive
+# A cloud image that booted a minute ago is usually still running
+# unattended-upgrades, which holds the dpkg lock. Without the timeout a first
+# run loses that race and fails for a reason nobody can see.
+apt-get -o DPkg::Lock::Timeout=300 update
+apt-get -o DPkg::Lock::Timeout=300 install -y ansible
+`
+
+// ansibleInstall maps a distribution to the way Ansible is installed on it.
+//
+// It holds what has been run on a real machine and nothing else. A table with
+// four entries nobody has tried gets somebody halfway through a first run and
+// then leaves them there; an honest refusal that names their distribution at
+// least tells them what to do next.
+var ansibleInstall = map[string]string{
+	"debian": aptInstallAnsible,
+	"ubuntu": aptInstallAnsible,
+}
+
+// InstallAnsible puts Ansible on the machine.
+//
+// It is the last thing done by hand. Everything after it is a play, which is
+// why this is the whole imperative surface and not the start of one.
+//
+// The output goes to out as it arrives: installing Ansible is minutes of work,
+// and minutes of silence look like a machine that has stopped answering.
+func InstallAnsible(ctx context.Context, c Client, out io.Writer) error {
+	release, err := c.Run(ctx, OSReleaseCommand)
+	if err != nil {
+		return fmt.Errorf("reading /etc/os-release to find out which distribution this is: %w", err)
+	}
+
+	id := OSReleaseID(release)
+	script, ok := ansibleInstall[id]
+	if !ok {
+		return fmt.Errorf("this CLI does not know how to install Ansible on %q: it has been run on "+
+			"debian and ubuntu only. Install the `ansible` package by hand — not `ansible-core`, "+
+			"which leaves out community.general — and run this again", id)
+	}
+
+	if err := c.Stream(ctx, script, out, out); err != nil {
+		return fmt.Errorf("installing Ansible on %s: %w", id, err)
 	}
 	return nil
 }

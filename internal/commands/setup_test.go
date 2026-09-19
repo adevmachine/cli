@@ -49,6 +49,7 @@ type bootstrapSteps struct {
 	proved           bool
 	provedWith       remote.Auth
 	hardened         bool
+	ansible          bool
 }
 
 func stubBootstrap(t *testing.T, s bootstrapStubs) *bootstrapSteps {
@@ -79,6 +80,10 @@ func stubBootstrap(t *testing.T, s bootstrapStubs) *bootstrapSteps {
 		steps.proved = true
 		steps.provedWith = a
 		return nopClient{}, nil
+	}))
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error {
+		steps.ansible = true
+		return nil
 	}))
 	t.Cleanup(swap(&harden, func(context.Context, remote.Client) error {
 		steps.hardened = true
@@ -496,5 +501,48 @@ func TestTheConfigurationFileIsNotReadableByOthers(t *testing.T) {
 	}
 	if perm := info.Mode().Perm(); perm != 0o600 {
 		t.Fatalf("mode = %o, want 600", perm)
+	}
+}
+
+func TestSetupInstallsAnsible(t *testing.T) {
+	// The imperative shell surface ends here. Everything after it is a play,
+	// so a machine without Ansible is a machine `sync` cannot reach.
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	if _, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "", "1", "devmachine"),
+		setupOptions{}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+	if !steps.ansible {
+		t.Fatal("it left the machine without Ansible")
+	}
+}
+
+func TestSetupInstallsAnsibleEvenWithNoHarden(t *testing.T) {
+	// --no-harden is about password login, not about leaving the job half
+	// done.
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if _, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "", "1"),
+		setupOptions{noHarden: true}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+	if !steps.ansible {
+		t.Fatal("--no-harden also skipped Ansible")
+	}
+}
+
+func TestSetupInstallsNothingWhenTheProofFails(t *testing.T) {
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false, proofFails: true})
+
+	if _, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "", "1", "devmachine"),
+		setupOptions{}); err == nil {
+		t.Fatal("a failed proof was reported as success")
+	}
+	if steps.ansible {
+		t.Fatal("it carried on installing on a machine it could not prove it owns")
 	}
 }

@@ -43,6 +43,15 @@ It then writes `config.yml` and starts on the machine. In order:
 5. it turns password login off;
 6. it installs Ansible.
 
+Step 6 installs the `ansible` package, not `ansible-core`: the core package
+leaves out `community.general`, which the firewall package needs, and that only
+shows up much later inside a play. It is the last thing done by hand — from
+there on everything the CLI does to a machine is a play.
+
+Ansible is installed on **Debian and Ubuntu**, the two this has been run on.
+Anywhere else `setup` stops and names your distribution rather than guessing at
+a package manager: install `ansible` by hand and run it again.
+
 Step 4 is why the order cannot change. Installing a key does not prove it
 works — a wrong mode on `authorized_keys`, an `AuthorizedKeysFile` pointing
 elsewhere, or SELinux all let it install and still refuse it. **If the proof
