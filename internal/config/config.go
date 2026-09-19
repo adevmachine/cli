@@ -18,9 +18,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -87,6 +89,9 @@ type Machine struct {
 	Key string `yaml:"key,omitempty"`
 	// Packages are the recipes this machine gets, by name.
 	Packages []string `yaml:"packages,omitempty"`
+	// Settings override the variables a package declares. A key is written
+	// `<package>.<name>`.
+	Settings map[string]any `yaml:"settings,omitempty"`
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -100,6 +105,9 @@ type Workspace struct {
 	User string `yaml:"user,omitempty"`
 	// Packages are the recipes this workspace gets, by name.
 	Packages []string `yaml:"packages,omitempty"`
+	// Settings override the variables a package declares. A key is written
+	// `<package>.<name>`.
+	Settings map[string]any `yaml:"settings,omitempty"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -258,6 +266,9 @@ func (c Config) Validate() error {
 		if name, dup := firstDuplicate(m.Packages); dup {
 			return fmt.Errorf("machine %q lists the package %q twice", m.Name, name)
 		}
+		if err := validateSettings("machine", m.Name, m.Settings, m.Packages); err != nil {
+			return err
+		}
 		for j, h := range m.Hosts {
 			if h.Address == "" {
 				return fmt.Errorf("machine %q: host %d is empty", m.Name, j+1)
@@ -283,6 +294,9 @@ func (c Config) Validate() error {
 		if name, dup := firstDuplicate(w.Packages); dup {
 			return fmt.Errorf("workspace %q lists the package %q twice", w.Name, name)
 		}
+		if err := validateSettings("workspace", w.Name, w.Settings, w.Packages); err != nil {
+			return err
+		}
 		names[w.Name] = true
 	}
 
@@ -292,6 +306,48 @@ func (c Config) Validate() error {
 	if c.Packages != "" && !releaseTag.MatchString(c.Packages) {
 		return fmt.Errorf(
 			"`packages: %s` is not a release tag: use one like `v1`, never a branch name", c.Packages)
+	}
+	return nil
+}
+
+// SettingsFor returns the settings for one package on one target, with the
+// "<package>." prefix stripped.
+//
+// Only the first dot segment is the package name, so a package is free to use
+// a dotted key of its own.
+func SettingsFor(settings map[string]any, pkg string) map[string]any {
+	out := map[string]any{}
+	for key, value := range settings {
+		name, rest, ok := strings.Cut(key, ".")
+		if ok && name == pkg && rest != "" {
+			out[rest] = value
+		}
+	}
+	return out
+}
+
+// validateSettings refuses a setting that would reach nothing.
+//
+// A value for a package the target does not install is worse than an error:
+// the recipe quietly keeps its default, and the machine is not what the
+// configuration says it is. A mistyped package name is exactly that.
+func validateSettings(kind, target string, settings map[string]any, installed []string) error {
+	has := map[string]bool{}
+	for _, name := range installed {
+		has[name] = true
+	}
+	for _, key := range slices.Sorted(maps.Keys(settings)) {
+		pkg, name, ok := strings.Cut(key, ".")
+		if !ok || pkg == "" || name == "" {
+			return fmt.Errorf(
+				"%s %q: the setting %q does not say which package it belongs to: write it as <package>.<name>",
+				kind, target, key)
+		}
+		if !has[pkg] {
+			return fmt.Errorf(
+				"%s %q sets %q, and does not install the package %q: add %q to its `packages:`, or drop the setting",
+				kind, target, key, pkg, pkg)
+		}
 	}
 	return nil
 }

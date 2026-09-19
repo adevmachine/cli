@@ -66,6 +66,43 @@ dns_provider: manual
 
 Defaults: `user` is `root`, `port` is `22`. Everything else is what you wrote.
 
+## Settings
+
+A package declares the values it reads under `variables`, each with a default.
+`settings:` is where a target overrides one. It sits on a machine or on a
+workspace, and a key is written `<package>.<name>`:
+
+```yaml
+machines:
+  - name: main
+    packages: [base, caddy]
+    settings:
+      base.timezone: America/Sao_Paulo
+      caddy.email: someone@example.com
+
+workspaces:
+  - name: alice
+    packages: [workspace, dev, zsh, claude-plugins]
+    settings:
+      claude-plugins.marketplace: example.com/their-plugins
+      claude-plugins.plugins: [their-plugin]
+```
+
+Only the first dot is the split, so a package may use a dotted name of its own:
+`claude-plugins.marketplace.url` is the package `claude-plugins` and the name
+`marketplace.url`.
+
+Two settings are refused rather than ignored:
+
+- one with no `<package>.` prefix, because nothing could tell what reads it
+- one for a package that target does not install
+
+The second is the one that matters. A mistyped package name would otherwise
+cost nothing and do nothing: the value reaches no recipe, the recipe keeps its
+default, and the machine quietly is not what the configuration says it is. If
+the package arrives through another package's `needs`, name it in `packages:`
+as well — you are configuring it, so say you want it.
+
 ## What is validated
 
 `config show` and every command that touches a machine refuse a configuration
@@ -76,6 +113,8 @@ that cannot work, and say what to change:
 - two machines, or two workspaces, with the same name
 - a workspace on a machine that is not configured
 - a workspace with no machine when there are several
+- a setting with no `<package>.` prefix, or for a package the target does not
+  install
 
 ## The command log
 
