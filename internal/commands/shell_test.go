@@ -265,6 +265,10 @@ func (f fakeRemote) Stream(_ context.Context, _ string, stdout, _ io.Writer) err
 	return f.err
 }
 
+func (f fakeRemote) RunInput(ctx context.Context, command string, _ io.Reader) (string, error) {
+	return f.Run(ctx, command)
+}
+
 func (f fakeRemote) Upload(context.Context, string, io.Reader) error { return nil }
 
 func (f fakeRemote) Close() error { return nil }

@@ -464,6 +464,12 @@ func (s *fakeSSHServer) methodsOffered() []string {
 	return append([]string(nil), s.methods...)
 }
 
+func (s *fakeSSHServer) connectionCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.connections
+}
+
 func sshServerAccepting(t *testing.T, method string) *fakeSSHServer {
 	return sshServer(t, method)
 }

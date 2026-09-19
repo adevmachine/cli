@@ -36,6 +36,10 @@ func (c *fakeClient) Stream(_ context.Context, command string, stdout, _ io.Writ
 	return c.err
 }
 
+func (c *fakeClient) RunInput(ctx context.Context, command string, _ io.Reader) (string, error) {
+	return c.Run(ctx, command)
+}
+
 func (c *fakeClient) Upload(_ context.Context, dir string, tarball io.Reader) error {
 	if c.uploaded == nil {
 		c.uploaded = map[string][]string{}

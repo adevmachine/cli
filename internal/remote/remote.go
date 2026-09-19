@@ -46,6 +46,11 @@ var (
 // Client runs commands on the machine.
 type Client interface {
 	Run(ctx context.Context, command string) (string, error)
+	// RunInput runs a command with stdin fed from the reader.
+	//
+	// It is how a value reaches the machine without going in an argument,
+	// where `ps` shows it to every account on the machine.
+	RunInput(ctx context.Context, command string, stdin io.Reader) (string, error)
 	// Stream runs a command with its output going to the writers as it
 	// arrives, and returns the exit status.
 	Stream(ctx context.Context, command string, stdout, stderr io.Writer) error
@@ -319,6 +324,25 @@ func (c *sshClient) Run(ctx context.Context, command string) (string, error) {
 	stop := c.closeOnCancel(ctx, session)
 	defer stop()
 
+	out, err := session.Output(command)
+	if err != nil {
+		return string(out), fmt.Errorf("running %q: %w", command, err)
+	}
+	return string(out), nil
+}
+
+// RunInput executes one command with stdin fed from the reader.
+func (c *sshClient) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("opening a session: %w", err)
+	}
+	defer session.Close()
+
+	stop := c.closeOnCancel(ctx, session)
+	defer stop()
+
+	session.Stdin = stdin
 	out, err := session.Output(command)
 	if err != nil {
 		return string(out), fmt.Errorf("running %q: %w", command, err)
