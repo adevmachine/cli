@@ -22,6 +22,16 @@ That starts the VM, authorizes a throwaway key and runs everything against it.
 The VM reproduces a freshly bought server: root over SSH with a password and no
 key installed.
 
+The VM is made by the CLI itself — `devmachine machines create-local`, see
+[the reference](reference/commands.md#machines) — so the harness and the
+feature are one thing and cannot drift apart.
+
+One difference is deliberate: the script then authorizes a key through
+`limactl shell`, and `create-local` never does. The integration tests need a
+machine they can already reach without running `setup` first, while
+`create-local` has to leave the machine exactly as a bought one arrives, or the
+trust bootstrap is never exercised by the thing that runs on every test.
+
 Driving it by hand:
 
 ```
@@ -33,6 +43,10 @@ scripts/fake-vps.sh down    destroy it
 
 Without the VM those tests **skip**, so `make test` stays green anywhere —
 including CI, which has no VM.
+
+`internal/local` goes further: where Lima is installed, its test creates a
+machine and proves that root gets in with the password and no key does. That
+costs a boot, so `go test -short` leaves it out.
 
 ## Rules this repository holds itself to
 
