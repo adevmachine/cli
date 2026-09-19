@@ -1,0 +1,32 @@
+internal/commands/machines_test.go
+  s_cab674f14f5e3f::t_e7e8d9b37c2c31 1-60
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_7cc7b717e4560b 52-56,59-79
+  s_cab674f14f5e3f::t_fed11cce867e25 80
+internal/local/machine.yaml
+  s_cab674f14f5e3f::t_cc85f60d4dc193 1-45
+internal/local/lima.go
+  s_cab674f14f5e3f::t_4a15383bd58cbf 1-219
+internal/commands/machines.go
+  s_cab674f14f5e3f::t_04d8e7d9fbdf98 6-7,16-22,61-171
+internal/local/lima_test.go
+  s_cab674f14f5e3f::t_d3e9eff7860308 1-335
+SURFACE.txt
+  s_cab674f14f5e3f::t_a1a902eab296de 10-11,13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "303d177410f19fd55a024be119a2876069faa89b",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
