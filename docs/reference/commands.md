@@ -270,8 +270,7 @@ devmachine help [command] [--json]
 
 ## The command log
 
-Every command that reaches a machine appends one line to
-`<config>/history.log`, mode `0600`:
+`run` and `sync` append one line each to `<config>/history.log`, mode `0600`:
 
 ```
 2026-09-18T12:00:00Z  workspace alice   ok      "docker ps"
@@ -286,3 +285,11 @@ The CLI only writes it. Read it with `tail` and `grep`, rotate it with
 `logrotate`, delete it whenever you like — see
 [configuration](../concepts/configuration.md#the-command-log) for what it is
 not.
+
+**`setup` and `machines add` are not logged**, and that is deliberate. They are
+the two commands that handle a root password, and a log is the last place that
+should ever come close to one. They also run once per machine, so there is
+little to look back at.
+
+`login` is not logged either: what it runs is a command the package declared,
+in a terminal you are watching.
