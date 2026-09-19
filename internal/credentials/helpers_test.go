@@ -16,12 +16,17 @@ type recordingClient struct {
 	commands []string
 	inputs   []string
 	output   map[string]string
-	err      error
+	// answer is what any command returns when output has no entry for it.
+	answer string
+	err    error
 }
 
 func (c *recordingClient) Run(_ context.Context, command string) (string, error) {
 	c.commands = append(c.commands, command)
-	return c.output[command], c.err
+	if out, ok := c.output[command]; ok {
+		return out, c.err
+	}
+	return c.answer, c.err
 }
 
 func (c *recordingClient) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
