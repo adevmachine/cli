@@ -1,0 +1,21 @@
+internal/packages/fetch.go
+  s_cab674f14f5e3f::t_6a043fccd30243 1-182
+internal/packages/fetch_test.go
+  s_cab674f14f5e3f::t_b17704515ee7a4 1-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f84ca4bb1bce691eaa59ed218deb5f19775495d4",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
