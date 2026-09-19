@@ -1,16 +1,22 @@
 package remote
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/adevmachine/cli/internal/config"
 	"golang.org/x/crypto/ssh"
@@ -324,5 +330,109 @@ func TestDialRejectsAKeyItCannotRead(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "absent") {
 		t.Fatalf("the error does not name the file: %v", err)
+	}
+}
+
+// tarballWith builds a gzipped tar in memory. The remote package cannot use
+// provision.Tar for this: provision reaches for a client, so importing it back
+// would be a cycle.
+func tarballWith(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zipped := gzip.NewWriter(&buf)
+	archive := tar.NewWriter(zipped)
+	for name, body := range files {
+		header := &tar.Header{Name: name, Mode: 0o644, Size: int64(len(body)), Typeflag: tar.TypeReg}
+		if err := archive.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := archive.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipped.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestUploadAndStreamAgainstTheThrowawayMachine(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	dir := "/tmp/devmachine-test-" + strconv.Itoa(os.Getpid())
+	defer client.Run(context.Background(), "rm -rf "+dir)
+
+	tarball := tarballWith(t, map[string]string{"hello.txt": "hi\n"})
+	if err := client.Upload(context.Background(), dir, bytes.NewReader(tarball)); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := client.Stream(context.Background(), "cat "+dir+"/hello.txt", &out, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(out.String()) != "hi" {
+		t.Fatalf("got %q", out.String())
+	}
+
+	if err := client.Stream(context.Background(), "exit 3", io.Discard, io.Discard); err == nil {
+		t.Fatal("a non-zero exit was reported as success")
+	}
+}
+
+// TestStreamWritesWhileTheCommandIsStillRunning is the whole reason Stream
+// exists: output collected and printed at the end makes a long run look stuck.
+func TestStreamWritesWhileTheCommandIsStillRunning(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	first := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- client.Stream(context.Background(), "echo one; sleep 5; echo two", &firstWrite{ch: first}, io.Discard)
+	}()
+
+	select {
+	case <-first:
+	case err := <-done:
+		t.Fatalf("the command finished before anything was written: %v", err)
+	case <-time.After(4 * time.Second):
+		t.Fatal("nothing was written in the first four seconds of a five second command")
+	}
+
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// firstWrite closes its channel the first time anything is written to it.
+type firstWrite struct {
+	ch   chan struct{}
+	once sync.Once
+}
+
+func (w *firstWrite) Write(p []byte) (int, error) {
+	w.once.Do(func() { close(w.ch) })
+	return len(p), nil
+}
+
+func TestShellQuoteSurvivesAQuoteInThePath(t *testing.T) {
+	if got := shellQuote("/opt/dev'machine"); got != `'/opt/dev'\''machine'` {
+		t.Fatalf("got %s", got)
 	}
 }
