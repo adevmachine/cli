@@ -12,7 +12,7 @@ import (
 //
 // It is an error rather than a quiet success because the exit code is what a
 // script reads, and "I did not do it" must not look like "I did it".
-var errDeclined = errors.New("nothing was applied")
+var errDeclined = errors.New("nothing was changed")
 
 // confirm asks a yes-or-no question and reads one line.
 //

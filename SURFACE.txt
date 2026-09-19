@@ -24,4 +24,5 @@ devmachine secrets set
 devmachine setup
 devmachine ssh
 devmachine stats
+devmachine sync
 devmachine version

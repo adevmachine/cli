@@ -142,6 +142,40 @@ exits 1 when it found any.
 that cannot drift, because the validator is what enforces it. The whole format
 is in [the package format](package-format.md).
 
+## sync
+
+```
+devmachine sync [--machine m] [--check] [--yes] [--tags a,b]
+```
+
+Puts a machine into the state the configuration describes.
+
+In order: it reads and judges the configuration, makes the pinned release
+available (fetching and verifying it the first time), resolves what the machine
+and each of its workspaces get and in what order, checks your own packages,
+prints the plan, asks, then sends everything to the machine and runs Ansible
+**there**, streaming the output as it arrives.
+
+| Flag | Meaning |
+| --- | --- |
+| `--check` | a dry run: the machine reports what would change and changes nothing |
+| `--yes` | apply without asking |
+| `--tags a,b` | only the packages named, by name |
+
+`--check` never asks, and never writes the lock: a dry run that recorded
+itself as applied would make the lock claim something nobody did.
+
+Only your own packages are checked before the run. A published one was checked
+when it was released; one in `<config>/packages/` has never been checked by
+anybody.
+
+With `--format json` the document on stdout is the result, and the plan, the
+prompt and the machine's own output go to stderr.
+
+On success, `<config>/packages.lock` records what was applied to that machine
+and its workspaces, at which release and checksum. Only the machine that was
+synced is rewritten — syncing one machine says nothing about another.
+
 ## version, help
 
 ```
