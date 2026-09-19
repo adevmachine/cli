@@ -132,3 +132,22 @@ is in [the package format](package-format.md).
 devmachine version
 devmachine help [command] [--json]
 ```
+
+## The command log
+
+Every command that reaches a machine appends one line to
+`<config>/history.log`, mode `0600`:
+
+```
+2026-09-18T12:00:00Z  workspace alice   ok      "docker ps"
+2026-09-18T12:01:00Z  machine main      failed  "sync --tags caddy"
+```
+
+The time is UTC, the target is the workspace or the machine the command
+resolved to, then whether it succeeded, then the command itself. The command is
+quoted, so one carrying a newline stays on one line.
+
+The CLI only writes it. Read it with `tail` and `grep`, rotate it with
+`logrotate`, delete it whenever you like — see
+[configuration](../concepts/configuration.md#the-command-log) for what it is
+not.

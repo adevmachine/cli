@@ -38,6 +38,7 @@ The two can never cross.
 <config>/config.yml     machines, workspaces, domain, DNS provider
 <config>/secrets.json   names of stored secrets, and values the keychain refused
 <config>/keys/          keys the CLI generated, when it generated any
+<config>/history.log    one line per command that reached a machine
 ```
 
 ## config.yml
@@ -75,6 +76,21 @@ that cannot work, and say what to change:
 - two machines, or two workspaces, with the same name
 - a workspace on a machine that is not configured
 - a workspace with no machine when there are several
+
+## The command log
+
+Every command that reaches a machine appends a line to `<config>/history.log`:
+when, which workspace or machine, whether it worked, and the command. It exists
+so that "what did that session do to my machine" has an answer — over `ssh` it
+does not, because the shell history stays on the machine, under whichever
+account was used.
+
+It is a record, and nothing more. It stops nothing, it checks nothing, and no
+command reads it. Writing it can never fail a command: if the file cannot be
+opened, the line is dropped and the command carries on. Calling a log a
+safeguard is how a safeguard stops being built, so this one says plainly that
+it is not one. The format is in
+[commands](../reference/commands.md#the-command-log).
 
 ## Secrets
 
