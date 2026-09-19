@@ -36,13 +36,13 @@
         name: claude-code
         apply:
           tags: [claude-code]
-      vars:
-        devmachine_workspace: "{{ item }}"
         devmachine_claude_code_plugins:
           - one
           - two
       loop:
         - {name: "alice", user: "alice"}
+      loop_control:
+        loop_var: devmachine_workspace
       tags: [claude-code]
 
     - name: sharing for each workspace that declares it
@@ -50,10 +50,10 @@
         name: sharing
         apply:
           tags: [sharing]
-      vars:
-        devmachine_workspace: "{{ item }}"
       loop:
         - {name: "alice", user: "alice"}
+      loop_control:
+        loop_var: devmachine_workspace
       tags: [sharing]
 
     - name: sharing extends caddy.sites.d for alice

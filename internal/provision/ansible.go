@@ -243,13 +243,18 @@ func workspaceTasks(plan packages.MachinePlan) (string, error) {
 		for _, group := range groups {
 			fmt.Fprintf(&out, "    - name: %s\n", group.title(name))
 			out.WriteString(includeRole(name))
-			out.WriteString("      vars:\n        devmachine_workspace: \"{{ item }}\"\n")
 			out.WriteString(group.vars)
 			out.WriteString("      loop:\n")
 			for _, workspace := range group.workspaces {
 				fmt.Fprintf(&out, "        - {name: %q, user: %q}\n",
 					workspace.Target.Name, workspace.Target.LinuxUser)
 			}
+			// loop_var, rather than `vars: devmachine_workspace: "{{ item }}"`.
+			// A role is free to have loops of its own, and any of them would
+			// rebind `item` — so the workspace would quietly become whatever
+			// the inner loop was iterating. Naming the variable here means no
+			// package can get it wrong, and none has to remember to try.
+			out.WriteString("      loop_control:\n        loop_var: devmachine_workspace\n")
 			fmt.Fprintf(&out, "      tags: [%s]\n\n", name)
 		}
 	}

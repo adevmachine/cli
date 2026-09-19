@@ -85,6 +85,26 @@ func TestGeneratePlaybookLoopsAWorkspacePackageOverItsWorkspacesOnly(t *testing.
 	}
 }
 
+func TestGenerateNamesTheLoopVariableRatherThanUsingItem(t *testing.T) {
+	plan := planWith(t, "main", nil, map[string][]string{"alice": {"claude-code"}})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playbook := string(files["site.yml"])
+
+	// A role is free to have loops of its own, and any of them rebinds `item`.
+	// A workspace package written that way would silently act on whatever the
+	// inner loop was iterating — it fails with "'AnsibleUnsafeText' object has
+	// no attribute 'user'", which names nothing useful.
+	if !strings.Contains(playbook, "loop_var: devmachine_workspace") {
+		t.Fatalf("the loop variable is not named:\n%s", playbook)
+	}
+	if strings.Contains(playbook, `devmachine_workspace: "{{ item }}"`) {
+		t.Fatalf("the workspace is still bound through item:\n%s", playbook)
+	}
+}
+
 func TestGenerateTagsEveryPackageWithItsOwnName(t *testing.T) {
 	files, err := Generate(planWith(t, "main", []string{"docker"}, nil))
 	if err != nil {
