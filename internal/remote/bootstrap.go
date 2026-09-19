@@ -55,15 +55,28 @@ func InstallKey(ctx context.Context, c Client, publicKey string) error {
 // AuthorizedKeysFile pointing elsewhere, or SELinux all let the key install and
 // still refuse it.
 func ProveKey(ctx context.Context, m config.Machine, user, keyPath string) error {
-	client, _, err := DialWith(ctx, m, user, Auth{KeyPath: keyPath})
+	client, err := ProveAuth(ctx, m, user, Auth{KeyPath: keyPath})
 	if err != nil {
-		return fmt.Errorf("the key %s is installed but does not log in as %q on machine %q. "+
+		return err
+	}
+	return client.Close()
+}
+
+// ProveAuth is ProveKey for a key nobody can point at: one an SSH agent holds
+// and never writes to disk.
+//
+// It hands back the connection it proved, so everything that follows — turning
+// password login off included — runs over the one that was proved rather than
+// over the password session that is about to stop working.
+func ProveAuth(ctx context.Context, m config.Machine, user string, a Auth) (Client, error) {
+	client, _, err := DialWith(ctx, m, user, a)
+	if err != nil {
+		return nil, fmt.Errorf("%s is installed but does not log in as %q on machine %q. "+
 			"Check that ~/.ssh/authorized_keys holds the line, that it is mode 0600 inside a 0700 ~/.ssh, "+
 			"that sshd's AuthorizedKeysFile points at that file, and that PubkeyAuthentication is on: %w",
-			keyPath, user, m.Name, err)
+			a.describe(), user, m.Name, err)
 	}
-	defer client.Close()
-	return nil
+	return client, nil
 }
 
 // hardeningDropInPath is where password login is turned off.

@@ -306,3 +306,25 @@ func TestHardeningDropInIsValidToARealSshd(t *testing.T) {
 		t.Fatalf("a real sshd refused the drop-in: %v", err)
 	}
 }
+
+// TestProveAuthHandsBackTheConnectionItProved: what follows a proof — turning
+// password login off included — has to run on the connection that was proved,
+// not on the password session that is about to stop working.
+func TestProveAuthHandsBackTheConnectionItProved(t *testing.T) {
+	server := sshServerAccepting(t, "publickey")
+	m := machineAt(t, server.addr)
+
+	client, err := ProveAuth(context.Background(), m, "root", Auth{KeyPath: throwawayKey(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client == nil {
+		t.Fatal("the proof returned no connection")
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("the proved connection was not open: %v", err)
+	}
+	if server.connectionCount() != 1 {
+		t.Fatalf("made %d connections", server.connectionCount())
+	}
+}

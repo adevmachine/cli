@@ -16,14 +16,50 @@ text.
 ## setup
 
 ```
-devmachine setup [--force]
+devmachine setup [--force] [--no-harden]
 ```
 
-Asks for a machine name, an address, the administrative login, a port and a
-domain, then writes `config.yml`.
+Takes a machine over. It asks for a machine name, an address, the
+administrative login, a port and a domain, then how the CLI should log in:
 
-It changes nothing on any machine. It refuses to overwrite a configuration that
-already exists unless `--force` is given.
+1. a key of its own, kept in `<config>/keys/<machine>` and used for nothing
+   else — the recommendation, and the answer if you have no opinion;
+2. a key file already on this computer;
+3. a key your SSH agent holds, offered by fingerprint and comment.
+
+The third is how a key kept in a password manager works: it never touches the
+disk, so there is no file to point at. Picking it leaves `key` out of
+`config.yml`, which is what tells the CLI to ask the agent every time.
+
+It then writes `config.yml` and starts on the machine. In order:
+
+1. it tries the key. **If that already works, no password is asked for** —
+   many servers arrive with a key pasted in at the provider, and their owner
+   has no root password to give;
+2. only when the key is refused does it ask for the password, without echoing
+   it when there is a terminal;
+3. it installs the key over that one connection;
+4. it **proves the key by opening a new connection with the key alone**;
+5. it turns password login off;
+6. it installs Ansible.
+
+Step 4 is why the order cannot change. Installing a key does not prove it
+works — a wrong mode on `authorized_keys`, an `AuthorizedKeysFile` pointing
+elsewhere, or SELinux all let it install and still refuse it. **If the proof
+fails, nothing is hardened and password login stays on**, so you can still get
+in; the error says where to look.
+
+The password is used once, on one connection, and is written nowhere: not to
+`config.yml`, not to the lock, not to the log.
+
+| Flag | Meaning |
+| --- | --- |
+| `--force` | overwrite a configuration that already exists |
+| `--no-harden` | leave password login on; the key is still installed and proved |
+
+Running it again on a machine it already owns is safe: it offers the key it
+made last time, finds that the key works, and skips straight past the
+password.
 
 ## doctor
 
