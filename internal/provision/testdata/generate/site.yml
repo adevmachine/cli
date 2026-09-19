@@ -31,13 +31,16 @@
           tags: [docker]
       tags: [docker]
 
-    - name: claude-code for each workspace that declares it
+    - name: claude-code for alice
       include_role:
         name: claude-code
         apply:
           tags: [claude-code]
       vars:
         devmachine_workspace: "{{ item }}"
+        devmachine_claude_code_plugins:
+          - one
+          - two
       loop:
         - {name: "alice", user: "alice"}
       tags: [claude-code]

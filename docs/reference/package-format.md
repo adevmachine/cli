@@ -113,6 +113,20 @@ variables:
     default: 53842
 ```
 
+The recipe reads `devmachine_<package>_<name>`, so a package called `tunnel`
+declaring `port` puts `devmachine_tunnel_port` in its own `defaults/main.yml`.
+The package name is in the variable because Ansible has one namespace for all
+of them, and two packages are free to both want a `port`.
+
+That is the same name a target's
+[settings](../concepts/configuration.md#settings) are written under, and it is
+the whole mechanism: a setting is a default somebody overrode. The recipe
+cannot tell where the value came from, and does not have to.
+
+A dash is fine in a package name and never fine in a variable, so `-` becomes
+`_` on the way in, as does the `.` a package may use inside a name of its own.
+Two names that collide that way are refused rather than one of them winning.
+
 ### `credentials`
 
 What the package's tool cannot work without, **and how each one is obtained**.

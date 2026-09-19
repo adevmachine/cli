@@ -3,9 +3,12 @@ package provision
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 
+	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/packages"
 	"gopkg.in/yaml.v3"
 )
@@ -39,11 +42,15 @@ func Generate(plan packages.MachinePlan) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	site, err := playbook(plan)
+	if err != nil {
+		return nil, err
+	}
 	return map[string][]byte{
 		"ansible.cfg":              []byte(ansibleCfg()),
 		"inventory.ini":            []byte(inventory()),
 		"host_vars/devmachine.yml": vars,
-		"site.yml":                 []byte(playbook(plan)),
+		"site.yml":                 []byte(site),
 	}, nil
 }
 
@@ -87,11 +94,23 @@ func hostVars(plan packages.MachinePlan) ([]byte, error) {
 		})
 	}
 
+	var root yaml.Node
+	if err := root.Encode(vars); err != nil {
+		return nil, fmt.Errorf("writing the host variables: %w", err)
+	}
+	for _, found := range plan.OnMachine.Ordered {
+		pairs, err := settingNodes(plan.Machine.Settings, found.Manifest.Name)
+		if err != nil {
+			return nil, err
+		}
+		root.Content = append(root.Content, pairs...)
+	}
+
 	var body bytes.Buffer
 	body.WriteString("---\n" + header)
 	encoder := yaml.NewEncoder(&body)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(vars); err != nil {
+	if err := encoder.Encode(&root); err != nil {
 		return nil, fmt.Errorf("writing the host variables: %w", err)
 	}
 	if err := encoder.Close(); err != nil {
@@ -100,19 +119,86 @@ func hostVars(plan packages.MachinePlan) ([]byte, error) {
 	return body.Bytes(), nil
 }
 
-func playbook(plan packages.MachinePlan) string {
+// settingNodes names one package's settings the way its recipe already reads
+// them: `devmachine_<package>_<key>`, which is the name its own
+// defaults/main.yml gives the variable. A setting is a default somebody
+// overrode, not a second mechanism, and the recipe cannot tell the difference.
+func settingNodes(settings map[string]any, pkg string) ([]*yaml.Node, error) {
+	values := config.SettingsFor(settings, pkg)
+	named := make(map[string]string, len(values))
+	for _, key := range slices.Sorted(maps.Keys(values)) {
+		name := ansibleVariable(pkg + "." + key)
+		if was, taken := named[name]; taken {
+			return nil, fmt.Errorf(
+				"the settings %q and %q are both the variable %s: rename one",
+				pkg+"."+was, pkg+"."+key, name)
+		}
+		named[name] = key
+	}
+
+	var out []*yaml.Node
+	for _, name := range slices.Sorted(maps.Keys(named)) {
+		value := &yaml.Node{}
+		if err := value.Encode(values[named[name]]); err != nil {
+			return nil, fmt.Errorf("writing the setting %s: %w", name, err)
+		}
+		out = append(out, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}, value)
+	}
+	return out, nil
+}
+
+// settingLines renders one package's settings as the body of a task's `vars:`
+// block, indented to sit inside it.
+func settingLines(settings map[string]any, pkg, indent string) (string, error) {
+	pairs, err := settingNodes(settings, pkg)
+	if err != nil {
+		return "", err
+	}
+	if len(pairs) == 0 {
+		return "", nil
+	}
+
+	var body bytes.Buffer
+	encoder := yaml.NewEncoder(&body)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: pairs}); err != nil {
+		return "", fmt.Errorf("writing the settings of %s: %w", pkg, err)
+	}
+	if err := encoder.Close(); err != nil {
+		return "", fmt.Errorf("writing the settings of %s: %w", pkg, err)
+	}
+
+	var out strings.Builder
+	for _, line := range strings.Split(strings.TrimRight(body.String(), "\n"), "\n") {
+		out.WriteString(indent + line + "\n")
+	}
+	return out.String(), nil
+}
+
+// ansibleVariable turns a setting's key into something Ansible accepts. A dash
+// is fine in a package name and never fine in a variable; nor is the dot a
+// package may use inside a key of its own.
+func ansibleVariable(key string) string {
+	return "devmachine_" + strings.NewReplacer("-", "_", ".", "_").Replace(key)
+}
+
+func playbook(plan packages.MachinePlan) (string, error) {
 	var out strings.Builder
 	out.WriteString("---\n" + header)
 	fmt.Fprintf(&out, "- hosts: %s\n  become: true\n", inventoryHost)
 
-	tasks := machineTasks(plan) + workspaceTasks(plan) + extensionTasks(plan)
+	forWorkspaces, err := workspaceTasks(plan)
+	if err != nil {
+		return "", err
+	}
+	tasks := machineTasks(plan) + forWorkspaces + extensionTasks(plan)
 	if tasks == "" {
 		out.WriteString("  tasks: []\n")
-		return out.String()
+		return out.String(), nil
 	}
 	out.WriteString("  tasks:\n")
 	out.WriteString(tasks)
-	return out.String()
+	return out.String(), nil
 }
 
 func machineTasks(plan packages.MachinePlan) string {
@@ -134,7 +220,7 @@ func machineTasks(plan packages.MachinePlan) string {
 // always preceded by what it needs inside every workspace that has it, so the
 // first appearance of a need is never later than the first appearance of the
 // package that needs it.
-func workspaceTasks(plan packages.MachinePlan) string {
+func workspaceTasks(plan packages.MachinePlan) (string, error) {
 	var (
 		out   strings.Builder
 		order []string
@@ -150,19 +236,70 @@ func workspaceTasks(plan packages.MachinePlan) string {
 	}
 
 	for _, name := range order {
-		fmt.Fprintf(&out, "    - name: %s for each workspace that declares it\n", name)
-		out.WriteString(includeRole(name))
-		out.WriteString("      vars:\n        devmachine_workspace: \"{{ item }}\"\n      loop:\n")
-		for _, workspace := range plan.Workspaces {
-			if !has(workspace, name) {
-				continue
-			}
-			fmt.Fprintf(&out, "        - {name: %q, user: %q}\n",
-				workspace.Target.Name, workspace.Target.LinuxUser)
+		groups, err := groupBySettings(plan, name)
+		if err != nil {
+			return "", err
 		}
-		fmt.Fprintf(&out, "      tags: [%s]\n\n", name)
+		for _, group := range groups {
+			fmt.Fprintf(&out, "    - name: %s\n", group.title(name))
+			out.WriteString(includeRole(name))
+			out.WriteString("      vars:\n        devmachine_workspace: \"{{ item }}\"\n")
+			out.WriteString(group.vars)
+			out.WriteString("      loop:\n")
+			for _, workspace := range group.workspaces {
+				fmt.Fprintf(&out, "        - {name: %q, user: %q}\n",
+					workspace.Target.Name, workspace.Target.LinuxUser)
+			}
+			fmt.Fprintf(&out, "      tags: [%s]\n\n", name)
+		}
 	}
-	return out.String()
+	return out.String(), nil
+}
+
+// group is the workspaces one include_role covers: those that give a package
+// the same settings, which is usually all of them and no settings at all.
+type group struct {
+	vars       string
+	workspaces []packages.Resolved
+}
+
+func (g group) title(pkg string) string {
+	if g.vars == "" {
+		return pkg + " for each workspace that declares it"
+	}
+	who := make([]string, 0, len(g.workspaces))
+	for _, workspace := range g.workspaces {
+		who = append(who, workspace.Target.Name)
+	}
+	return pkg + " for " + strings.Join(who, ", ")
+}
+
+// groupBySettings splits the workspaces that install a package by what they
+// set on it, in the order they appear. One loop cannot carry two values for
+// one variable, so a workspace that overrides something gets a task of its
+// own; everybody else keeps sharing one.
+func groupBySettings(plan packages.MachinePlan, pkg string) ([]group, error) {
+	var (
+		groups []group
+		at     = map[string]int{}
+	)
+	for _, workspace := range plan.Workspaces {
+		if !has(workspace, pkg) {
+			continue
+		}
+		vars, err := settingLines(workspace.Target.Settings, pkg, "        ")
+		if err != nil {
+			return nil, fmt.Errorf("workspace %q: %w", workspace.Target.Name, err)
+		}
+		index, known := at[vars]
+		if !known {
+			index = len(groups)
+			at[vars] = index
+			groups = append(groups, group{vars: vars})
+		}
+		groups[index].workspaces = append(groups[index].workspaces, workspace)
+	}
+	return groups, nil
 }
 
 // extensionTasks copy each contribution into the directory its provider

@@ -10,3 +10,4 @@ devmachine_workspaces:
   - name: bob
     user: bob
     packages: []
+devmachine_caddy_email: someone@example.com
