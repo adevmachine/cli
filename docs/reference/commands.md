@@ -95,11 +95,26 @@ a configuration.
 
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
+devmachine machines add [--no-harden]     take over another machine and record it
+devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on this computer
 devmachine machines start <name>          start a local machine
 devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
 ```
+
+`setup` writes the first machine; `add` writes every one after it. It asks the
+same questions, minus the domain, and runs the same bootstrap: the key first, a
+password only if the key is refused, the proof on a connection of its own, then
+hardening and Ansible. See [setup](#setup) for what each step is for.
+
+`rm` takes a machine out of `config.yml` and **does nothing at all to the
+server** — it keeps running, with everything on it, and the key still gets in.
+It asks first unless `--yes` is given, and it refuses to leave a workspace
+pointing at a machine that is no longer there.
+
+**`rm` is not `delete-local`.** They look alike and only one destroys anything:
+`rm` forgets a server, `delete-local` erases a machine on this computer.
 
 `create-local` builds a machine on this computer and hands it back as an
 ordinary machine: an address, a port and an admin login. It comes up the way a
@@ -112,8 +127,7 @@ It writes nothing to your configuration. `setup` does that, and running it
 against the new machine is the point.
 
 `start`, `stop` and `delete-local` act on a local machine only. A bought server
-is not the CLI's to switch on or off. `delete-local` asks first, and is not
-`machines rm`, which forgets a server and leaves it running.
+is not the CLI's to switch on or off. `delete-local` asks first.
 
 Two limits, both from what a machine on your own computer is:
 

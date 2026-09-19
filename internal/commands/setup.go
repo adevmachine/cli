@@ -76,7 +76,11 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 
 	r := bufio.NewReader(in)
 
-	m, domain, err := askForMachine(r, out, "main")
+	m, err := askForMachine(r, out, "main")
+	if err != nil {
+		return err
+	}
+	domain, err := ask(r, out, "domain (leave empty for none)", "")
 	if err != nil {
 		return err
 	}
@@ -108,36 +112,34 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	return nil
 }
 
-// askForMachine asks where the machine is and who to log in as.
-func askForMachine(r *bufio.Reader, out io.Writer, defaultName string) (config.Machine, string, error) {
+// askForMachine asks where the machine is and who to log in as. The domain is
+// not asked for here: it belongs to the configuration, not to a machine, so
+// only setup has a reason to ask.
+func askForMachine(r *bufio.Reader, out io.Writer, defaultName string) (config.Machine, error) {
 	var m config.Machine
 
 	name, err := ask(r, out, "machine name", defaultName)
 	if err != nil {
-		return m, "", err
+		return m, err
 	}
 	address, err := ask(r, out, "address (an IP, a hostname, or tailscale:<name>)", "")
 	if err != nil {
-		return m, "", err
+		return m, err
 	}
 	if address == "" {
-		return m, "", errors.New("an address is required: the CLI has nothing to reach without one")
+		return m, errors.New("an address is required: the CLI has nothing to reach without one")
 	}
 	admin, err := ask(r, out, "administrative login", config.DefaultAdminUser)
 	if err != nil {
-		return m, "", err
+		return m, err
 	}
 	portText, err := ask(r, out, "SSH port", strconv.Itoa(config.DefaultPort))
 	if err != nil {
-		return m, "", err
+		return m, err
 	}
 	port, err := strconv.Atoi(portText)
 	if err != nil {
-		return m, "", fmt.Errorf("%q is not a port number", portText)
-	}
-	domain, err := ask(r, out, "domain (leave empty for none)", "")
-	if err != nil {
-		return m, "", err
+		return m, fmt.Errorf("%q is not a port number", portText)
 	}
 
 	return config.Machine{
@@ -145,7 +147,7 @@ func askForMachine(r *bufio.Reader, out io.Writer, defaultName string) (config.M
 		Hosts: []config.Host{{Address: address}},
 		User:  admin,
 		Port:  port,
-	}, domain, nil
+	}, nil
 }
 
 // chosenKey is how the CLI will log in from now on.
