@@ -1,0 +1,31 @@
+docs/troubleshooting.md
+  s_cab674f14f5e3f::t_371d9cbafd2e9e 48-51,91-155
+internal/commands/sync.go
+  s_cab674f14f5e3f::t_9c907314af974b 1-201
+SURFACE.txt
+  s_cab674f14f5e3f::t_f6550ae887d83e 27
+internal/commands/root.go
+  s_cab674f14f5e3f::t_7bca14ae878ed9 78
+internal/commands/confirm.go
+  s_cab674f14f5e3f::t_efa5bc2b61de83 15
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_49487419fd3f66 145-178
+internal/commands/sync_test.go
+  s_cab674f14f5e3f::t_f19be7c3672d13 1-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "df7439eca9ff54e561306eeaf9aacd0689d6acb2",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
