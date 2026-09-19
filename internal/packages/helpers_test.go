@@ -47,3 +47,12 @@ func problemAbout(t *testing.T, problems []Problem, want string) Problem {
 	t.Fatalf("no problem about %q in %#v", want, problems)
 	return Problem{}
 }
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}

@@ -126,7 +126,7 @@ func extract(tarball []byte, into string) error {
 	if err != nil {
 		return fmt.Errorf("reading the release archive: %w", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 
 	root := filepath.Clean(into)
 	reader := tar.NewReader(gz)

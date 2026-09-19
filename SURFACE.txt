@@ -9,6 +9,10 @@ devmachine help
 devmachine machines
 devmachine machines list
 devmachine mosh
+devmachine packages
+devmachine packages new
+devmachine packages schema
+devmachine packages validate
 devmachine run
 devmachine secrets
 devmachine secrets list

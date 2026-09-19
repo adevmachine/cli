@@ -29,6 +29,8 @@ when something behaves in a way that surprises you.
 ## Reference
 
 - [Commands](reference/commands.md) — every command, its flags and its output.
+- [The package format](reference/package-format.md) — every `package.yml`
+  field, and the message behind every validation rule.
 
 ## Fixing things
 

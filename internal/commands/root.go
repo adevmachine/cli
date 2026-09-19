@@ -74,6 +74,7 @@ func NewRootCmd() *cobra.Command {
 		newSSHCmd(opts),
 		newMoshCmd(opts),
 		newRunCmd(opts),
+		newPackagesCmd(opts),
 	)
 	return root
 }

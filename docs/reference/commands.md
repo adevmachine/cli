@@ -108,6 +108,24 @@ devmachine secrets rm <name>
 With no value, `set` asks without echoing, so the secret never reaches your
 shell history. `list` prints names only.
 
+## packages
+
+```
+devmachine packages new <name> [--scope machine|workspace] [--into <dir>]
+devmachine packages validate <dir>
+devmachine packages schema [--json]
+```
+
+`new` writes a package that already passes `validate` and already installs
+something. It refuses to write over one that is there.
+
+`validate` reports every problem at once, each with the file and the line, and
+exits 1 when it found any.
+
+`schema` prints the `package.yml` format this binary reads. It is the answer
+that cannot drift, because the validator is what enforces it. The whole format
+is in [the package format](package-format.md).
+
 ## version, help
 
 ```
