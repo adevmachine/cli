@@ -317,9 +317,12 @@ func installWithPassword(ctx context.Context, r *bufio.Reader, source io.Reader,
 
 	proved, err := proveAuth(ctx, m, m.User, key.auth())
 	if err != nil {
+		// The detail is in the error the caller prints. What goes here is the
+		// one thing somebody needs to know before they panic: the machine is
+		// still reachable the way they reached it a minute ago.
 		fmt.Fprintf(out,
 			"\nThe key was installed and does not log in, so nothing was hardened and "+
-				"password login is still on: you can still get in with the password.\n%v\n", err)
+				"password login is still on: you can still get in with the password.\n")
 		return nil, fmt.Errorf("the key was installed but not proved, so password login was left on: %w", err)
 	}
 	fmt.Fprintf(out, "the key works.\n")
