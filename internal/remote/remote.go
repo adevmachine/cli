@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -44,6 +45,11 @@ var (
 // Client runs commands on the machine.
 type Client interface {
 	Run(ctx context.Context, command string) (string, error)
+	// Stream runs a command with its output going to the writers as it
+	// arrives, and returns the exit status.
+	Stream(ctx context.Context, command string, stdout, stderr io.Writer) error
+	// Upload extracts a gzipped tar into a directory on the machine.
+	Upload(ctx context.Context, dir string, tarball io.Reader) error
 	Close() error
 }
 
@@ -235,8 +241,73 @@ func (c *sshClient) Run(ctx context.Context, command string) (string, error) {
 	}
 	defer session.Close()
 
+	stop := c.closeOnCancel(ctx, session)
+	defer stop()
+
+	out, err := session.Output(command)
+	if err != nil {
+		return string(out), fmt.Errorf("running %q: %w", command, err)
+	}
+	return string(out), nil
+}
+
+// Stream executes one command with its output reaching the writers as it
+// arrives.
+//
+// Collecting the output and printing it at the end makes a long run look stuck
+// when it is not, which is exactly what a provisioning run is.
+func (c *sshClient) Stream(ctx context.Context, command string, stdout, stderr io.Writer) error {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return fmt.Errorf("opening a session: %w", err)
+	}
+	defer session.Close()
+
+	stop := c.closeOnCancel(ctx, session)
+	defer stop()
+
+	session.Stdout = stdout
+	session.Stderr = stderr
+	if err := session.Run(command); err != nil {
+		return fmt.Errorf("running %q: %w", command, err)
+	}
+	return nil
+}
+
+// Upload extracts a gzipped tar into a directory on the machine.
+//
+// One session carries the whole tree, and tar is on any machine that can run
+// Ansible — neither scp nor sftp has to be there.
+func (c *sshClient) Upload(ctx context.Context, dir string, tarball io.Reader) error {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return fmt.Errorf("opening a session: %w", err)
+	}
+	defer session.Close()
+
+	stop := c.closeOnCancel(ctx, session)
+	defer stop()
+
+	quoted := shellQuote(dir)
+	session.Stdin = tarball
+	command := "mkdir -p " + quoted + " && tar -C " + quoted + " -xzf -"
+	// tar says what it refused on stderr, and that message is the whole
+	// diagnosis when an upload fails.
+	out, err := session.CombinedOutput(command)
+	if err != nil {
+		return fmt.Errorf("sending a directory to %s: %w: %s", dir, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// closeOnCancel closes the session when the context is cancelled, and returns
+// the function that retires the goroutine once the command is done.
+//
+// It frees the session, and no more than that: OpenSSH's server ignores the
+// signal request, so a cancelled command keeps running there until it ends or
+// the connection drops.
+func (c *sshClient) closeOnCancel(ctx context.Context, session *ssh.Session) func() {
 	done := make(chan struct{})
-	defer close(done)
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -244,12 +315,12 @@ func (c *sshClient) Run(ctx context.Context, command string) (string, error) {
 		case <-done:
 		}
 	}()
+	return func() { close(done) }
+}
 
-	out, err := session.Output(command)
-	if err != nil {
-		return string(out), fmt.Errorf("running %q: %w", command, err)
-	}
-	return string(out), nil
+// shellQuote wraps a value so the remote shell takes it as one word.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func (c *sshClient) Close() error { return c.conn.Close() }

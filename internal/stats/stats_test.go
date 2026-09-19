@@ -3,6 +3,7 @@ package stats
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,6 +121,17 @@ func (f fakeClient) Run(_ context.Context, command string) (string, error) {
 	}
 	return f.out[command], nil
 }
+
+func (f fakeClient) Stream(ctx context.Context, command string, stdout, _ io.Writer) error {
+	out, err := f.Run(ctx, command)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(stdout, out)
+	return err
+}
+
+func (f fakeClient) Upload(context.Context, string, io.Reader) error { return nil }
 
 func (f fakeClient) Close() error { return nil }
 
