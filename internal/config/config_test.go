@@ -662,3 +662,121 @@ workspaces:
 		t.Fatal("it removed the machine anyway")
 	}
 }
+
+func TestSettingsForStripsThePackagePrefix(t *testing.T) {
+	got := SettingsFor(map[string]any{
+		"caddy.email":   "someone@example.com",
+		"base.timezone": "UTC",
+	}, "caddy")
+
+	if len(got) != 1 || got["email"] != "someone@example.com" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSettingsForKeepsADottedKeyInsideAPackage(t *testing.T) {
+	// A package may want `claude-plugins.marketplace.url`. Only the first
+	// segment is the package name.
+	got := SettingsFor(map[string]any{"a.b.c": 1}, "a")
+	if got["b.c"] != 1 {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSettingsForIgnoresAnotherPackage(t *testing.T) {
+	got := SettingsFor(map[string]any{"base.timezone": "UTC"}, "caddy")
+	if len(got) != 0 {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestLoadReadsTheSettingsOfBothKindsOfTarget(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [base]
+    settings:
+      base.timezone: America/Sao_Paulo
+workspaces:
+  - name: alice
+    packages: [claude-plugins]
+    settings:
+      claude-plugins.plugins: [their-plugin]
+`)
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Machines[0].Settings["base.timezone"] != "America/Sao_Paulo" {
+		t.Fatalf("got %#v", c.Machines[0].Settings)
+	}
+	if got, ok := c.Workspaces[0].Settings["claude-plugins.plugins"].([]any); !ok || len(got) != 1 {
+		t.Fatalf("got %#v", c.Workspaces[0].Settings)
+	}
+}
+
+func TestValidateRefusesASettingWithNoPackagePrefix(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{
+			Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22,
+			Settings: map[string]any{"timezone": "UTC"},
+		}},
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a setting belonging to nothing was accepted")
+	}
+	if !strings.Contains(err.Error(), "<package>.<name>") {
+		t.Fatalf("the error does not give the shape: %v", err)
+	}
+}
+
+func TestValidateRefusesASettingForAPackageTheTargetDoesNotHave(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{
+			Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22,
+			Packages: []string{"base"},
+			Settings: map[string]any{"caddy.email": "x@example.com"},
+		}},
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a setting for a package nobody installed was accepted")
+	}
+	// A typo in a package name would otherwise be silent: the value simply
+	// never reaches anything, and the recipe keeps its default.
+	if !strings.Contains(err.Error(), "caddy") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+}
+
+func TestValidateRefusesAWorkspaceSettingForAPackageItDoesNotHave(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22}},
+		Workspaces: []Workspace{{
+			Name: "alice", Packages: []string{"zsh"},
+			Settings: map[string]any{"claude-plugins.marketplace": "example.com/plugins"},
+		}},
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a setting for a package the workspace does not have was accepted")
+	}
+	if !strings.Contains(err.Error(), "claude-plugins") || !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not say what and where: %v", err)
+	}
+}
+
+func TestValidateAcceptsASettingForAPackageTheTargetHas(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{
+			Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22,
+			Packages: []string{"base", "caddy"},
+			Settings: map[string]any{"caddy.email": "someone@example.com"},
+		}},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

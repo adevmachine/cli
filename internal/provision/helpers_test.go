@@ -6,7 +6,9 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -46,6 +48,11 @@ summary: A proxy with automatic certificates.
 needs: [firewall]
 provides:
   sites.d: /etc/caddy/sites.d
+`,
+	"acme": `format: 1
+name: acme
+scope: machine
+summary: A second recipe that also reads an address, so two can collide.
 `,
 	"unused": `format: 1
 name: unused
@@ -154,6 +161,55 @@ func planFor(t *testing.T, store *packages.Store, machineName string,
 		t.Fatal(err)
 	}
 	return plan
+}
+
+// planWithSettings resolves a plan whose targets carry settings. The packages
+// are read out of the settings themselves: a setting for a package the target
+// does not install is refused by the configuration, so a fixture that does
+// that would be testing something that cannot happen.
+func planWithSettings(t *testing.T, machine map[string]any,
+	workspaces map[string]map[string]any) packages.MachinePlan {
+	t.Helper()
+
+	target := config.Machine{
+		Name:     "main",
+		Hosts:    []config.Host{{Address: "203.0.113.10"}},
+		Port:     22,
+		Packages: packagesNamedBy(machine),
+		Settings: machine,
+	}
+	cfg := config.Config{Machines: []config.Machine{target}, Packages: pin}
+	for _, name := range slices.Sorted(maps.Keys(workspaces)) {
+		cfg.Workspaces = append(cfg.Workspaces, config.Workspace{
+			Name:     name,
+			Machine:  target.Name,
+			Packages: packagesNamedBy(workspaces[name]),
+			Settings: workspaces[name],
+		})
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := packages.ResolveMachine(storeWithCatalogue(t), cfg, target, "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+// packagesNamedBy is every package a set of settings mentions.
+func packagesNamedBy(settings map[string]any) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, key := range slices.Sorted(maps.Keys(settings)) {
+		name, _, _ := strings.Cut(key, ".")
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 func planWith(t *testing.T, machineName string,

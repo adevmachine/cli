@@ -17,6 +17,8 @@ type Target struct {
 	// LinuxUser is empty for a machine.
 	LinuxUser string   `json:"linux_user,omitempty"`
 	Packages  []string `json:"packages,omitempty"`
+	// Settings are this target's overrides, keyed `<package>.<name>`.
+	Settings map[string]any `json:"settings,omitempty"`
 }
 
 // Resolved is everything a target gets, in the order it has to run.
@@ -57,6 +59,7 @@ func ResolveMachine(store *Store, cfg config.Config, machine config.Machine, cli
 
 	resolved, err := resolveTarget(store, Target{
 		Kind: ScopeMachine, Name: machine.Name, Packages: machine.Packages,
+		Settings: machine.Settings,
 	}, cliVersion)
 	if err != nil {
 		return plan, err
@@ -66,6 +69,7 @@ func ResolveMachine(store *Store, cfg config.Config, machine config.Machine, cli
 	for _, w := range cfg.WorkspacesOn(machine.Name) {
 		r, err := resolveTarget(store, Target{
 			Kind: ScopeWorkspace, Name: w.Name, LinuxUser: w.LinuxUser(), Packages: w.Packages,
+			Settings: w.Settings,
 		}, cliVersion)
 		if err != nil {
 			return plan, err

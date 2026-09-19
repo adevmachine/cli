@@ -234,11 +234,155 @@ func TestGenerateIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestGenerateCarriesAMachineSetting(t *testing.T) {
+	files, err := Generate(planWithSettings(t, map[string]any{"base.timezone": "UTC"}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars := string(files["host_vars/devmachine.yml"])
+	if !strings.Contains(vars, "devmachine_base_timezone: UTC") {
+		t.Fatalf("got:\n%s", vars)
+	}
+}
+
+func TestGenerateNamespacesASettingByItsPackage(t *testing.T) {
+	// Two packages may both want `email`. Ansible has one variable namespace,
+	// so the package name is what keeps them apart.
+	files, err := Generate(planWithSettings(t, map[string]any{
+		"caddy.email": "a@example.com", "acme.email": "b@example.com",
+	}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars := string(files["host_vars/devmachine.yml"])
+	for _, want := range []string{"devmachine_caddy_email:", "devmachine_acme_email:"} {
+		if !strings.Contains(vars, want) {
+			t.Fatalf("got:\n%s", vars)
+		}
+	}
+}
+
+func TestGenerateTurnsADashIntoAnUnderscore(t *testing.T) {
+	// `claude-code` is a fine package name and an invalid Ansible variable.
+	files, err := Generate(planWithSettings(t, nil,
+		map[string]map[string]any{"alice": {"claude-code.model": "x"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(files["site.yml"]), "devmachine_claude_code_model: x") {
+		t.Fatalf("got:\n%s", files["site.yml"])
+	}
+}
+
+func TestGenerateKeepsOnlyTheFirstDotAsThePackageName(t *testing.T) {
+	// A package is free to use a dotted name of its own, and the whole of it
+	// is still one Ansible variable.
+	files, err := Generate(planWithSettings(t, nil,
+		map[string]map[string]any{"alice": {"claude-code.marketplace.url": "example.com"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(files["site.yml"]), "devmachine_claude_code_marketplace_url: example.com") {
+		t.Fatalf("got:\n%s", files["site.yml"])
+	}
+}
+
+func TestGenerateCarriesASettingThatIsNotAString(t *testing.T) {
+	files, err := Generate(planWithSettings(t, map[string]any{
+		"firewall.http":     false,
+		"firewall.ports":    []string{"80", "443"},
+		"firewall.maxretry": 5,
+	}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars := string(files["host_vars/devmachine.yml"])
+	for _, want := range []string{
+		"devmachine_firewall_http: false",
+		"devmachine_firewall_maxretry: 5",
+		"- \"80\"",
+	} {
+		if !strings.Contains(vars, want) {
+			t.Fatalf("%q is missing from:\n%s", want, vars)
+		}
+	}
+}
+
+func TestGenerateGivesEachWorkspaceItsOwnSettings(t *testing.T) {
+	// alice and bob may install the same package with different values, and
+	// the loop has to carry each one's.
+	plan := planWithSettings(t, nil, map[string]map[string]any{
+		"alice": {"claude-code.model": "one"},
+		"bob":   {"claude-code.model": "two"},
+	})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	playbook := string(files["site.yml"])
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		vars, ok := task["vars"].(map[string]any)
+		if !ok || vars["devmachine_claude_code_model"] == nil {
+			continue
+		}
+		loop, ok := task["loop"].([]any)
+		if !ok || len(loop) != 1 {
+			t.Fatalf("a setting reached %d workspaces at once:\n%s", len(loop), playbook)
+		}
+		who := loop[0].(map[string]any)["name"]
+		want := map[any]string{"alice": "one", "bob": "two"}[who]
+		if vars["devmachine_claude_code_model"] != want {
+			t.Fatalf("%v got %v, not %q:\n%s", who, vars["devmachine_claude_code_model"], want, playbook)
+		}
+	}
+}
+
+func TestGenerateLeavesAWorkspaceWithoutSettingsInTheSharedLoop(t *testing.T) {
+	// Only a workspace that overrides something needs a task of its own;
+	// everybody else keeps sharing one.
+	plan := planWith(t, "main", nil, map[string][]string{
+		"alice": {"claude-code"},
+		"bob":   {"claude-code"},
+	})
+	plan.Workspaces[0].Target.Settings = map[string]any{"claude-code.model": "one"}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playbook := string(files["site.yml"])
+	if !strings.Contains(playbook, "claude-code for each workspace that declares it") {
+		t.Fatalf("bob lost the shared loop:\n%s", playbook)
+	}
+	if strings.Count(playbook, "include_role") != 2 {
+		t.Fatalf("got:\n%s", playbook)
+	}
+}
+
+func TestGenerateRefusesTwoSettingsWithTheSameVariableName(t *testing.T) {
+	// `a-b` and `a.b` are two settings and one Ansible variable. Letting one
+	// win silently is the failure this whole feature exists to prevent.
+	_, err := Generate(planWithSettings(t, map[string]any{
+		"base.a-b": "one",
+		"base.a.b": "two",
+	}, nil))
+	if err == nil {
+		t.Fatal("two settings collapsed into one variable without a word")
+	}
+	if !strings.Contains(err.Error(), "devmachine_base_a_b") {
+		t.Fatalf("the error does not name the variable: %v", err)
+	}
+}
+
 func TestGenerateMatchesTheGoldenFiles(t *testing.T) {
 	plan := planWith(t, "main", []string{"caddy", "docker"}, map[string][]string{
 		"alice": {"claude-code", "sharing"},
 		"bob":   {},
 	})
+	plan.Machine.Settings = map[string]any{"caddy.email": "someone@example.com"}
+	plan.Workspaces[0].Target.Settings = map[string]any{"claude-code.plugins": []string{"one", "two"}}
+
 	files, err := Generate(plan)
 	if err != nil {
 		t.Fatal(err)

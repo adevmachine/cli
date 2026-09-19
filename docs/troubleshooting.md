@@ -58,6 +58,22 @@ the next address is tried. That is deliberate.
 To see what happened, run `tailscale status` and check the machine is there
 under the name you wrote.
 
+## A setting is accepted and the recipe still uses its default
+
+A setting reaches the machine as `devmachine_<package>_<name>`, with a dash or
+a dot turned into an underscore. If the recipe reads some other variable, the
+value arrives and nothing looks at it.
+
+Read what was sent, which settles it in one command:
+
+```
+devmachine run --machine main -- "cat /opt/devmachine/host_vars/devmachine.yml"
+```
+
+The variable is there, and the recipe's `defaults/main.yml` names a different
+one. The recipe is what has to change: the name in its defaults is the contract
+a setting overrides.
+
 ## `devmachine ssh` opens a session as the wrong user
 
 `devmachine ssh` with no argument logs in as the machine's **administrative**
