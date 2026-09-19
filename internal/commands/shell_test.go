@@ -1,11 +1,17 @@
 package commands
 
 import (
+	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/history"
+	"github.com/adevmachine/cli/internal/remote"
 )
 
 // captureInteractive records what would have been launched instead of
@@ -241,5 +247,75 @@ func TestAWorkspaceUsesItsNameAsTheLinuxAccount(t *testing.T) {
 
 	if line := strings.Join(*got, " "); !strings.Contains(line, "alice@") {
 		t.Fatalf("the workspace name was not used as the account: %q", line)
+	}
+}
+
+// fakeRemote answers one command, so a test can drive `run` without a machine.
+type fakeRemote struct {
+	out string
+	err error
+}
+
+func (f fakeRemote) Run(context.Context, string) (string, error) { return f.out, f.err }
+
+func (f fakeRemote) Stream(_ context.Context, _ string, stdout, _ io.Writer) error {
+	if _, err := io.WriteString(stdout, f.out); err != nil {
+		return err
+	}
+	return f.err
+}
+
+func (f fakeRemote) Upload(context.Context, string, io.Reader) error { return nil }
+
+func (f fakeRemote) Close() error { return nil }
+
+// dialing answers every dial with this client, and reports nothing was reached
+// for real.
+func dialing(t *testing.T, client remote.Client) {
+	t.Helper()
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return client, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { dial = remote.Dial })
+}
+
+func historyLines(t *testing.T, dir string) []string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(dir, history.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Split(strings.TrimSpace(string(body)), "\n")
+}
+
+func TestRunRecordsTheCommandAndTheWorkspaceItRanIn(t *testing.T) {
+	dialing(t, fakeRemote{out: "CONTAINER ID\n"})
+	dir := configWith(t, twoMachineConfig)
+
+	if _, err := execute(t, "--config", dir, "run", "docker ps", "--workspace", "alice"); err != nil {
+		t.Fatalf("run returned %v", err)
+	}
+
+	line := historyLines(t, dir)[0]
+	for _, want := range []string{"workspace alice", "docker ps", "ok"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("the log line leaves out %q: %q", want, line)
+		}
+	}
+}
+
+func TestRunRecordsAFailureAgainstTheMachineItRanOn(t *testing.T) {
+	dialing(t, fakeRemote{err: errors.New("exit status 1")})
+	dir := configWith(t, twoMachineConfig)
+
+	if _, err := execute(t, "--config", dir, "--machine", "sandbox", "run", "false"); err == nil {
+		t.Fatal("expected the command's own failure")
+	}
+
+	line := historyLines(t, dir)[0]
+	for _, want := range []string{"machine sandbox", "false", "failed"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("the log line leaves out %q: %q", want, line)
+		}
 	}
 }

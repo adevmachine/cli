@@ -47,6 +47,14 @@ func workspaceTarget(opts *options, name string) (target, error) {
 	return target{machine: m, user: w.LinuxUser(), workspace: w.Name}, nil
 }
 
+// label is how the command log names this target.
+func (t target) label() string {
+	if t.workspace != "" {
+		return "workspace " + t.workspace
+	}
+	return "machine " + t.machine.Name
+}
+
 // login is the account to authenticate as.
 func (t target) login() string {
 	if t.user != "" {

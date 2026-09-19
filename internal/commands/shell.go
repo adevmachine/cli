@@ -5,8 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"time"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/history"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +19,7 @@ var (
 	runInteractive  = realExecCommand
 	realLookPath    = exec.LookPath
 	lookPath        = realLookPath
+	dial            = remote.Dial
 )
 
 func execCommand(name string, args ...string) error {
@@ -37,6 +40,18 @@ func loadConfig(opts *options) (config.Config, error) {
 		return cfg, err
 	}
 	return cfg, cfg.Validate()
+}
+
+// record writes one line in the command log.
+//
+// It is called once the machine has been reached, so the log holds what was
+// asked of a machine rather than every attempt to find one.
+func record(opts *options, tgt target, command string, ok bool) {
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return
+	}
+	history.Append(dir, history.Entry{At: time.Now(), Target: tgt.label(), Command: command, OK: ok})
 }
 
 // firstAddress is the address an interactive session should use. It is the
@@ -130,13 +145,14 @@ func newRunCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, _, err := remote.Dial(cmd.Context(), tgt.machine, tgt.user)
+			client, _, err := dial(cmd.Context(), tgt.machine, tgt.user)
 			if err != nil {
 				return err
 			}
 			defer client.Close()
 
 			out, err := client.Run(cmd.Context(), args[0])
+			record(opts, tgt, args[0], err == nil)
 			// The output of a command that failed is usually the explanation,
 			// so it is printed before the error is reported.
 			if out != "" {
