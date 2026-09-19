@@ -13,6 +13,8 @@ Set up and operate a personal development VPS.
   everything else is built on.
 - [Configuration](concepts/configuration.md) — where it lives, what it holds,
   and how the CLI finds it.
+- [Packages](concepts/packages.md) — everything a machine gets, including the
+  things every machine gets.
 
 ## How it works
 
@@ -25,6 +27,8 @@ when something behaves in a way that surprises you.
   machine with several addresses is reached, and what is dropped silently.
 - [Choosing a target](how-it-works/choosing-a-target.md) — why a command asks
   instead of guessing which machine it runs against.
+- [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — what
+  fetching every recipe buys, and the one thing it costs.
 
 ## Reference
 

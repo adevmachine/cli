@@ -148,6 +148,29 @@ The same error appears when the provider is installed but does not declare that
 place. Check its `provides:` against the `extends:` that names it — the point is
 written `<package>.<place>`, and both halves have to match.
 
+## `sync --check` fails on a machine nothing has been applied to yet
+
+A dry run against a machine that has no packages on it reports failures like:
+
+```
+No package matching 'docker-ce' is available
+Could not find the requested service caddy: host
+```
+
+**Nothing is wrong.** This is what `--check` cannot do rather than something it
+found. A dry run changes nothing, so a package's repository is never really
+added, the package index is never really refreshed, and the package that
+repository would have provided is genuinely not available to look at. The same
+goes for a service belonging to software that was never installed.
+
+Ansible has this limit with any third-party repository; it is not particular to
+this CLI.
+
+What to do: run `devmachine sync` for real once. From then on `--check` is
+meaningful, because the packages and their repositories exist and it is
+comparing against something. A dry run is a tool for seeing what a change would
+do to a machine you already built, not for previewing the build itself.
+
 ## `sync` asks and I answered nothing
 
 An empty answer is no, and so is a closed input. A command that changes a
