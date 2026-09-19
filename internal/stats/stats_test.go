@@ -131,6 +131,10 @@ func (f fakeClient) Stream(ctx context.Context, command string, stdout, _ io.Wri
 	return err
 }
 
+func (f fakeClient) RunInput(ctx context.Context, command string, _ io.Reader) (string, error) {
+	return f.Run(ctx, command)
+}
+
 func (f fakeClient) Upload(context.Context, string, io.Reader) error { return nil }
 
 func (f fakeClient) Close() error { return nil }

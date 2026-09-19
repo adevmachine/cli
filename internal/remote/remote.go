@@ -12,6 +12,7 @@ package remote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -45,6 +46,11 @@ var (
 // Client runs commands on the machine.
 type Client interface {
 	Run(ctx context.Context, command string) (string, error)
+	// RunInput runs a command with stdin fed from the reader.
+	//
+	// It is how a value reaches the machine without going in an argument,
+	// where `ps` shows it to every account on the machine.
+	RunInput(ctx context.Context, command string, stdin io.Reader) (string, error)
 	// Stream runs a command with its output going to the writers as it
 	// arrives, and returns the exit status.
 	Stream(ctx context.Context, command string, stdout, stderr io.Writer) error
@@ -125,17 +131,70 @@ type peer struct {
 	TailscaleIPs []string `json:"TailscaleIPs"`
 }
 
+// ErrAuthRefused says the machine answered and then refused the login.
+//
+// It is a different problem from nothing answering, with a different fix, so a
+// caller can tell them apart without matching strings.
+var ErrAuthRefused = errors.New("the machine refused the login")
+
+// Auth says how to authenticate. Exactly one field is set.
+//
+// Never more than one: a server counts every method offered against
+// MaxAuthTries and cuts the connection when the count runs out, so a list ends
+// the session before the method that would have worked is reached.
+type Auth struct {
+	KeyPath  string
+	Password string
+	Agent    bool
+}
+
+// describe names the method in the words of whoever has to fix it.
+func (a Auth) describe() string {
+	switch {
+	case a.KeyPath != "":
+		return "the key " + a.KeyPath
+	case a.Password != "":
+		return "a password"
+	case a.Agent:
+		return "a key from the SSH agent"
+	}
+	return "nothing"
+}
+
 // Dial tries each of a machine's addresses in order and returns the first
 // client that answered, along with the address it answered on.
 //
 // user is who to log in as. Empty means the machine's administrative login;
 // a workspace passes its own Linux account instead.
 func Dial(ctx context.Context, m config.Machine, user string) (Client, string, error) {
-	addresses, err := Resolve(m)
+	a, err := authFor(m)
 	if err != nil {
 		return nil, "", err
 	}
-	auth, err := authMethods(m)
+	return DialWith(ctx, m, user, a)
+}
+
+// authFor is what a machine's configuration implies: its own key when it has
+// one, and the agent otherwise.
+func authFor(m config.Machine) (Auth, error) {
+	if m.Key != "" {
+		return Auth{KeyPath: m.Key}, nil
+	}
+	if os.Getenv("SSH_AUTH_SOCK") == "" {
+		return Auth{}, fmt.Errorf("no key in the configuration and no SSH agent: set `key` in config.yml or start an agent")
+	}
+	return Auth{Agent: true}, nil
+}
+
+// DialWith is Dial with the authentication method chosen by the caller, which
+// is what the bootstrap needs: a password before any key exists, then the key
+// alone to prove it.
+func DialWith(ctx context.Context, m config.Machine, user string, a Auth) (Client, string, error) {
+	auth, err := authMethods(a)
+	if err != nil {
+		return nil, "", err
+	}
+	addresses, err := Resolve(m)
 	if err != nil {
 		return nil, "", err
 	}
@@ -169,8 +228,8 @@ func Dial(ctx context.Context, m config.Machine, user string) (Client, string, e
 		// Reporting both as "nothing answered" sends people to check the
 		// network when the account or the key is what is wrong.
 		if isAuthFailure(err) && authErr == nil {
-			authErr = fmt.Errorf("machine %q answered on %s but refused the login for %q: %w",
-				m.Name, address, user, err)
+			authErr = fmt.Errorf("%w: machine %q answered on %s but refused %s for %q: %w",
+				ErrAuthRefused, m.Name, address, a.describe(), user, err)
 		}
 		failures = append(failures, fmt.Sprintf("%s (%v)", address, err))
 	}
@@ -203,19 +262,40 @@ func dialContext(ctx context.Context, target string, cfg *ssh.ClientConfig) (*ss
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-// authMethods offers the key from the configuration when there is one, and the
-// agent otherwise. Never both: offering everything is what trips MaxAuthTries.
-func authMethods(m config.Machine) ([]ssh.AuthMethod, error) {
-	if m.Key != "" {
-		body, err := os.ReadFile(m.Key)
+// authMethods turns an Auth into the one method it names.
+//
+// More than one is refused rather than merged: offering everything is what
+// trips MaxAuthTries.
+func authMethods(a Auth) ([]ssh.AuthMethod, error) {
+	var chosen []string
+	if a.KeyPath != "" {
+		chosen = append(chosen, "a key")
+	}
+	if a.Password != "" {
+		chosen = append(chosen, "a password")
+	}
+	if a.Agent {
+		chosen = append(chosen, "the SSH agent")
+	}
+	if len(chosen) != 1 {
+		return nil, fmt.Errorf("exactly one authentication method can be offered, got %d (%s)",
+			len(chosen), strings.Join(chosen, ", "))
+	}
+
+	switch {
+	case a.KeyPath != "":
+		body, err := os.ReadFile(a.KeyPath)
 		if err != nil {
-			return nil, fmt.Errorf("reading the private key %s: %w", m.Key, err)
+			return nil, fmt.Errorf("reading the private key %s: %w", a.KeyPath, err)
 		}
 		signer, err := ssh.ParsePrivateKey(body)
 		if err != nil {
-			return nil, fmt.Errorf("parsing the private key %s: %w", m.Key, err)
+			return nil, fmt.Errorf("parsing the private key %s: %w", a.KeyPath, err)
 		}
 		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+
+	case a.Password != "":
+		return []ssh.AuthMethod{ssh.Password(a.Password)}, nil
 	}
 
 	socket := os.Getenv("SSH_AUTH_SOCK")
@@ -244,6 +324,25 @@ func (c *sshClient) Run(ctx context.Context, command string) (string, error) {
 	stop := c.closeOnCancel(ctx, session)
 	defer stop()
 
+	out, err := session.Output(command)
+	if err != nil {
+		return string(out), fmt.Errorf("running %q: %w", command, err)
+	}
+	return string(out), nil
+}
+
+// RunInput executes one command with stdin fed from the reader.
+func (c *sshClient) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
+	session, err := c.conn.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("opening a session: %w", err)
+	}
+	defer session.Close()
+
+	stop := c.closeOnCancel(ctx, session)
+	defer stop()
+
+	session.Stdin = stdin
 	out, err := session.Output(command)
 	if err != nil {
 		return string(out), fmt.Errorf("running %q: %w", command, err)

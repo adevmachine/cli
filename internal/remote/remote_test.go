@@ -10,8 +10,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -434,5 +436,232 @@ func (w *firstWrite) Write(p []byte) (int, error) {
 func TestShellQuoteSurvivesAQuoteInThePath(t *testing.T) {
 	if got := shellQuote("/opt/dev'machine"); got != `'/opt/dev'\''machine'` {
 		t.Fatalf("got %s", got)
+	}
+}
+
+// fakeSSHServer is an SSH server in this process, so a test can assert on what
+// the client offered and how many times it connected.
+//
+// Shelling out to `ssh` would make both unobservable, and those two facts are
+// the whole point of the bootstrap: offer one method, and prove the key on a
+// connection of its own.
+type fakeSSHServer struct {
+	addr string
+
+	mu          sync.Mutex
+	methods     []string
+	connections int
+}
+
+// methodsOffered returns the authentication methods the client actually chose.
+//
+// Every SSH client asks "none" first, because that is how the protocol says to
+// find out what a server takes. It is not a method the CLI offered, so it is
+// left out.
+func (s *fakeSSHServer) methodsOffered() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.methods...)
+}
+
+func (s *fakeSSHServer) connectionCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.connections
+}
+
+func sshServerAccepting(t *testing.T, method string) *fakeSSHServer {
+	return sshServer(t, method)
+}
+
+func sshServerRejecting(t *testing.T) *fakeSSHServer {
+	return sshServer(t, "")
+}
+
+func sshServer(t *testing.T, accept string) *fakeSSHServer {
+	t.Helper()
+
+	s := &fakeSSHServer{}
+	cfg := &ssh.ServerConfig{
+		AuthLogCallback: func(_ ssh.ConnMetadata, method string, _ error) {
+			if method == "none" {
+				return
+			}
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.methods = append(s.methods, method)
+		},
+		PasswordCallback: func(ssh.ConnMetadata, []byte) (*ssh.Permissions, error) {
+			if accept != "password" {
+				return nil, errors.New("refused")
+			}
+			return &ssh.Permissions{}, nil
+		},
+		PublicKeyCallback: func(ssh.ConnMetadata, ssh.PublicKey) (*ssh.Permissions, error) {
+			if accept != "publickey" {
+				return nil, errors.New("refused")
+			}
+			return &ssh.Permissions{}, nil
+		},
+	}
+	cfg.AddHostKey(serverHostKey(t))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+	s.addr = listener.Addr().String()
+
+	go s.serve(listener, cfg)
+	return s
+}
+
+func (s *fakeSSHServer) serve(listener net.Listener, cfg *ssh.ServerConfig) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		// Counted here, before the handshake, so the count is already written
+		// by the time the client's Dial returns.
+		s.mu.Lock()
+		s.connections++
+		s.mu.Unlock()
+
+		go func() {
+			defer conn.Close()
+			served, chans, reqs, err := ssh.NewServerConn(conn, cfg)
+			if err != nil {
+				return
+			}
+			defer served.Close()
+			go ssh.DiscardRequests(reqs)
+			for ch := range chans {
+				ch.Reject(ssh.Prohibited, "this server only answers about authentication")
+			}
+		}()
+	}
+}
+
+func serverHostKey(t *testing.T) ssh.Signer {
+	t.Helper()
+
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
+
+func machineAt(t *testing.T, addr string) config.Machine {
+	t.Helper()
+
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return config.Machine{
+		Name:  "sandbox",
+		Hosts: []config.Host{{Address: host}},
+		User:  "root",
+		Port:  n,
+	}
+}
+
+func TestDialWithOffersOnlyThePasswordWhenOneIsGiven(t *testing.T) {
+	// An agent holding many keys makes a server cut the connection at
+	// MaxAuthTries before the password is ever tried. Offering one method is
+	// the whole reason this does not shell out to ssh.
+	server := sshServerAccepting(t, "password")
+	m := machineAt(t, server.addr)
+
+	client, _, err := DialWith(context.Background(), m, "root", Auth{Password: "devmachine"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if got := server.methodsOffered(); !slices.Equal(got, []string{"password"}) {
+		t.Fatalf("offered %v", got)
+	}
+}
+
+func TestDialWithOffersOnlyTheKeyWhenOneIsGiven(t *testing.T) {
+	server := sshServerAccepting(t, "publickey")
+	m := machineAt(t, server.addr)
+
+	client, _, err := DialWith(context.Background(), m, "root", Auth{KeyPath: throwawayKey(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if got := server.methodsOffered(); !slices.Equal(got, []string{"publickey"}) {
+		t.Fatalf("offered %v", got)
+	}
+}
+
+func TestDialWithRefusesMoreThanOneMethod(t *testing.T) {
+	_, _, err := DialWith(context.Background(), config.Machine{}, "root",
+		Auth{KeyPath: "/k", Password: "p"})
+	if err == nil {
+		t.Fatal("two methods were accepted")
+	}
+}
+
+func TestDialWithSaysAPasswordWasRefused(t *testing.T) {
+	server := sshServerRejecting(t)
+	m := machineAt(t, server.addr)
+
+	_, _, err := DialWith(context.Background(), m, "root", Auth{Password: "wrong"})
+	if !errors.Is(err, ErrAuthRefused) {
+		t.Fatalf("got %v, want ErrAuthRefused", err)
+	}
+	// "no address answered" sends somebody to check the network when the
+	// password is what is wrong.
+	if !strings.Contains(err.Error(), "password") {
+		t.Fatalf("the error does not say which method failed: %v", err)
+	}
+}
+
+func TestDialWithSaysAKeyWasRefused(t *testing.T) {
+	server := sshServerRejecting(t)
+	m := machineAt(t, server.addr)
+	key := throwawayKey(t)
+
+	_, _, err := DialWith(context.Background(), m, "root", Auth{KeyPath: key})
+	if !errors.Is(err, ErrAuthRefused) {
+		t.Fatalf("got %v, want ErrAuthRefused", err)
+	}
+	if !strings.Contains(err.Error(), key) {
+		t.Fatalf("the error does not name the key that failed: %v", err)
+	}
+}
+
+// TestDialWithLeavesAnUnreachableMachineApart guards the other half of the
+// distinction: nothing answered, so no method was refused.
+func TestDialWithLeavesAnUnreachableMachineApart(t *testing.T) {
+	m := config.Machine{
+		Name:  "main",
+		Hosts: []config.Host{{Address: "203.0.113.1"}},
+		User:  "root",
+		Port:  22,
+	}
+
+	_, _, err := DialWith(context.Background(), m, "root", Auth{Password: "devmachine"})
+	if err == nil {
+		t.Fatal("expected an error from an address that cannot answer")
+	}
+	if errors.Is(err, ErrAuthRefused) {
+		t.Fatalf("an unreachable machine was reported as a refused login: %v", err)
 	}
 }
