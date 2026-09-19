@@ -1,6 +1,12 @@
 package commands
 
 import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
@@ -15,6 +21,8 @@ func newMachinesCmd(opts *options) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newMachinesListCmd(opts),
+		newMachinesAddCmd(opts),
+		newMachinesRmCmd(opts),
 		newMachinesCreateLocalCmd(opts),
 		newMachinesStartCmd(),
 		newMachinesStopCmd(),
@@ -57,6 +65,114 @@ func newMachinesListCmd(opts *options) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newMachinesAddCmd(opts *options) *cobra.Command {
+	var s setupOptions
+
+	c := &cobra.Command{
+		Use:   "add",
+		Short: "Take over another machine and add it to the configuration",
+		Long: "Asks the same questions as `setup`, minus the domain, and runs the " +
+			"same bootstrap: it installs a key, proves the key on a connection of " +
+			"its own, turns password login off, and installs Ansible.\n\n" +
+			"`setup` writes the first machine. This writes every one after it.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _, err := config.Dir(opts.configDir)
+			if err != nil {
+				return err
+			}
+			return runMachinesAdd(cmd.Context(), dir, cmd.InOrStdin(), cmd.OutOrStdout(), s)
+		},
+	}
+	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
+		"leave password login on (the key is still installed and proved)")
+	return c
+}
+
+func newMachinesRmCmd(opts *options) *cobra.Command {
+	var yes bool
+
+	c := &cobra.Command{
+		Use:   "rm <name>",
+		Short: "Forget a machine, leaving the server running",
+		Long: "Takes the machine out of the configuration and does nothing at all " +
+			"to the server: it keeps running, with everything on it, and it is " +
+			"still reachable by the key.\n\n" +
+			"It is not `machines delete-local`, which destroys a machine on this " +
+			"computer and everything on it.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _, err := config.Dir(opts.configDir)
+			if err != nil {
+				return err
+			}
+			if !yes {
+				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(),
+					"Forget the machine "+args[0]+"? The server keeps running, untouched.")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errDeclined
+				}
+			}
+			if err := config.RemoveMachine(dir, args[0]); err != nil {
+				return err
+			}
+			cmd.Printf("%s is out of the configuration.\n", args[0])
+			cmd.Printf("The server itself is untouched and still running: nothing on it was " +
+				"changed or deleted, and the key still gets in.\n")
+			cmd.Printf("`machines delete-local` is the one that destroys a machine, and only " +
+				"one on this computer.\n")
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "forget it without asking")
+	return c
+}
+
+// runMachinesAdd asks for a machine, records it, then takes it over.
+//
+// It reads and writes through the streams it is given, for the same reason
+// setup does: every branch of the bootstrap is reachable without a terminal.
+func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupOptions) error {
+	current, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+
+	r := bufio.NewReader(in)
+	m, err := askForMachine(r, out, "")
+	if err != nil {
+		return err
+	}
+	if m.Name == "" {
+		return errors.New("a machine needs a name: it is how every other command says which one to act on")
+	}
+	if _, err := current.Machine(m.Name); err == nil {
+		return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
+	}
+
+	key, err := askForKey(r, out, dir, m.Name)
+	if err != nil {
+		return err
+	}
+	m.Key = key.Path
+
+	if err := config.AddMachine(dir, m); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "\nadded %s to %s\n\n", m.Name, filepath.Join(dir, config.FileName))
+
+	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n",
+		m.Name, m.Name)
+	return nil
 }
 
 func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
@@ -123,8 +239,9 @@ func newMachinesDeleteLocalCmd() *cobra.Command {
 		Use:   "delete-local <name>",
 		Short: "Destroy a machine on this computer",
 		Long: "Destroy a machine on this computer, and everything on it.\n\n" +
-			"Only a local machine, created with `create-local`. It is not " +
-			"`machines rm`, which forgets a server and leaves it running.",
+			"Only a local machine, created with `create-local`. This is the one " +
+			"that destroys: `machines rm` only forgets a server, and leaves it " +
+			"running.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {

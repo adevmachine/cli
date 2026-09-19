@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -347,10 +348,7 @@ func Save(dir string, c Config) error {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}
 
-	mode := os.FileMode(0o600)
-	if info, err := os.Stat(path); err == nil {
-		mode = info.Mode().Perm()
-	}
+	mode := modeOf(path)
 
 	var document yaml.Node
 	if err := yaml.Unmarshal(body, &document); err != nil {
@@ -464,4 +462,140 @@ func writeYAML(path string, value any, mode os.FileMode) error {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	return nil
+}
+
+// AddMachine appends a machine to config.yml.
+//
+// Like Save, it edits the document rather than marshalling over the top, so
+// everything the person wrote — comments included — is still there afterwards.
+func AddMachine(dir string, m Machine) error {
+	path := filepath.Join(dir, FileName)
+
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("there is no %s to add to: run `devmachine setup` for the first machine", path)
+	}
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	var document yaml.Node
+	if err := yaml.Unmarshal(body, &document); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("%s is not a configuration: run `devmachine setup` for the first machine", path)
+	}
+
+	root := document.Content[0]
+	machines := field(root, "machines")
+	if machines == nil || machines.Kind != yaml.SequenceNode {
+		machines = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		setField(root, "machines", machines)
+	}
+	for _, entry := range machines.Content {
+		if scalar(field(entry, "name")) == m.Name {
+			return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
+		}
+	}
+	machines.Content = append(machines.Content, machineNode(m))
+
+	return writeYAML(path, &document, modeOf(path))
+}
+
+// RemoveMachine takes a machine out of config.yml.
+//
+// It removes the entry and nothing else. The server it named keeps running:
+// forgetting a machine is not destroying one, and this package could not
+// destroy anything if it tried.
+func RemoveMachine(dir, name string) error {
+	path := filepath.Join(dir, FileName)
+
+	current, err := Load(dir)
+	if err != nil {
+		return err
+	}
+	if _, err := current.Machine(name); err != nil {
+		return err
+	}
+	if orphans := current.workspacesLosing(name); len(orphans) > 0 {
+		return fmt.Errorf(
+			"machine %q still holds the workspace %s: move %s to another machine, or remove it, first",
+			name, strings.Join(orphans, ", "), plural(len(orphans), "it", "them"))
+	}
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+	var document yaml.Node
+	if err := yaml.Unmarshal(body, &document); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("%s is not a configuration", path)
+	}
+
+	machines := field(document.Content[0], "machines")
+	if machines == nil || machines.Kind != yaml.SequenceNode {
+		return fmt.Errorf("%s has no `machines`", path)
+	}
+	for i, entry := range machines.Content {
+		if scalar(field(entry, "name")) != name {
+			continue
+		}
+		machines.Content = append(machines.Content[:i], machines.Content[i+1:]...)
+		return writeYAML(path, &document, modeOf(path))
+	}
+	return fmt.Errorf("no machine named %q in %s", name, path)
+}
+
+// workspacesLosing names the workspaces that would be left pointing at nothing
+// if that machine went away.
+func (c Config) workspacesLosing(machine string) []string {
+	var out []string
+	for _, w := range c.Workspaces {
+		if w.Machine == machine || (w.Machine == "" && len(c.Machines) == 1) {
+			out = append(out, w.Name)
+		}
+	}
+	return out
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+// machineNode is a machine as the file holds it.
+func machineNode(m Machine) *yaml.Node {
+	addresses := make([]string, 0, len(m.Hosts))
+	for _, h := range m.Hosts {
+		addresses = append(addresses, h.Address)
+	}
+
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	setField(node, "name", stringNode(m.Name))
+	setField(node, "hosts", sequenceNode(addresses))
+	setField(node, "user", stringNode(m.User))
+	setField(node, "port", intNode(m.Port))
+	setField(node, "key", stringNode(m.Key))
+	return node
+}
+
+func intNode(value int) *yaml.Node {
+	if value == 0 {
+		return nil
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(value)}
+}
+
+// modeOf keeps a file's own permissions when it is rewritten.
+func modeOf(path string) os.FileMode {
+	if info, err := os.Stat(path); err == nil {
+		return info.Mode().Perm()
+	}
+	return 0o600
 }

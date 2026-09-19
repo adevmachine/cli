@@ -7,9 +7,11 @@ devmachine dns status
 devmachine doctor
 devmachine help
 devmachine machines
+devmachine machines add
 devmachine machines create-local
 devmachine machines delete-local
 devmachine machines list
+devmachine machines rm
 devmachine machines start
 devmachine machines stop
 devmachine mosh

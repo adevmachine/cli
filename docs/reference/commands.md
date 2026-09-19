@@ -16,14 +16,59 @@ text.
 ## setup
 
 ```
-devmachine setup [--force]
+devmachine setup [--force] [--no-harden]
 ```
 
-Asks for a machine name, an address, the administrative login, a port and a
-domain, then writes `config.yml`.
+Takes a machine over. It asks for a machine name, an address, the
+administrative login, a port and a domain, then how the CLI should log in:
 
-It changes nothing on any machine. It refuses to overwrite a configuration that
-already exists unless `--force` is given.
+1. a key of its own, kept in `<config>/keys/<machine>` and used for nothing
+   else — the recommendation, and the answer if you have no opinion;
+2. a key file already on this computer;
+3. a key your SSH agent holds, offered by fingerprint and comment.
+
+The third is how a key kept in a password manager works: it never touches the
+disk, so there is no file to point at. Picking it leaves `key` out of
+`config.yml`, which is what tells the CLI to ask the agent every time.
+
+It then writes `config.yml` and starts on the machine. In order:
+
+1. it tries the key. **If that already works, no password is asked for** —
+   many servers arrive with a key pasted in at the provider, and their owner
+   has no root password to give;
+2. only when the key is refused does it ask for the password, without echoing
+   it when there is a terminal;
+3. it installs the key over that one connection;
+4. it **proves the key by opening a new connection with the key alone**;
+5. it turns password login off;
+6. it installs Ansible.
+
+Step 6 installs the `ansible` package, not `ansible-core`: the core package
+leaves out `community.general`, which the firewall package needs, and that only
+shows up much later inside a play. It is the last thing done by hand — from
+there on everything the CLI does to a machine is a play.
+
+Ansible is installed on **Debian and Ubuntu**, the two this has been run on.
+Anywhere else `setup` stops and names your distribution rather than guessing at
+a package manager: install `ansible` by hand and run it again.
+
+Step 4 is why the order cannot change. Installing a key does not prove it
+works — a wrong mode on `authorized_keys`, an `AuthorizedKeysFile` pointing
+elsewhere, or SELinux all let it install and still refuse it. **If the proof
+fails, nothing is hardened and password login stays on**, so you can still get
+in; the error says where to look.
+
+The password is used once, on one connection, and is written nowhere: not to
+`config.yml`, not to the lock, not to the log.
+
+| Flag | Meaning |
+| --- | --- |
+| `--force` | overwrite a configuration that already exists |
+| `--no-harden` | leave password login on; the key is still installed and proved |
+
+Running it again on a machine it already owns is safe: it offers the key it
+made last time, finds that the key works, and skips straight past the
+password.
 
 ## doctor
 
@@ -50,11 +95,26 @@ a configuration.
 
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
+devmachine machines add [--no-harden]     take over another machine and record it
+devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on this computer
 devmachine machines start <name>          start a local machine
 devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
 ```
+
+`setup` writes the first machine; `add` writes every one after it. It asks the
+same questions, minus the domain, and runs the same bootstrap: the key first, a
+password only if the key is refused, the proof on a connection of its own, then
+hardening and Ansible. See [setup](#setup) for what each step is for.
+
+`rm` takes a machine out of `config.yml` and **does nothing at all to the
+server** — it keeps running, with everything on it, and the key still gets in.
+It asks first unless `--yes` is given, and it refuses to leave a workspace
+pointing at a machine that is no longer there.
+
+**`rm` is not `delete-local`.** They look alike and only one destroys anything:
+`rm` forgets a server, `delete-local` erases a machine on this computer.
 
 `create-local` builds a machine on this computer and hands it back as an
 ordinary machine: an address, a port and an admin login. It comes up the way a
@@ -67,8 +127,7 @@ It writes nothing to your configuration. `setup` does that, and running it
 against the new machine is the point.
 
 `start`, `stop` and `delete-local` act on a local machine only. A bought server
-is not the CLI's to switch on or off. `delete-local` asks first, and is not
-`machines rm`, which forgets a server and leaves it running.
+is not the CLI's to switch on or off. `delete-local` asks first.
 
 Two limits, both from what a machine on your own computer is:
 

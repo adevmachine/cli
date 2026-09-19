@@ -306,3 +306,136 @@ func TestHardeningDropInIsValidToARealSshd(t *testing.T) {
 		t.Fatalf("a real sshd refused the drop-in: %v", err)
 	}
 }
+
+// TestProveAuthHandsBackTheConnectionItProved: what follows a proof — turning
+// password login off included — has to run on the connection that was proved,
+// not on the password session that is about to stop working.
+func TestProveAuthHandsBackTheConnectionItProved(t *testing.T) {
+	server := sshServerAccepting(t, "publickey")
+	m := machineAt(t, server.addr)
+
+	client, err := ProveAuth(context.Background(), m, "root", Auth{KeyPath: throwawayKey(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client == nil {
+		t.Fatal("the proof returned no connection")
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("the proved connection was not open: %v", err)
+	}
+	if server.connectionCount() != 1 {
+		t.Fatalf("made %d connections", server.connectionCount())
+	}
+}
+
+// clientWithOsRelease answers the one question InstallAnsible asks before it
+// decides anything.
+func clientWithOsRelease(body string) *recordingClient {
+	return &recordingClient{output: map[string]string{OSReleaseCommand: body}}
+}
+
+func TestInstallAnsiblePicksThePackageManagerFromOsRelease(t *testing.T) {
+	for _, c := range []struct{ id, want string }{
+		{"ubuntu", "apt-get"},
+		{"debian", "apt-get"},
+	} {
+		client := clientWithOsRelease("ID=" + c.id + "\n")
+		if err := InstallAnsible(context.Background(), client, io.Discard); err != nil {
+			t.Fatalf("%s: %v", c.id, err)
+		}
+		if !strings.Contains(client.transcript(), c.want) {
+			t.Fatalf("%s: got %s", c.id, client.transcript())
+		}
+	}
+}
+
+func TestInstallAnsibleInstallsTheFullPackageNotTheCore(t *testing.T) {
+	// ansible-core alone has no community.general, and the firewall package
+	// needs it. This was found on the throwaway VM, not reasoned about.
+	c := clientWithOsRelease("ID=ubuntu\n")
+	if err := InstallAnsible(context.Background(), c, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	joined := c.transcript()
+	if strings.Contains(joined, "ansible-core") || !strings.Contains(joined, " ansible") {
+		t.Fatalf("got %s", joined)
+	}
+}
+
+func TestInstallAnsibleSaysSoOnADistributionItDoesNotKnow(t *testing.T) {
+	// The table claims what has been run on a real machine and nothing more.
+	// Guessing a package manager gets somebody halfway through a first run and
+	// then leaves them there.
+	for _, id := range []string{"plan9", "arch", "fedora", "alpine"} {
+		c := clientWithOsRelease("ID=" + id + "\n")
+		err := InstallAnsible(context.Background(), c, io.Discard)
+		if err == nil {
+			t.Fatalf("%s: it guessed a package manager", id)
+		}
+		if !strings.Contains(err.Error(), id) {
+			t.Fatalf("the error does not name it: %v", err)
+		}
+		if len(c.commands) != 1 {
+			t.Fatalf("%s: it ran something anyway: %#v", id, c.commands)
+		}
+	}
+}
+
+func TestInstallAnsibleLeavesAMachineThatAlreadyHasItAlone(t *testing.T) {
+	// setup is run again on a machine it already owns more often than on a new
+	// one, and apt-get on every run is minutes nobody asked for.
+	c := clientWithOsRelease("ID=debian\n")
+	if err := InstallAnsible(context.Background(), c, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	joined := c.transcript()
+	look := strings.Index(joined, "command -v ansible-playbook")
+	install := strings.Index(joined, "apt-get")
+	if look < 0 || look > install {
+		t.Fatalf("it installs without looking first: %s", joined)
+	}
+}
+
+func TestInstallAnsibleSaysWhenItCannotTellWhatTheMachineIs(t *testing.T) {
+	c := &recordingClient{failOn: "os-release"}
+	err := InstallAnsible(context.Background(), c, io.Discard)
+	if err == nil {
+		t.Fatal("it carried on without knowing the distribution")
+	}
+	if !strings.Contains(err.Error(), "os-release") {
+		t.Fatalf("the error does not say what failed: %v", err)
+	}
+}
+
+// TestInstallAnsibleAgainstTheThrowawayMachine is the only proof that matters:
+// the package exists, the name is right, and running it twice is free.
+func TestInstallAnsibleAgainstTheThrowawayMachine(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	for range 2 {
+		if err := InstallAnsible(context.Background(), client, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	out, err := client.Run(context.Background(), "ansible-playbook --version")
+	if err != nil {
+		t.Fatalf("ansible-playbook is not there after installing it: %v", err)
+	}
+	if !strings.Contains(out, "ansible-playbook") {
+		t.Fatalf("got %q", out)
+	}
+	// ansible-core alone would install the binary and leave the collection
+	// out, which only shows up much later, inside a play.
+	if _, err := client.Run(context.Background(),
+		"ansible-doc -l community.general 2>/dev/null | head -1"); err != nil {
+		t.Fatalf("community.general is missing: %v", err)
+	}
+}

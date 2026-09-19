@@ -77,3 +77,28 @@ func checkName(name string) error {
 	}
 	return nil
 }
+
+// PublicFor returns the authorized_keys line for a private key on disk.
+//
+// It prefers the .pub beside the key, because that is where the comment lives,
+// and a comment is how a person recognises their own key in a list. Without
+// one the line is derived from the private key instead, which is the only way
+// to install a key somebody generated without keeping the pair together.
+func PublicFor(path string) (string, error) {
+	if body, err := os.ReadFile(path + ".pub"); err == nil {
+		if line := strings.TrimSpace(string(body)); line != "" {
+			return line, nil
+		}
+	}
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading the private key %s: %w", path, err)
+	}
+	signer, err := ssh.ParsePrivateKey(body)
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w. A key with a passphrase cannot be read from a file: "+
+			"add it to your SSH agent and choose it from there instead", path, err)
+	}
+	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer.PublicKey()))), nil
+}

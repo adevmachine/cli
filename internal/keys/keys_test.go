@@ -136,3 +136,51 @@ func TestDirIsInsideTheConfiguration(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestPublicForReadsTheLineBesideTheKey(t *testing.T) {
+	dir := t.TempDir()
+	path, public, err := Generate(dir, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PublicFor(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != public {
+		t.Fatalf("got %q, want %q", got, public)
+	}
+}
+
+func TestPublicForDerivesTheLineWhenThereIsNoPubFile(t *testing.T) {
+	// A key generated elsewhere often arrives without its .pub, and the pair
+	// is still installable: the public half is in the private one.
+	dir := t.TempDir()
+	path, public, err := Generate(dir, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path + ".pub"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PublicFor(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The comment lives in the .pub, so what comes back is the key itself.
+	if !strings.HasPrefix(public, got) {
+		t.Fatalf("got %q, which is not the key in %q", got, public)
+	}
+}
+
+func TestPublicForSaysWhereToLookForAKeyItCannotRead(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "absent")
+
+	if _, err := PublicFor(path); err == nil {
+		t.Fatal("a key that is not there was read anyway")
+	} else if !strings.Contains(err.Error(), path) {
+		t.Fatalf("the error does not name the file: %v", err)
+	}
+}

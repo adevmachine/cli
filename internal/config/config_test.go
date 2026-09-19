@@ -522,3 +522,143 @@ func TestConfigSaveRefusesATargetTheFileDoesNotHave(t *testing.T) {
 		t.Fatalf("the error does not say which one: %v", err)
 	}
 }
+
+func configDirWith(t *testing.T, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestAddMachineKeepsEverythingElseAsItWasWritten(t *testing.T) {
+	dir := configDirWith(t, `# the machine I bought first
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+domain: example.com
+`)
+
+	err := AddMachine(dir, Machine{
+		Name:  "sandbox",
+		Hosts: []Host{{Address: "198.51.100.7"}},
+		User:  "root",
+		Port:  2222,
+		Key:   "/keys/sandbox",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A file that loses its comments the first time the CLI touches it is a
+	// file people stop letting the CLI touch.
+	if !strings.Contains(string(body), "# the machine I bought first") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Machines) != 2 {
+		t.Fatalf("machines = %#v", cfg.Machines)
+	}
+	added := cfg.Machines[1]
+	if added.Name != "sandbox" || added.Port != 2222 || added.Key != "/keys/sandbox" {
+		t.Fatalf("got %#v", added)
+	}
+	if cfg.Domain != "example.com" {
+		t.Fatalf("domain = %q", cfg.Domain)
+	}
+}
+
+func TestAddMachineRefusesANameThatIsTaken(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	err := AddMachine(dir, Machine{Name: "main", Hosts: []Host{{Address: "198.51.100.7"}}})
+	if err == nil {
+		t.Fatal("two machines were allowed the same name")
+	}
+	if !strings.Contains(err.Error(), "main") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+}
+
+func TestAddMachineNeedsAConfigurationToAddTo(t *testing.T) {
+	err := AddMachine(t.TempDir(), Machine{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}})
+	if err == nil {
+		t.Fatal("it wrote a configuration out of nothing")
+	}
+	if !strings.Contains(err.Error(), "setup") {
+		t.Fatalf("the error does not say where to start: %v", err)
+	}
+}
+
+func TestRemoveMachineTakesItOutAndLeavesTheRest(t *testing.T) {
+	dir := configDirWith(t, `machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: sandbox
+    hosts: [198.51.100.7]
+domain: example.com
+`)
+
+	if err := RemoveMachine(dir, "sandbox"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Machines) != 1 || cfg.Machines[0].Name != "main" {
+		t.Fatalf("machines = %#v", cfg.Machines)
+	}
+	if cfg.Domain != "example.com" {
+		t.Fatalf("domain = %q", cfg.Domain)
+	}
+}
+
+func TestRemoveMachineSaysWhichOnesThereAre(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	err := RemoveMachine(dir, "absent")
+	if err == nil {
+		t.Fatal("it removed a machine that is not configured")
+	}
+	if !strings.Contains(err.Error(), "main") {
+		t.Fatalf("the error does not say what is there: %v", err)
+	}
+}
+
+func TestRemoveMachineRefusesToOrphanAWorkspace(t *testing.T) {
+	// A workspace pointing at a machine that is gone is a configuration that
+	// no longer loads, and the person finds out on the next command.
+	dir := configDirWith(t, `machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: sandbox
+    hosts: [198.51.100.7]
+workspaces:
+  - name: alice
+    machine: sandbox
+`)
+
+	err := RemoveMachine(dir, "sandbox")
+	if err == nil {
+		t.Fatal("it left a workspace pointing at nothing")
+	}
+	if !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not name the workspace: %v", err)
+	}
+
+	cfg, _ := Load(dir)
+	if len(cfg.Machines) != 2 {
+		t.Fatal("it removed the machine anyway")
+	}
+}
