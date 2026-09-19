@@ -1,0 +1,23 @@
+docs/concepts/configuration.md
+  s_cab674f14f5e3f::t_5218692ffd5bee 69-105,116-117
+internal/config/config.go
+  s_cab674f14f5e3f::t_e36f880ba3097e 21,25,92-94,108-110,269-271,297-299,313-354
+internal/config/config_test.go
+  s_cab674f14f5e3f::t_160f11f22bc2f1 665-782
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8848a7b304fa624032be64b7687f9cf1106072f4",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
