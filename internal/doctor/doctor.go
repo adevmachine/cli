@@ -63,14 +63,14 @@ func Run(ctx context.Context, dir, machine string, dial Dialer) []Check {
 	if err != nil {
 		return append(
 			[]Check{{Name: CheckConfiguration, Status: StatusFail, Detail: err.Error()}},
-			skipRest("the configuration is not usable")...,
+			skipRest(CheckConfiguration, "the configuration is not usable")...,
 		)
 	}
 	m, err := cfg.Machine(machine)
 	if err != nil {
 		return append(
 			[]Check{{Name: CheckConfiguration, Status: StatusFail, Detail: err.Error()}},
-			skipRest("there is no machine to check")...,
+			skipRest(CheckConfiguration, "there is no machine to check")...,
 		)
 	}
 
@@ -84,7 +84,7 @@ func Run(ctx context.Context, dir, machine string, dial Dialer) []Check {
 	client, address, err := dial(ctx, m, "")
 	if err != nil {
 		checks = append(checks, Check{Name: CheckConnection, Status: StatusFail, Detail: err.Error()})
-		return append(checks, skipRest("the machine is unreachable")...)
+		return append(checks, skipRest(CheckConnection, "the machine is unreachable")...)
 	}
 	defer client.Close()
 
@@ -104,11 +104,25 @@ func loadAndValidate(dir string) (config.Config, error) {
 	return cfg, cfg.Validate()
 }
 
-func skipRest(reason string) []Check {
-	names := []string{CheckConnection, CheckOperatingSystem, CheckAnsible}
-	out := make([]Check, 0, len(names))
-	for _, n := range names {
-		out = append(out, Check{Name: n, Status: StatusSkip, Detail: reason})
+// order is every check, in the order they run. skipRest walks it, so a check
+// added here is skipped by every cascade without anybody remembering to.
+var order = []string{CheckConfiguration, CheckConnection, CheckOperatingSystem, CheckAnsible}
+
+// skipRest returns a skip for every check that comes after `done`.
+//
+// It takes the last check already reported rather than a fixed list: reporting
+// a connection as failed and then skipping it as well says two things about
+// one check, and the one a reader believes is whichever they see first.
+func skipRest(done, reason string) []Check {
+	var out []Check
+	past := false
+	for _, n := range order {
+		if past {
+			out = append(out, Check{Name: n, Status: StatusSkip, Detail: reason})
+		}
+		if n == done {
+			past = true
+		}
 	}
 	return out
 }

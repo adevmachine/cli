@@ -214,10 +214,30 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass {
 		t.Fatalf("operating system = %q (%s), want pass", got.Status, got.Detail)
 	}
-	// Ansible is not installed on a fresh machine. Reporting that honestly is
-	// the point of the check, so this asserts the failure rather than hiding it.
-	if got := find(t, checks, CheckAnsible); got.Status != StatusFail {
-		t.Fatalf("ansible = %q, want fail on a machine that has none", got.Status)
+	// Whether Ansible is there depends on how far the machine has been taken:
+	// a freshly created one has none, one that `sync` has run against does.
+	// What this asserts is that the check answered at all — a skip here would
+	// mean the cascade stopped earlier than the two passes above say it did.
+	if got := find(t, checks, CheckAnsible); got.Status == StatusSkip {
+		t.Fatalf("ansible = skip (%s), but the connection and the OS both passed", got.Detail)
+	}
+}
+
+func TestRunReportsEachCheckOnce(t *testing.T) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("no address answered")
+	}
+	body := "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"
+	checks := Run(context.Background(), configDir(t, body), "", dial)
+
+	seen := map[string]int{}
+	for _, c := range checks {
+		seen[c.Name]++
+	}
+	for name, n := range seen {
+		if n != 1 {
+			t.Errorf("%q appears %d times; a check that failed must not also be skipped", name, n)
+		}
 	}
 }
 
