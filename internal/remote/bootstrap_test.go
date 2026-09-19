@@ -212,3 +212,97 @@ func TestProveKeyAgainstTheThrowawayMachine(t *testing.T) {
 		t.Fatal("a key the machine does not trust was reported as proved")
 	}
 }
+
+// everything joins the commands and what was fed to them, because Harden puts
+// the file's body on stdin rather than in the command.
+func (c *recordingClient) everything() string {
+	return strings.Join(append(append([]string(nil), c.commands...), c.inputs...), "\n")
+}
+
+func TestHardenWritesADropInThatSortsFirst(t *testing.T) {
+	c := &recordingClient{}
+	if err := Harden(context.Background(), c); err != nil {
+		t.Fatal(err)
+	}
+	joined := c.everything()
+	// sshd uses the FIRST value it finds for each directive, and the Include
+	// of sshd_config.d sits at the top. A cloud image ships
+	// 60-cloudimg-settings.conf with PasswordAuthentication yes, so a 99-
+	// prefix silently does nothing.
+	if !strings.Contains(joined, "/etc/ssh/sshd_config.d/00-") {
+		t.Fatalf("the drop-in does not sort first: %s", joined)
+	}
+	if !strings.Contains(joined, "PasswordAuthentication no") {
+		t.Fatalf("got %s", joined)
+	}
+}
+
+// TestHardenSaysWhyTheNameSortsFirst guards the reasoning, not the number. A
+// later edit that renames the file has to read why before it can.
+func TestHardenSaysWhyTheNameSortsFirst(t *testing.T) {
+	for _, want := range []string{"first", "60-cloudimg-settings.conf"} {
+		if !strings.Contains(hardeningDropIn, want) {
+			t.Fatalf("the drop-in does not carry %q: %s", want, hardeningDropIn)
+		}
+	}
+}
+
+func TestHardenValidatesBeforeReloading(t *testing.T) {
+	c := &recordingClient{}
+	if err := Harden(context.Background(), c); err != nil {
+		t.Fatal(err)
+	}
+	joined := c.transcript()
+	// A bad sshd_config plus a reload is a machine nobody can reach again.
+	sshdT := strings.Index(joined, "sshd -t")
+	reload := strings.Index(joined, "reload")
+	if sshdT < 0 || reload < 0 || sshdT > reload {
+		t.Fatalf("it reloads without validating: %s", joined)
+	}
+}
+
+func TestHardenLeavesPasswordsOnWhenValidationFails(t *testing.T) {
+	c := &recordingClient{failOn: "sshd -t"}
+	err := Harden(context.Background(), c)
+	if err == nil {
+		t.Fatal("it carried on past a bad config")
+	}
+	if strings.Contains(c.transcript(), "reload") {
+		t.Fatal("it reloaded a config sshd refused")
+	}
+}
+
+// TestHardenTakesBackAConfigSshdRefused: a file the daemon will not accept,
+// left on disk, breaks the next reload by anything at all, including a reboot.
+func TestHardenTakesBackAConfigSshdRefused(t *testing.T) {
+	c := &recordingClient{failOn: "sshd -t"}
+	_ = Harden(context.Background(), c)
+
+	last := c.commands[len(c.commands)-1]
+	if !strings.Contains(last, "rm ") || !strings.Contains(last, hardeningDropInPath) {
+		t.Fatalf("the refused drop-in was left behind: %s", c.transcript())
+	}
+}
+
+// TestHardeningDropInIsValidToARealSshd writes the file on the throwaway
+// machine, asks sshd to parse it and takes it away again. It never reloads:
+// what is being proved is the content, not the restart.
+func TestHardeningDropInIsValidToARealSshd(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	probe := "/etc/ssh/sshd_config.d/00-devmachine-probe.conf"
+	defer client.Run(context.Background(), "rm -f "+probe)
+
+	if _, err := client.RunInput(context.Background(), "cat > "+probe, strings.NewReader(hardeningDropIn)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Run(context.Background(), validateScript); err != nil {
+		t.Fatalf("a real sshd refused the drop-in: %v", err)
+	}
+}
