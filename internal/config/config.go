@@ -15,6 +15,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -67,6 +68,9 @@ func (h *Host) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML writes a host back as the bare string it was read from.
+func (h Host) MarshalYAML() (any, error) { return h.Address, nil }
+
 // Machine is a server the CLI operates.
 type Machine struct {
 	Name string `yaml:"name"`
@@ -74,14 +78,14 @@ type Machine struct {
 	// rest are fallbacks.
 	Hosts []Host `yaml:"hosts"`
 	// User is the administrative login used to provision, not a workspace.
-	User string `yaml:"user"`
-	Port int    `yaml:"port"`
+	User string `yaml:"user,omitempty"`
+	Port int    `yaml:"port,omitempty"`
 	// Key is a private key on disk. Left empty, the SSH agent serves the keys
 	// instead, which is how a 1Password-style agent is supported without this
 	// package knowing such a thing exists.
-	Key string `yaml:"key"`
+	Key string `yaml:"key,omitempty"`
 	// Packages are the recipes this machine gets, by name.
-	Packages []string `yaml:"packages"`
+	Packages []string `yaml:"packages,omitempty"`
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -89,12 +93,12 @@ type Workspace struct {
 	Name string `yaml:"name"`
 	// Machine names where this workspace lives. It may be left out when the
 	// configuration has exactly one machine.
-	Machine string `yaml:"machine"`
+	Machine string `yaml:"machine,omitempty"`
 	// User overrides the Linux account. It is only needed when the workspace
 	// name cannot be the account name.
-	User string `yaml:"user"`
+	User string `yaml:"user,omitempty"`
 	// Packages are the recipes this workspace gets, by name.
-	Packages []string `yaml:"packages"`
+	Packages []string `yaml:"packages,omitempty"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -108,12 +112,12 @@ func (w Workspace) LinuxUser() string {
 // Config is what config.yml holds.
 type Config struct {
 	Machines    []Machine   `yaml:"machines"`
-	Workspaces  []Workspace `yaml:"workspaces"`
-	Domain      string      `yaml:"domain"`
-	DNSProvider string      `yaml:"dns_provider"`
+	Workspaces  []Workspace `yaml:"workspaces,omitempty"`
+	Domain      string      `yaml:"domain,omitempty"`
+	DNSProvider string      `yaml:"dns_provider,omitempty"`
 	// Packages is the release of the packages repository every recipe is read
 	// from, for example "v1".
-	Packages string `yaml:"packages"`
+	Packages string `yaml:"packages,omitempty"`
 }
 
 // Dir returns the configuration directory and the rule that chose it.
@@ -320,4 +324,144 @@ func (c Config) workspaceNames() []string {
 		out = append(out, w.Name)
 	}
 	return out
+}
+
+// Save writes the configuration back to dir.
+//
+// Only what the CLI edits is written: the package pin, and each target's
+// package list. Everything else in the file is left as the person wrote it,
+// comments included, because a file that loses its comments the first time the
+// CLI touches it is a file people stop letting the CLI touch.
+//
+// That is also why the struct is not simply marshalled over the top: Load
+// fills in the admin user and the port, so a full rewrite would put values in
+// the file that nobody chose and that stop tracking the defaults.
+func Save(dir string, c Config) error {
+	path := filepath.Join(dir, FileName)
+
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return writeYAML(path, &c, 0o600)
+	}
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	}
+
+	var document yaml.Node
+	if err := yaml.Unmarshal(body, &document); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+		return writeYAML(path, &c, mode)
+	}
+
+	root := document.Content[0]
+	setField(root, "packages", stringNode(c.Packages))
+	for _, m := range c.Machines {
+		if err := setPackages(root, "machines", m.Name, m.Packages); err != nil {
+			return fmt.Errorf("writing %s: %w", path, err)
+		}
+	}
+	for _, w := range c.Workspaces {
+		if err := setPackages(root, "workspaces", w.Name, w.Packages); err != nil {
+			return fmt.Errorf("writing %s: %w", path, err)
+		}
+	}
+	return writeYAML(path, &document, mode)
+}
+
+// setPackages puts one target's package list on the entry it belongs to.
+func setPackages(root *yaml.Node, section, name string, list []string) error {
+	entries := field(root, section)
+	if entries != nil && entries.Kind == yaml.SequenceNode {
+		for _, entry := range entries.Content {
+			if entry.Kind == yaml.MappingNode && scalar(field(entry, "name")) == name {
+				setField(entry, "packages", sequenceNode(list))
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("`%s` has no entry named %q", section, name)
+}
+
+// setField replaces a key's value, appends the key when it is not there, and
+// removes it when the value is nil. An empty list or an empty pin is written
+// as nothing rather than as `packages: []`.
+func setField(node *yaml.Node, key string, value *yaml.Node) {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value != key {
+			continue
+		}
+		if value == nil {
+			node.Content = append(node.Content[:i], node.Content[i+2:]...)
+			return
+		}
+		value.HeadComment = node.Content[i+1].HeadComment
+		value.LineComment = node.Content[i+1].LineComment
+		value.FootComment = node.Content[i+1].FootComment
+		node.Content[i+1] = value
+		return
+	}
+	if value == nil {
+		return
+	}
+	node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
+}
+
+func field(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func scalar(node *yaml.Node) string {
+	if node == nil {
+		return ""
+	}
+	return node.Value
+}
+
+func stringNode(value string) *yaml.Node {
+	if value == "" {
+		return nil
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+}
+
+func sequenceNode(values []string) *yaml.Node {
+	if len(values) == 0 {
+		return nil
+	}
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Style: yaml.FlowStyle}
+	for _, v := range values {
+		node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v})
+	}
+	return node
+}
+
+func writeYAML(path string, value any, mode os.FileMode) error {
+	var buffer bytes.Buffer
+	encoder := yaml.NewEncoder(&buffer)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(value); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if err := encoder.Close(); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if err := os.WriteFile(path, buffer.Bytes(), mode); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	return nil
 }

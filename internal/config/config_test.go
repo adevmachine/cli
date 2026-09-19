@@ -382,3 +382,143 @@ func TestValidateRefusesAPinThatIsABranch(t *testing.T) {
 		t.Fatalf("the error does not say what a pin is: %v", err)
 	}
 }
+
+func TestConfigSaveKeepsComments(t *testing.T) {
+	dir := writeConfig(t, `
+# The main server.
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Machines[0].Packages = []string{"base"}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# The main server.") {
+		t.Fatalf("the comment was lost:\n%s", body)
+	}
+	if !strings.Contains(string(body), "base") {
+		t.Fatalf("the package was not written:\n%s", body)
+	}
+}
+
+func TestConfigSaveLeavesTheRestOfTheFileAlone(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10, 100.64.0.7]
+workspaces:
+  - name: alice
+domain: example.com
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Workspaces[0].Packages = []string{"claude-code"}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Domain != "example.com" {
+		t.Fatalf("domain is %q", saved.Domain)
+	}
+	if len(saved.Machines[0].Hosts) != 2 || saved.Machines[0].Hosts[1].Address != "100.64.0.7" {
+		t.Fatalf("hosts %#v", saved.Machines[0].Hosts)
+	}
+	// Load fills in the admin user and the port, so writing the struct back
+	// would put values in the file that nobody wrote.
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "port") || strings.Contains(string(body), "user") {
+		t.Fatalf("a default leaked into the file:\n%s", body)
+	}
+}
+
+func TestConfigSaveRoundTripsTheListsAndThePin(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [base, docker]
+workspaces:
+  - name: alice
+    packages: [claude-code]
+packages: v1
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Machines[0].Packages = []string{"base"}
+	cfg.Workspaces[0].Packages = nil
+	cfg.Packages = "v2"
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Machines[0].Packages) != 1 || saved.Machines[0].Packages[0] != "base" {
+		t.Fatalf("machine packages %#v", saved.Machines[0].Packages)
+	}
+	if len(saved.Workspaces[0].Packages) != 0 {
+		t.Fatalf("workspace packages %#v", saved.Workspaces[0].Packages)
+	}
+	if saved.Packages != "v2" {
+		t.Fatalf("pin is %q", saved.Packages)
+	}
+}
+
+func TestConfigSaveWritesAFileThatIsNotThereYet(t *testing.T) {
+	dir := t.TempDir()
+	c := Config{
+		Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Packages: []string{"base"}}},
+		Packages: "v1",
+	}
+	if err := Save(dir, c); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Machines) != 1 || saved.Machines[0].Packages[0] != "base" {
+		t.Fatalf("got %#v", saved.Machines)
+	}
+}
+
+func TestConfigSaveRefusesATargetTheFileDoesNotHave(t *testing.T) {
+	dir := writeConfig(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Machines = append(cfg.Machines, Machine{Name: "spare", Hosts: []Host{{Address: "203.0.113.11"}}})
+
+	err = Save(dir, cfg)
+	if err == nil {
+		t.Fatal("a machine that is not in the file was silently dropped")
+	}
+	if !strings.Contains(err.Error(), "spare") {
+		t.Fatalf("the error does not say which one: %v", err)
+	}
+}
