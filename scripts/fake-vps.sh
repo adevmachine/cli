@@ -54,6 +54,17 @@ cmd_up() {
     "${DEVMACHINE[@]}" machines start "$VM"
   fi
 
+  # A VM that has been synced is a poor test machine: `sync` turns on ufw and
+  # fail2ban, and a harness that reconnects hundreds of times is exactly what
+  # those are built to stop. Say that, instead of letting `limactl shell` fail
+  # with `kex_exchange_identification`, which tells nobody anything.
+  if ! limactl shell "$VM" -- true >/dev/null 2>&1; then
+    echo "$VM is running but will not take a connection." >&2
+    echo "It has probably been converged; a firewall or fail2ban is in the way." >&2
+    echo "It exists to be destroyed: scripts/fake-vps.sh down && scripts/fake-vps.sh up" >&2
+    exit 1
+  fi
+
   mkdir -p "$KEY_DIR"
   chmod 700 "$KEY_DIR"
   [ -f "$KEY" ] || ssh-keygen -t ed25519 -N "" -C "devmachine fake vps" -f "$KEY" >/dev/null
