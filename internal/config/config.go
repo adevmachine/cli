@@ -79,6 +79,8 @@ type Machine struct {
 	// instead, which is how a 1Password-style agent is supported without this
 	// package knowing such a thing exists.
 	Key string `yaml:"key"`
+	// Packages are the machine-scope packages this machine gets.
+	Packages []string `yaml:"packages"`
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -90,6 +92,8 @@ type Workspace struct {
 	// User overrides the Linux account. It is only needed when the workspace
 	// name cannot be the account name.
 	User string `yaml:"user"`
+	// Packages are the workspace-scope packages this workspace gets.
+	Packages []string `yaml:"packages"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -106,6 +110,8 @@ type Config struct {
 	Workspaces  []Workspace `yaml:"workspaces"`
 	Domain      string      `yaml:"domain"`
 	DNSProvider string      `yaml:"dns_provider"`
+	// Packages is the pinned release the recipes come from, such as "v1".
+	Packages string `yaml:"packages"`
 }
 
 // Dir returns the configuration directory and the rule that chose it.
