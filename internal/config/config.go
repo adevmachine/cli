@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -79,6 +80,8 @@ type Machine struct {
 	// instead, which is how a 1Password-style agent is supported without this
 	// package knowing such a thing exists.
 	Key string `yaml:"key"`
+	// Packages are the recipes this machine gets, by name.
+	Packages []string `yaml:"packages"`
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -90,6 +93,8 @@ type Workspace struct {
 	// User overrides the Linux account. It is only needed when the workspace
 	// name cannot be the account name.
 	User string `yaml:"user"`
+	// Packages are the recipes this workspace gets, by name.
+	Packages []string `yaml:"packages"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -106,6 +111,9 @@ type Config struct {
 	Workspaces  []Workspace `yaml:"workspaces"`
 	Domain      string      `yaml:"domain"`
 	DNSProvider string      `yaml:"dns_provider"`
+	// Packages is the release of the packages repository every recipe is read
+	// from, for example "v1".
+	Packages string `yaml:"packages"`
 }
 
 // Dir returns the configuration directory and the rule that chose it.
@@ -242,6 +250,9 @@ func (c Config) Validate() error {
 		case m.Port < 1 || m.Port > 65535:
 			return fmt.Errorf("machine %q has port %d: use a port between 1 and 65535", m.Name, m.Port)
 		}
+		if name, dup := firstDuplicate(m.Packages); dup {
+			return fmt.Errorf("machine %q lists the package %q twice", m.Name, name)
+		}
 		for j, h := range m.Hosts {
 			if h.Address == "" {
 				return fmt.Errorf("machine %q: host %d is empty", m.Name, j+1)
@@ -264,9 +275,35 @@ func (c Config) Validate() error {
 		case w.Machine != "" && !seen[w.Machine]:
 			return fmt.Errorf("workspace %q runs on machine %q, which is not configured", w.Name, w.Machine)
 		}
+		if name, dup := firstDuplicate(w.Packages); dup {
+			return fmt.Errorf("workspace %q lists the package %q twice", w.Name, name)
+		}
 		names[w.Name] = true
 	}
+
+	// A pin is a release tag, never a branch: `packages: main` would mean the
+	// set changes under you because somebody pushed an hour ago. Upgrading is
+	// meant to be a deliberate act with a diff to read.
+	if c.Packages != "" && !releaseTag.MatchString(c.Packages) {
+		return fmt.Errorf(
+			"`packages: %s` is not a release tag: use one like `v1`, never a branch name", c.Packages)
+	}
 	return nil
+}
+
+// releaseTag is deliberately loose about the shape after the v: the packages
+// repository decides how it numbers its releases, not this package.
+var releaseTag = regexp.MustCompile(`^v[0-9][0-9A-Za-z.\-]*$`)
+
+func firstDuplicate(names []string) (string, bool) {
+	seen := map[string]bool{}
+	for _, n := range names {
+		if seen[n] {
+			return n, true
+		}
+		seen[n] = true
+	}
+	return "", false
 }
 
 func (c Config) machineNames() []string {

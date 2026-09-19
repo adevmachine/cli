@@ -314,3 +314,71 @@ func TestLoadRejectsBrokenYAML(t *testing.T) {
 		t.Fatal("expected an error for broken YAML")
 	}
 }
+
+func TestLoadReadsThePackagePinAndTheLists(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [base, docker]
+workspaces:
+  - name: alice
+    packages: [claude-code]
+packages: v1
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Packages != "v1" {
+		t.Fatalf("pin is %q", cfg.Packages)
+	}
+	if len(cfg.Machines[0].Packages) != 2 || cfg.Machines[0].Packages[1] != "docker" {
+		t.Fatalf("machine packages %#v", cfg.Machines[0].Packages)
+	}
+	if len(cfg.Workspaces[0].Packages) != 1 {
+		t.Fatalf("workspace packages %#v", cfg.Workspaces[0].Packages)
+	}
+}
+
+func TestValidateRefusesTheSamePackageTwiceOnOneTarget(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22,
+			Packages: []string{"docker", "docker"}}},
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a duplicate was accepted")
+	}
+	if !strings.Contains(err.Error(), "docker") || !strings.Contains(err.Error(), "main") {
+		t.Fatalf("the error does not say what and where: %v", err)
+	}
+}
+
+func TestValidateRefusesTheSamePackageTwiceOnAWorkspace(t *testing.T) {
+	c := Config{
+		Machines:   []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22}},
+		Workspaces: []Workspace{{Name: "alice", Packages: []string{"claude-code", "claude-code"}}},
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a duplicate was accepted")
+	}
+	if !strings.Contains(err.Error(), "claude-code") || !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not say what and where: %v", err)
+	}
+}
+
+func TestValidateRefusesAPinThatIsABranch(t *testing.T) {
+	c := Config{
+		Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22}},
+		Packages: "main",
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("a branch name was accepted as a pin")
+	}
+	if !strings.Contains(err.Error(), "tag") {
+		t.Fatalf("the error does not say what a pin is: %v", err)
+	}
+}
