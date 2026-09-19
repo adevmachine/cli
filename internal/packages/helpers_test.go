@@ -3,6 +3,7 @@ package packages
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -23,4 +24,26 @@ func writeMode(t *testing.T, path, body string, mode os.FileMode) {
 	if err := os.Chmod(path, mode); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// writePackage creates a package directory named dirName and writes body as
+// its manifest. The directory name is explicit because one rule under test is
+// that a package's name has to match the directory it lives in.
+func writePackage(t *testing.T, dirName, body string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), dirName)
+	write(t, ManifestPath(dir), body)
+	return dir
+}
+
+// problemAbout returns the first problem whose message carries want.
+func problemAbout(t *testing.T, problems []Problem, want string) Problem {
+	t.Helper()
+	for _, p := range problems {
+		if strings.Contains(p.What, want) {
+			return p
+		}
+	}
+	t.Fatalf("no problem about %q in %#v", want, problems)
+	return Problem{}
 }
