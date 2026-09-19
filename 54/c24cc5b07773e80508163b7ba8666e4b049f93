@@ -1,0 +1,33 @@
+internal/commands/shell_test.go
+  s_cab674f14f5e3f::t_eed0a1212ce0ed 268-271
+internal/doctor/doctor_test.go
+  s_cab674f14f5e3f::t_dfa367cacb7573 38-41
+internal/provision/ansible_runner_test.go
+  s_cab674f14f5e3f::t_bd2fb4fe19e2fa 39-42
+internal/remote/bootstrap.go
+  s_cab674f14f5e3f::t_a9e416e242552b 1-67
+internal/remote/bootstrap_test.go
+  s_cab674f14f5e3f::t_f59ee152581418 1-214
+internal/remote/remote.go
+  s_cab674f14f5e3f::t_fe4932ee220e07 49-53,334-352
+internal/remote/remote_test.go
+  s_cab674f14f5e3f::t_3a30a0ca77e4a2 467-472
+internal/stats/stats_test.go
+  s_cab674f14f5e3f::t_ede58218f06731 134-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "54c24cc5b07773e80508163b7ba8666e4b049f93",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
