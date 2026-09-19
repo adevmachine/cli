@@ -14,6 +14,9 @@ func newPackagesCmd(opts *options) *cobra.Command {
 		Short: "The recipes a machine and its workspaces are built from",
 	}
 	cmd.AddCommand(
+		newPackagesListCmd(opts),
+		newPackagesAddCmd(opts),
+		newPackagesRmCmd(opts),
 		newPackagesNewCmd(opts),
 		newPackagesValidateCmd(opts),
 		newPackagesSchemaCmd(opts),

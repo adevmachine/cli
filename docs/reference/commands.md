@@ -111,10 +111,26 @@ shell history. `list` prints names only.
 ## packages
 
 ```
+devmachine packages list
+devmachine packages add <name> [--machine m | --workspace w] [--check] [--yes]
+devmachine packages rm  <name> [--machine m | --workspace w] [--check] [--yes]
 devmachine packages new <name> [--scope machine|workspace] [--into <dir>]
 devmachine packages validate <dir>
 devmachine packages schema [--json]
 ```
+
+`list` reads the recipes and the configuration together, so a package appears
+once with every machine and workspace that asks for it. A name a target asks
+for and nothing provides is listed as `missing`, rather than left out for
+`sync` to find.
+
+`add` and `rm` edit `config.yml` and touch no machine — `devmachine sync`
+applies the change. Pass one of `--machine` or `--workspace`; with neither, and
+one configured machine, that machine is the target. Adding a package a target
+already has changes nothing and says so.
+
+Comments in `config.yml` survive: only the package lists and the pin are
+rewritten, everything else is left as you wrote it.
 
 `new` writes a package that already passes `validate` and already installs
 something. It refuses to write over one that is there.
@@ -125,6 +141,40 @@ exits 1 when it found any.
 `schema` prints the `package.yml` format this binary reads. It is the answer
 that cannot drift, because the validator is what enforces it. The whole format
 is in [the package format](package-format.md).
+
+## sync
+
+```
+devmachine sync [--machine m] [--check] [--yes] [--tags a,b]
+```
+
+Puts a machine into the state the configuration describes.
+
+In order: it reads and judges the configuration, makes the pinned release
+available (fetching and verifying it the first time), resolves what the machine
+and each of its workspaces get and in what order, checks your own packages,
+prints the plan, asks, then sends everything to the machine and runs Ansible
+**there**, streaming the output as it arrives.
+
+| Flag | Meaning |
+| --- | --- |
+| `--check` | a dry run: the machine reports what would change and changes nothing |
+| `--yes` | apply without asking |
+| `--tags a,b` | only the packages named, by name |
+
+`--check` never asks, and never writes the lock: a dry run that recorded
+itself as applied would make the lock claim something nobody did.
+
+Only your own packages are checked before the run. A published one was checked
+when it was released; one in `<config>/packages/` has never been checked by
+anybody.
+
+With `--format json` the document on stdout is the result, and the plan, the
+prompt and the machine's own output go to stderr.
+
+On success, `<config>/packages.lock` records what was applied to that machine
+and its workspaces, at which release and checksum. Only the machine that was
+synced is rewritten — syncing one machine says nothing about another.
 
 ## version, help
 
