@@ -1,0 +1,21 @@
+internal/packages/lock.go
+  s_cab674f14f5e3f::t_98083d01b5342d 1-130
+internal/packages/lock_test.go
+  s_cab674f14f5e3f::t_71af81f63e1c1a 1-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e759ee05d1f850d032c55b7e124f0662d0e85410",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
