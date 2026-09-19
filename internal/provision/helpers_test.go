@@ -1,7 +1,10 @@
 package provision
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"io"
 	"io/fs"
 	"path/filepath"
 	"sort"
@@ -171,4 +174,27 @@ func planWithLocalPackage(t *testing.T, machineName, name string) packages.Machi
 func planWithExtension(t *testing.T) packages.MachinePlan {
 	t.Helper()
 	return planWith(t, "main", []string{"caddy"}, map[string][]string{"alice": {"sharing"}})
+}
+
+// archiveNames lists an archive's entries. It reports an error rather than
+// failing a test, because its caller is a fake with no testing.T to fail.
+func archiveNames(r io.Reader) ([]string, error) {
+	unzipped, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	defer unzipped.Close()
+
+	var names []string
+	archive := tar.NewReader(unzipped)
+	for {
+		header, err := archive.Next()
+		if err == io.EOF {
+			return names, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, header.Name)
+	}
 }
