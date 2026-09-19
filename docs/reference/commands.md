@@ -49,8 +49,34 @@ a configuration.
 ## machines
 
 ```
-devmachine machines list    each machine, its addresses, port and workspaces
+devmachine machines list                  each machine, its addresses, port and workspaces
+devmachine machines create-local <name>   a machine on this computer
+devmachine machines start <name>          start a local machine
+devmachine machines stop <name>           stop a local machine
+devmachine machines delete-local <name> [--yes]   destroy it and everything on it
 ```
+
+`create-local` builds a machine on this computer and hands it back as an
+ordinary machine: an address, a port and an admin login. It comes up the way a
+bought server arrives — root reachable over SSH with a password and **no key
+installed** — so `devmachine setup` has the same work to do on it as on
+anything else. The root password is `devmachine`, and it is public on purpose:
+the VM holds no data and exists to be destroyed.
+
+It writes nothing to your configuration. `setup` does that, and running it
+against the new machine is the point.
+
+`start`, `stop` and `delete-local` act on a local machine only. A bought server
+is not the CLI's to switch on or off. `delete-local` asks first, and is not
+`machines rm`, which forgets a server and leaves it running.
+
+Two limits, both from what a machine on your own computer is:
+
+- It needs [Lima](https://lima-vm.io) (`brew install lima`), which runs on
+  macOS and Linux. **There is no Windows path.**
+- It is not reachable from the internet, so `dns`, TLS and subdomains do not
+  work on it. Everything else does: `setup`, `doctor`, `run`, `ssh`, `sync`,
+  packages.
 
 ## stats
 
