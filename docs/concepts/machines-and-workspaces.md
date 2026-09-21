@@ -75,3 +75,81 @@ reinvented.
 | inventory and host variables | the CLI generates them |
 | converging a machine | Ansible |
 | sessions, stats, DNS, diagnosis | the CLI, straight over SSH |
+
+## Making one
+
+```
+devmachine workspaces new alice
+devmachine workspaces new bob --like alice
+devmachine sync
+```
+
+`new` writes a line in `config.yml` and **touches no machine**. `sync` is what
+creates the account. The command says so, because somebody who stops after the
+first line has a workspace that exists only in their configuration.
+
+What a new workspace gets, when no flag says otherwise, is `defaults.workspace`
+in your own configuration — seeded by `setup`, and yours to change:
+
+```yaml
+defaults:
+  workspace: [workspace, dev, zsh, mise]
+```
+
+Change that one line and every workspace made afterwards is different. `--like
+bob` copies another workspace's packages instead, and **only its packages**: a
+copied account name would collide, and a copied machine would put the new
+workspace wherever the old one happens to be.
+
+**A workspace cannot be created on a machine with no key.** It is reachable
+because the administrative key is copied into it, and with no key there is
+nothing to copy — the account would exist with no way in. Run `devmachine
+setup` first.
+
+## Removing one
+
+```
+devmachine workspaces rm alice
+```
+
+This removes the entry from `config.yml`. **The Linux account, its home and its
+files stay on the machine**, and the command says so.
+
+Deleting somebody's home is not something a configuration edit should do, and
+`sync` could not put it back. If you want the account gone, remove it on the
+machine yourself, deliberately.
+
+## Reaching one by name
+
+```
+devmachine aliases --write
+mosh alice-devmachine
+```
+
+The CLI already knows every workspace, its machine, its addresses, its port and
+its key, so writing SSH aliases needs no Ansible and no package — it is a local
+file, written from your configuration.
+
+It replaces a **delimited block** and never the whole file:
+
+```
+# >>> devmachine — generated, do not edit
+Host alice-devmachine
+    HostName 100.64.0.5
+    User alice
+    HostKeyAlias main-devmachine
+# <<< devmachine
+```
+
+Your `~/.ssh/config` holds hosts this CLI knows nothing about — a work jump
+host, a sandbox. Rewriting the whole file would eat them.
+
+**`HostKeyAlias` is the same on every alias for one machine**, and that is the
+part worth understanding. `known_hosts` is indexed by address, so one machine
+reached at two addresses gives two entries, and switching between them gives
+`Host key verification failed` on a machine that is perfectly fine.
+`HostKeyAlias` indexes by name instead, so the tailnet address and the public
+one are the same host as far as SSH is concerned.
+
+A `-pub` alias appears only when there is a second, different address to fall
+back to. Somebody with one address never sees one.
