@@ -781,6 +781,7 @@ func UpdateWorkspace(dir string, w Workspace) error {
 				setField(entry, "user", stringNode(w.User))
 				setField(entry, "packages", sequenceNode(w.Packages))
 				setField(entry, "settings", settings)
+				setField(entry, "credentials", credentialsNode(w.Credentials))
 				return nil
 			}
 		}
@@ -866,6 +867,23 @@ func workspaceNode(w Workspace) (*yaml.Node, error) {
 
 // settingsNode renders a settings map with its keys in order, so two runs that
 // set the same things produce the same file.
+// credentialsNode renders a workspace's sharing choices.
+//
+// It is separate from settingsNode because a choice is always a string and can
+// never fail to encode, so the caller has no error to handle.
+func credentialsNode(choices map[string]string) *yaml.Node {
+	if len(choices) == 0 {
+		return nil
+	}
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for _, name := range slices.Sorted(maps.Keys(choices)) {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: choices[name]})
+	}
+	return node
+}
+
 func settingsNode(settings map[string]any) (*yaml.Node, error) {
 	if len(settings) == 0 {
 		return nil, nil

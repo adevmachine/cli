@@ -299,6 +299,10 @@ func newWorkspacesEditCmd(opts *options) *cobra.Command {
 			"`--set <package>.<name>=<value>` writes into the workspace's " +
 			"`settings:`, which is how a package's variables are set. An empty " +
 			"value takes the setting out again.\n\n" +
+			"`--share <credential>=own` keeps this workspace's own login instead " +
+			"of the one shared across the machine, which is how one workspace " +
+			"signs in to a different account. `=machine` puts it back, and an " +
+			"empty value falls back to whatever the configuration says.\n\n" +
 			"Changing the machine looks like moving a workspace and is not: the " +
 			"next sync creates the account on the new machine, and the old one " +
 			"keeps everything it had.",
@@ -312,6 +316,8 @@ func newWorkspacesEditCmd(opts *options) *cobra.Command {
 	c.Flags().StringSliceVar(&e.add, "add", nil, "a package to add")
 	c.Flags().StringSliceVar(&e.remove, "rm", nil, "a package to take off")
 	c.Flags().StringArrayVar(&e.set, "set", nil, "a setting, as <package>.<name>=<value>")
+	c.Flags().StringArrayVar(&e.share, "share", nil,
+		"whether a login is shared, as <credential>=machine|own")
 	c.Flags().BoolVar(&e.check, "check", false, "say what would change, and change nothing")
 	c.Flags().BoolVar(&e.yes, "yes", false, "do not ask")
 	return c
@@ -325,6 +331,7 @@ type workspaceEditOptions struct {
 	add     []string
 	remove  []string
 	set     []string
+	share   []string
 	check   bool
 	yes     bool
 }
@@ -350,7 +357,7 @@ func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspac
 	}
 	if len(changes) == 0 {
 		return fmt.Errorf(
-			"nothing to change on %q: pass --machine, --user, --add, --rm or --set", name)
+			"nothing to change on %q: pass --machine, --user, --add, --rm, --set or --share", name)
 	}
 
 	// Validating the whole configuration is what catches a setting for a
@@ -439,6 +446,36 @@ func applyWorkspaceEdit(cfg config.Config, w *config.Workspace, e workspaceEditO
 		changes = append(changes, "take off the package "+name)
 	}
 	w.Packages = packages
+
+	shared := maps.Clone(w.Credentials)
+	if shared == nil {
+		shared = map[string]string{}
+	}
+	for _, raw := range e.share {
+		name, choice, ok := strings.Cut(raw, "=")
+		if !ok || name == "" {
+			return nil, fmt.Errorf("--share %q is not a choice: write it as <credential>=machine|own", raw)
+		}
+		switch choice {
+		case "":
+			if _, held := shared[name]; held {
+				delete(shared, name)
+				changes = append(changes, "stop deciding about the login "+name)
+			}
+		case config.CredentialMachine, config.CredentialOwn:
+			if shared[name] != choice {
+				shared[name] = choice
+				changes = append(changes, fmt.Sprintf("take the login %s as %s", name, choice))
+			}
+		default:
+			return nil, fmt.Errorf("--share %s=%s: a login is %q or %q",
+				name, choice, config.CredentialMachine, config.CredentialOwn)
+		}
+	}
+	if len(shared) == 0 {
+		shared = nil
+	}
+	w.Credentials = shared
 
 	settings := maps.Clone(w.Settings)
 	if settings == nil {

@@ -296,6 +296,53 @@ func TestWorkspacesListSaysWhenThereAreNone(t *testing.T) {
 	}
 }
 
+func TestWorkspacesEditKeepsAWorkspacesOwnLogin(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [dev]\n")
+
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--share", "gh=own", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, _ := cfg.Workspace("alice")
+	// Without this, a workspace signed in to a different account is
+	// overwritten by the shared login on the next sync, and loses it with
+	// nothing saying why.
+	if w.Credentials["gh"] != config.CredentialOwn {
+		t.Fatalf("got %#v", w.Credentials)
+	}
+}
+
+func TestWorkspacesEditRefusesAChoiceThatIsNeither(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [dev]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--share", "gh=sometimes", "--yes")
+	if err == nil {
+		t.Fatal("a choice that is neither was accepted")
+	}
+	if !strings.Contains(err.Error(), "machine") || !strings.Contains(err.Error(), "own") {
+		t.Fatalf("the error does not say what it takes: %v", err)
+	}
+}
+
+func TestWorkspacesEditWithAnEmptyShareFallsBackToTheConfiguration(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [dev]\n")
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--share", "gh=own", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--share", "gh=", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if _, held := w.Credentials["gh"]; held {
+		t.Fatalf("the decision survived being taken back: %#v", w.Credentials)
+	}
+}
+
 func TestWorkspacesEditWarnsThatChangingTheMachineMovesNothing(t *testing.T) {
 	dir := configWithKey(t, "  - name: sandbox\n    hosts: [198.51.100.7]\nworkspaces:\n  - name: alice\n    machine: main\n")
 

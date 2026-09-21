@@ -187,6 +187,14 @@ may be repeated. `--set <package>.<name>=<value>` writes into the workspace's
 `--set claude-plugins.plugins=[one, two]` sets a list; an empty value,
 `--set zsh.theme=`, takes the setting out again.
 
+`--share <credential>=own` keeps this workspace's own login instead of the one
+shared across the machine — which is how one workspace signs in to a different
+account. `=machine` puts it back, and an empty value falls back to whatever the
+configuration says.
+
+A workspace with `own` is left out of the copying on purpose, so it never loses
+the account it logged in with.
+
 A setting for a package the workspace does not install is refused. It would
 reach nothing: the recipe would quietly keep its default, and the machine would
 not be what the configuration says it is.
