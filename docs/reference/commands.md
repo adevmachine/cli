@@ -137,6 +137,45 @@ Two limits, both from what a machine on your own computer is:
   work on it. Everything else does: `setup`, `doctor`, `run`, `ssh`, `sync`,
   packages.
 
+## workspaces
+
+```
+devmachine workspaces list
+devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
+devmachine workspaces rm <name> [--yes]
+```
+
+A workspace is one Linux account on one machine. These commands edit
+`config.yml` and touch no machine — `devmachine sync` is what creates or
+changes the account.
+
+`new` takes its package list from `defaults.workspace` in your configuration:
+
+```yaml
+defaults:
+  workspace: [workspace, dev, zsh, mise]
+```
+
+`setup` seeds that list, and changing one line there changes every workspace
+made afterwards. `--packages` overrides it for one workspace; `--like <name>`
+copies another workspace's list instead.
+
+**`--like` copies the packages and nothing else.** Not the Linux account, which
+would collide, and not the machine, which would put one workspace wherever
+another happens to be.
+
+**`new` refuses on a machine with no key.** A workspace is reachable because
+the administrative key is copied into it; with nothing to copy, the account
+would be created with no way in. The fix is `devmachine setup`, which gives the
+machine a key. A machine with no `key:` in `config.yml` is served by your SSH
+agent, so an agent holding nothing is the same situation.
+
+With several machines configured, `new` refuses to guess: pass `--machine`.
+
+**`rm` leaves the Linux account, its home and its files on the machine.**
+Deleting a home is not something a configuration edit should do, and `sync`
+could not put it back. Remove them there by hand if you really want them gone.
+
 ## stats
 
 ```

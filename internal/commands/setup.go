@@ -98,6 +98,7 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 
 	if err := writeConfig(dir, path, configFile{
 		Machines: []machineFile{machineEntry(m)},
+		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
 		Domain:   domain,
 	}); err != nil {
 		return err
@@ -399,7 +400,12 @@ func machineEntry(m config.Machine) machineFile {
 type configFile struct {
 	Machines   []machineFile   `yaml:"machines"`
 	Workspaces []workspaceFile `yaml:"workspaces,omitempty"`
+	Defaults   defaultsFile    `yaml:"defaults,omitempty"`
 	Domain     string          `yaml:"domain,omitempty"`
+}
+
+type defaultsFile struct {
+	Workspace []string `yaml:"workspace,omitempty"`
 }
 
 type machineFile struct {

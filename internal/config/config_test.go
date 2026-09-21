@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -778,5 +779,217 @@ func TestValidateAcceptsASettingForAPackageTheTargetHas(t *testing.T) {
 	}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadReadsTheDefaultPackagesForANewWorkspace(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+defaults:
+  workspace: [workspace, dev, zsh]
+`)
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Defaults.Workspace, []string{"workspace", "dev", "zsh"}) {
+		t.Fatalf("got %#v", cfg.Defaults.Workspace)
+	}
+}
+
+func TestAddWorkspaceKeepsEverythingElseAsItWasWritten(t *testing.T) {
+	dir := configDirWith(t, `# the machine I bought first
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+domain: example.com
+`)
+
+	err := AddWorkspace(dir, Workspace{
+		Name:     "alice",
+		Machine:  "main",
+		Packages: []string{"workspace", "dev"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# the machine I bought first") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := cfg.Workspace("alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Machine != "main" || !slices.Equal(w.Packages, []string{"workspace", "dev"}) {
+		t.Fatalf("got %#v", w)
+	}
+}
+
+func TestAddWorkspaceMakesTheSectionWhenThereIsNone(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if err := AddWorkspace(dir, Workspace{Name: "alice"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Workspaces) != 1 || cfg.Workspaces[0].Name != "alice" {
+		t.Fatalf("got %#v", cfg.Workspaces)
+	}
+}
+
+func TestAddWorkspaceRefusesANameThatIsTaken(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+`)
+
+	err := AddWorkspace(dir, Workspace{Name: "alice"})
+	if err == nil {
+		t.Fatal("it added a second alice")
+	}
+	if !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+}
+
+func TestRemoveWorkspaceTakesItOutAndLeavesTheRest(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+  - name: bob
+domain: example.com
+`)
+
+	if err := RemoveWorkspace(dir, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Workspaces) != 1 || cfg.Workspaces[0].Name != "bob" {
+		t.Fatalf("got %#v", cfg.Workspaces)
+	}
+	if cfg.Domain != "example.com" {
+		t.Fatalf("the rest of the file changed: %#v", cfg)
+	}
+}
+
+func TestRemoveWorkspaceSaysWhichOnesThereAre(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: bob
+`)
+
+	err := RemoveWorkspace(dir, "alice")
+	if err == nil {
+		t.Fatal("it removed a workspace that does not exist")
+	}
+	if !strings.Contains(err.Error(), "bob") {
+		t.Fatalf("the error does not say what is there: %v", err)
+	}
+}
+
+func TestUpdateWorkspaceWritesTheFieldsTheCLIEdits(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: sandbox
+    hosts: [198.51.100.7]
+workspaces:
+  - name: alice  # the one I work in
+    machine: main
+`)
+
+	err := UpdateWorkspace(dir, Workspace{
+		Name:     "alice",
+		Machine:  "sandbox",
+		User:     "alice2",
+		Packages: []string{"workspace", "zsh"},
+		Settings: map[string]any{"zsh.theme": "plain"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "the one I work in") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, _ := cfg.Workspace("alice")
+	if w.Machine != "sandbox" || w.User != "alice2" {
+		t.Fatalf("got %#v", w)
+	}
+	if w.Settings["zsh.theme"] != "plain" {
+		t.Fatalf("the setting did not survive: %#v", w.Settings)
+	}
+}
+
+func TestUpdateWorkspaceRemovesWhatWasEmptied(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+    user: other
+    settings:
+      zsh.theme: plain
+    packages: [zsh]
+`)
+
+	err := UpdateWorkspace(dir, Workspace{Name: "alice", Packages: []string{"zsh"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, _ := cfg.Workspace("alice")
+	if w.User != "" || len(w.Settings) != 0 {
+		t.Fatalf("got %#v", w)
+	}
+}
+
+func TestUpdateWorkspaceRefusesOneTheFileDoesNotHave(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if err := UpdateWorkspace(dir, Workspace{Name: "alice"}); err == nil {
+		t.Fatal("it edited a workspace that is not there")
 	}
 }
