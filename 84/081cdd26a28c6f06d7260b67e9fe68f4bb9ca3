@@ -1,0 +1,27 @@
+docs/reference/package-format.md
+  s_cab674f14f5e3f::t_1686edd0c21f9b 156-169
+internal/packages/manifest.go
+  s_cab674f14f5e3f::t_ae2cd81651a74d 56-58,60-64
+internal/packages/manifest_test.go
+  s_cab674f14f5e3f::t_11940c8b75ac8e 102-136
+internal/packages/validate.go
+  s_cab674f14f5e3f::t_75e57f0077f04f 226-230,236-240
+internal/packages/validate_test.go
+  s_cab674f14f5e3f::t_80dc97049d6bf6 509-577
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "84081cdd26a28c6f06d7260b67e9fe68f4bb9ca3",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
