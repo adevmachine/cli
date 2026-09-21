@@ -32,6 +32,9 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+      - name: Coverage floor
+        run: make cover
+
       - name: Check the command surface is up to date
         run: |
           go run ./cmd/surface > /tmp/surface.txt

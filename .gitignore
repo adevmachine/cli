@@ -9,3 +9,4 @@ CLAUDE.local.md
 
 # Worktrees the agents work in
 .claude/
+coverage.out

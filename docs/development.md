@@ -93,3 +93,17 @@ live in the operator's own repo and are gitignored here.
 
 `docs/` is for people using the CLI. That is a different audience and a
 different document.
+
+## Coverage
+
+```
+make cover
+```
+
+The floor is **80%**, and it is a floor rather than a target: it is set at a
+number the tree already clears, so it catches a regression instead of teaching
+everybody to ignore a red gate. Raise it when the number earns it.
+
+`internal/remote` is the low one, and honestly so — half of it only runs against
+a real machine, and those tests skip without one. `make test-vps` is what
+exercises them.
