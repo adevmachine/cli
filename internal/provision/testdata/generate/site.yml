@@ -46,6 +46,18 @@
         loop_var: devmachine_workspace
       tags: [claude-code]
 
+    - name: dev for each workspace that declares it
+      include_role:
+        name: dev
+        apply:
+          tags: [dev]
+      loop:
+        - {name: "alice", user: "alice"}
+        - {name: "bob", user: "bob"}
+      loop_control:
+        loop_var: devmachine_workspace
+      tags: [dev]
+
     - name: sharing for each workspace that declares it
       include_role:
         name: sharing
@@ -56,6 +68,43 @@
       loop_control:
         loop_var: devmachine_workspace
       tags: [sharing]
+
+    - name: look for the shared gh login
+      stat:
+        path: "/etc/devmachine/gh/hosts.yml"
+      register: devmachine_shared_gh
+      check_mode: false
+      tags: [dev, credentials]
+
+    - name: the directories the shared gh login lands in
+      file:
+        path: "{{ devmachine_shared.path }}"
+        state: directory
+        owner: "{{ devmachine_shared.user }}"
+        group: "{{ devmachine_shared.user }}"
+        mode: "0700"
+      loop:
+        - {user: "alice", path: "~alice/.config"}
+        - {user: "alice", path: "~alice/.config/gh"}
+      loop_control:
+        loop_var: devmachine_shared
+      when: devmachine_shared_gh.stat.exists
+      tags: [dev, credentials]
+
+    - name: the shared gh login, for the workspaces that want it
+      copy:
+        src: "/etc/devmachine/gh/hosts.yml"
+        dest: "{{ devmachine_shared.path }}"
+        remote_src: true
+        owner: "{{ devmachine_shared.user }}"
+        group: "{{ devmachine_shared.user }}"
+        mode: "0600"
+      loop:
+        - {user: "alice", path: "~alice/.config/gh/hosts.yml"}
+      loop_control:
+        loop_var: devmachine_shared
+      when: devmachine_shared_gh.stat.exists
+      tags: [dev, credentials]
 
     - name: sharing extends caddy.sites.d for alice
       copy:

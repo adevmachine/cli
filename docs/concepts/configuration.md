@@ -136,6 +136,9 @@ A package that says `shareable: false` beats all three: asking for `machine` on
 one is refused, naming the package, rather than copying something that would
 not work.
 
+What the copying actually does, and why the CLI generates it rather than any
+package, is in [Sharing a login](../how-it-works/sharing-a-login.md).
+
 This block holds no values and no method. The package still says how a login
 happens and whether it travels; this says only what you want done about it.
 

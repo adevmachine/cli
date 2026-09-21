@@ -204,7 +204,14 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tasks := machineTasks(plan) + forWorkspaces + extensionTasks(plan)
+	// The copies come after the packages that declared them: the account and
+	// the tool both have to exist before a session is put where the tool
+	// looks for it.
+	shared, err := sharingTasks(plan)
+	if err != nil {
+		return "", err
+	}
+	tasks := machineTasks(plan) + forWorkspaces + shared + extensionTasks(plan)
 	if tasks == "" {
 		out.WriteString("  tasks: []\n")
 		return out.String(), nil
