@@ -1,0 +1,37 @@
+docs/concepts/configuration.md
+  s_cab674f14f5e3f::t_3b23932ba38041 139-141
+docs/how-it-works/sharing-a-login.md
+  s_cab674f14f5e3f::t_71bb453fbeadcc 1-70
+docs/index.md
+  s_cab674f14f5e3f::t_21f9e41f60ad57 32-33
+internal/provision/ansible.go
+  s_cab674f14f5e3f::t_00c9d4b289919d 207-214
+internal/provision/ansible_test.go
+  s_cab674f14f5e3f::t_59943cb129c9bf 13,408-409,413
+internal/provision/helpers_test.go
+  s_cab674f14f5e3f::t_638927fae6ebb7 61-83
+internal/provision/sharing.go
+  s_cab674f14f5e3f::t_1c53bf1086eaeb 1-133
+internal/provision/sharing_test.go
+  s_cab674f14f5e3f::t_7d3db880b6bb9c 1-188
+internal/provision/testdata/generate/host_vars/devmachine.yml
+  s_cab674f14f5e3f::t_6c82ddc7beeaa0 9,13-14
+internal/provision/testdata/generate/site.yml
+  s_cab674f14f5e3f::t_c8f602a6437820 49-60,72-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "18223d140ab7f7fbd96b1026dc2cee099d15732e",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
