@@ -147,7 +147,7 @@ func TestPresentAgainstTheThrowawayMachine(t *testing.T) {
 func machineLogin(name string) Declared {
 	return Declared{
 		Credential: packages.Credential{
-			Name: name, Kind: packages.KindLogin, Scope: packages.ScopeMachine,
+			Name: name, Kind: packages.KindManual, Scope: packages.ScopeMachine,
 			Command: name + " auth login", StoredAt: "~/.config/" + name + "/hosts.yml",
 		},
 		Package: name,
@@ -157,7 +157,7 @@ func machineLogin(name string) Declared {
 func workspaceLogin(workspace, name string) Declared {
 	return Declared{
 		Credential: packages.Credential{
-			Name: name, Kind: packages.KindLogin, Scope: packages.ScopeWorkspace,
+			Name: name, Kind: packages.KindManual, Scope: packages.ScopeWorkspace,
 			Command: name + " /login", StoredAt: "~/.claude/.credentials.json",
 		},
 		Package: name, Workspace: workspace, LinuxUser: workspace,

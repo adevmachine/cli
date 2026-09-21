@@ -84,7 +84,7 @@ func Sharing(plan packages.MachinePlan) ([]Shared, error) {
 	for _, workspace := range plan.Workspaces {
 		for _, found := range workspace.Ordered {
 			for _, c := range found.Manifest.Credentials {
-				if c.Kind != packages.KindLogin || c.StoredAt == "" {
+				if c.Kind != packages.KindManual || c.StoredAt == "" {
 					continue
 				}
 				scope, err := Resolve(found.Manifest.Name, c, workspace.Target.Credentials)

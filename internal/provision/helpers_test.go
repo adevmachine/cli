@@ -65,7 +65,7 @@ scope: workspace
 summary: The GitHub CLI, and the login one account normally shares.
 credentials:
   - name: gh
-    kind: login
+    kind: manual
     scope: machine
     shareable: true
     command: gh auth login
@@ -77,7 +77,7 @@ scope: workspace
 summary: A tool whose session is bound to the account that made it.
 credentials:
   - name: vendor
-    kind: login
+    kind: manual
     scope: workspace
     command: vendor login
     stored_at: ~/.vendor/session

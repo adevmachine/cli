@@ -26,8 +26,11 @@ const (
 
 // The kinds of credential, and the only hard one is the first.
 const (
-	// KindLogin cannot be automated: a browser or a device code, and a person.
-	KindLogin = "login"
+	// KindManual cannot be automated: a browser or a device code, and a
+	// person. The name is about who does it, not about what it produces —
+	// `tailscale up` authenticates a whole machine, and calling that a
+	// "login" suggested a user session it has nothing to do with.
+	KindManual = "manual"
 	// KindSecret is a value somebody hands over once.
 	KindSecret = "secret"
 	// KindFile is a file somebody drops on the machine.
@@ -62,7 +65,7 @@ type Credential struct {
 	// token bound to a device or a browser does not. Which is which is found
 	// by trying, so leaving it out means no.
 	Shareable bool `yaml:"shareable"`
-	// Command is the interactive login to run, for KindLogin.
+	// Command is what a person runs, for KindManual.
 	Command string `yaml:"command"`
 	// StoredAt is where the tool keeps the result, so doctor can look and a
 	// later version can copy it. It is a claim, not a guarantee.

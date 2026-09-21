@@ -335,7 +335,7 @@ func dialling(client remote.Client) Dialer {
 func login(name, workspace, user string) credentials.Declared {
 	return credentials.Declared{
 		Credential: packages.Credential{
-			Name: name, Kind: packages.KindLogin,
+			Name: name, Kind: packages.KindManual,
 			Command: name + " auth login", StoredAt: "~/.config/" + name + "/hosts.yml",
 		},
 		Package: name + "-login", Workspace: workspace, LinuxUser: user,
@@ -383,7 +383,7 @@ func TestACredentialWithNowhereToLookIsNotReportedMissing(t *testing.T) {
 	// "I cannot tell" and "it is not there" are different things, and only one
 	// of them is a failure.
 	wanted := []credentials.Declared{{
-		Credential: packages.Credential{Name: "gh", Kind: packages.KindLogin, Command: "gh auth login"},
+		Credential: packages.Credential{Name: "gh", Kind: packages.KindManual, Command: "gh auth login"},
 		Package:    "gh-login",
 	}}
 	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("")), wanted)

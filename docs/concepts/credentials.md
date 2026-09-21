@@ -11,7 +11,7 @@ created. Credentials are how the CLI knows that, and how it fixes what it can.
 
 | Kind | Examples | Can it be automated? |
 | --- | --- | --- |
-| **login** | `gh`, `claude`, `tailscale up` | **no** — a browser or a device code, and a person |
+| **manual** | `gh`, `claude`, `tailscale up` | **no** — a browser or a device code, and a person |
 | **secret** | an API token, an SMTP password | yes |
 | **file** | a VPN profile, a kubeconfig | yes |
 
@@ -31,7 +31,7 @@ Claude does.
 # packages/claude-code/package.yml
 credentials:
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     shareable: true
     command: claude /login

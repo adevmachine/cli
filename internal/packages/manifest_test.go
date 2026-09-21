@@ -109,13 +109,13 @@ scope: workspace
 summary: The GitHub CLI.
 credentials:
   - name: gh
-    kind: login
+    kind: manual
     scope: machine
     shareable: true
     command: gh auth login
     stored_at: ~/.config/gh/hosts.yml
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     command: claude /login
     stored_at: ~/.claude/.credentials.json

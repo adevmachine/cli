@@ -110,7 +110,7 @@ func secretName(d credentials.Declared, stored map[string]bool) string {
 // It is the whole value of the report: nobody should have to work out what to
 // do next from the fact that something is missing.
 func fixFor(d credentials.Declared, stored map[string]bool) string {
-	if d.Kind == packages.KindLogin {
+	if d.Kind == packages.KindManual {
 		return credentials.LoginCommand(d)
 	}
 	if stored[secretName(d, stored)] {
@@ -281,7 +281,7 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	var work []deliverable
 	for _, d := range found.wanted {
 		switch {
-		case d.Kind == packages.KindLogin:
+		case d.Kind == packages.KindManual:
 			report.Skipped = append(report.Skipped, skippedJSON{
 				credentials.Key(d),
 				"a login cannot be pushed: run `" + credentials.LoginCommand(d) + "`",

@@ -104,7 +104,7 @@ func TestPushRefusesALoginKind(t *testing.T) {
 	c := &recordingClient{}
 	d := Declared{
 		Credential: packages.Credential{
-			Name: "gh", Kind: packages.KindLogin, Scope: packages.ScopeMachine,
+			Name: "gh", Kind: packages.KindManual, Scope: packages.ScopeMachine,
 			Command: "gh auth login", StoredAt: "~/.config/gh/hosts.yml",
 		},
 		Package: "gh-login",
@@ -127,7 +127,7 @@ func TestPushRefusesALoginKind(t *testing.T) {
 func TestPushRefusesALoginForAWorkspaceNamingTheWorkspace(t *testing.T) {
 	d := Declared{
 		Credential: packages.Credential{
-			Name: "claude", Kind: packages.KindLogin, Scope: packages.ScopeWorkspace,
+			Name: "claude", Kind: packages.KindManual, Scope: packages.ScopeWorkspace,
 			Command: "claude /login", StoredAt: "~/.claude/.credentials.json",
 		},
 		Package: "claude-code", Workspace: "alice", LinuxUser: "alice",

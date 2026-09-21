@@ -93,7 +93,7 @@ func pickCredential(wanted []credentials.Declared, name, workspace string) (cred
 			"no package installed here declares a credential named %q: `devmachine credentials list` shows the ones that do",
 			name)
 	}
-	if kind := matches[0].Kind; kind != packages.KindLogin {
+	if kind := matches[0].Kind; kind != packages.KindManual {
 		return credentials.Declared{}, fmt.Errorf(
 			"credential %q is a %s, and nobody logs into a %s: store it with `devmachine secrets set %s`, "+
 				"then deliver it with `devmachine credentials push`",

@@ -223,7 +223,7 @@ func credentialChecks(ctx context.Context, client remote.Client, wanted []creden
 // credentialFix is the command that makes a missing credential arrive. A
 // failure that does not say what to do next is half a report.
 func credentialFix(d credentials.Declared) string {
-	if d.Kind == packages.KindLogin {
+	if d.Kind == packages.KindManual {
 		return "missing: run `" + credentials.LoginCommand(d) + "`"
 	}
 	return fmt.Sprintf("missing: run `devmachine secrets set %s`, then `devmachine credentials push`", d.Name)

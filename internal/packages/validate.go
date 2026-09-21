@@ -213,7 +213,7 @@ func validateCredentials(m Manifest) []Problem {
 		}
 
 		switch c.Kind {
-		case KindLogin:
+		case KindManual:
 			if c.Scope == ScopeMachine && !c.Shareable {
 				at(fmt.Sprintf(
 					"credential %q recommends `scope: machine`, so it needs `shareable: true`: one login "+
@@ -248,7 +248,7 @@ func validateCredentials(m Manifest) []Problem {
 			}
 		default:
 			at(fmt.Sprintf("credential %q: kind must be %q, %q or %q, got %q",
-				c.Name, KindLogin, KindSecret, KindFile, c.Kind))
+				c.Name, KindManual, KindSecret, KindFile, c.Kind))
 		}
 	}
 	return problems

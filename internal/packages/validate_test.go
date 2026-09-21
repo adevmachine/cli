@@ -341,7 +341,7 @@ scope: workspace
 summary: x
 credentials:
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     stored_at: ~/.claude/.credentials.json
 `)
@@ -363,7 +363,7 @@ scope: workspace
 summary: x
 credentials:
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     command: claude /login
 `)
@@ -481,7 +481,7 @@ scope: workspace
 summary: Claude Code, logged in per workspace.
 credentials:
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     command: claude /login
     stored_at: ~/.claude/.credentials.json
@@ -559,7 +559,7 @@ scope: workspace
 summary: x
 credentials:
   - name: gh
-    kind: login
+    kind: manual
     scope: machine
     shareable: true
     command: gh auth login
@@ -583,7 +583,7 @@ scope: workspace
 summary: x
 credentials:
   - name: gh
-    kind: login
+    kind: manual
     scope: machine
     command: gh auth login
     stored_at: ~/.config/gh/hosts.yml

@@ -154,7 +154,7 @@ func claudeLogin() packages.Manifest {
 		Name: "claude-code", Scope: packages.ScopeWorkspace,
 		Credentials: []packages.Credential{{
 			Name:  "claude",
-			Kind:  packages.KindLogin,
+			Kind:  packages.KindManual,
 			Scope: packages.ScopeWorkspace,
 			// The session file does copy; accounts usually differ between
 			// workspaces, which is a different thing and the operator's call.
@@ -170,7 +170,7 @@ func ghLogin() packages.Manifest {
 		Name: "gh-login", Scope: packages.ScopeWorkspace,
 		Credentials: []packages.Credential{{
 			Name:      "gh",
-			Kind:      packages.KindLogin,
+			Kind:      packages.KindManual,
 			Scope:     packages.ScopeMachine,
 			Shareable: true,
 			Command:   "gh auth login",

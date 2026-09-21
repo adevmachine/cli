@@ -35,7 +35,7 @@ func TestResolveFallsBackToThePackagesRecommendation(t *testing.T) {
 
 func TestResolveRefusesToShareWhatTheToolSaysCannotTravel(t *testing.T) {
 	bound := packages.Credential{
-		Name: "vendor", Kind: packages.KindLogin, Scope: packages.ScopeWorkspace,
+		Name: "vendor", Kind: packages.KindManual, Scope: packages.ScopeWorkspace,
 		Command: "vendor login", StoredAt: "~/.vendor/session",
 	}
 
@@ -55,7 +55,7 @@ func TestResolveRefusesToShareWhatTheToolSaysCannotTravel(t *testing.T) {
 
 func TestResolveNeverSharesWhatCannotTravelEvenWhenThePackageSaysSo(t *testing.T) {
 	contradictory := packages.Credential{
-		Name: "vendor", Kind: packages.KindLogin, Scope: packages.ScopeMachine,
+		Name: "vendor", Kind: packages.KindManual, Scope: packages.ScopeMachine,
 		Command: "vendor login", StoredAt: "~/.vendor/session",
 	}
 
@@ -165,7 +165,7 @@ func TestSharingRefusesToShareWhatCannotTravel(t *testing.T) {
 	bound := packages.Manifest{
 		Name: "vendor-cli", Scope: packages.ScopeWorkspace,
 		Credentials: []packages.Credential{{
-			Name: "vendor", Kind: packages.KindLogin, Scope: packages.ScopeWorkspace,
+			Name: "vendor", Kind: packages.KindManual, Scope: packages.ScopeWorkspace,
 			Command: "vendor login", StoredAt: "~/.vendor/session",
 		}},
 	}

@@ -137,14 +137,14 @@ then what its kind needs:
 
 | `kind` | also needs | what it means |
 | --- | --- | --- |
-| `login` | `command`, `stored_at` | A person runs `command`; the tool leaves its session at `stored_at`. |
+| `manual` | `command`, `stored_at` | A person runs `command`; the tool leaves its session at `stored_at`. |
 | `secret` | `env` or `path` | A value handed over once, delivered there. |
 | `file` | `path` | A file dropped on the machine at that path. |
 
 ```yaml
 credentials:
   - name: claude
-    kind: login
+    kind: manual
     scope: workspace
     command: claude /login
     stored_at: ~/.claude/.credentials.json
@@ -153,17 +153,17 @@ credentials:
 `stored_at` is a claim, not a guarantee. It is what lets `doctor` look and say
 whether the login worked.
 
-A `login` may also say `shareable: true`, which means a copy of `stored_at`
+A `manual` credential may also say `shareable: true`, which means a copy of `stored_at`
 works on another account — one GitHub login serving every workspace, say. It is
 a fact about the tool, found by trying: a session file copies, a token bound to
 a device or a browser does not. Left out it is `false`, and the CLI never
 copies it anywhere.
 
-A `login` that recommends `scope: machine` has to be `shareable: true`, because
+A `manual` credential that recommends `scope: machine` has to be `shareable: true`, because
 `scope: machine` means exactly "one login, copied into every workspace". Saying
 both would be the package asking for something it also says cannot work.
 
-`shareable` belongs to a `login` alone. A `secret` and a `file` are delivered
+`shareable` belongs to a `manual` credential alone. A `secret` and a `file` are delivered
 to each place that wants them rather than copied out of one of them, so saying
 it there is refused.
 

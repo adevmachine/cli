@@ -85,10 +85,10 @@ workspaces:
 `, secret))
 
 	writeCredentialPackage(t, dir, "gh-login", packages.ScopeMachine,
-		"  - name: gh\n    kind: login\n    scope: machine\n"+
+		"  - name: gh\n    kind: manual\n    scope: machine\n"+
 			"    command: gh auth login\n    stored_at: ~/.config/gh/hosts.yml\n")
 	writeCredentialPackage(t, dir, "claude-code", packages.ScopeWorkspace,
-		"  - name: claude\n    kind: login\n    scope: workspace\n"+
+		"  - name: claude\n    kind: manual\n    scope: workspace\n"+
 			"    command: claude /login\n    stored_at: ~/.claude/.credentials.json\n")
 	writeCredentialPackage(t, dir, secret, packages.ScopeWorkspace,
 		fmt.Sprintf("  - name: %s\n    kind: secret\n    scope: workspace\n    env: PROBE_TOKEN\n", secret))
@@ -264,7 +264,7 @@ workspaces:
 `, first, second))
 
 	writeCredentialPackage(t, dir, "gh-login", packages.ScopeMachine,
-		"  - name: gh\n    kind: login\n    scope: machine\n"+
+		"  - name: gh\n    kind: manual\n    scope: machine\n"+
 			"    command: gh auth login\n    stored_at: ~/.config/gh/hosts.yml\n")
 	for _, name := range []string{first, second} {
 		writeCredentialPackage(t, dir, name, packages.ScopeWorkspace,

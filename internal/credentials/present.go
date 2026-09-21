@@ -20,7 +20,7 @@ import (
 // For a secret or a file it is where this CLI delivered the value, which is
 // not a claim about anybody.
 func Place(d Declared) string {
-	if d.Kind == packages.KindLogin {
+	if d.Kind == packages.KindManual {
 		return d.StoredAt
 	}
 	return Destination(d)

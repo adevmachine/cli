@@ -99,7 +99,7 @@ cat > "$path"
 //
 // It never prints the value, and never puts it in a command.
 func Push(ctx context.Context, c remote.Client, d Declared, value string) error {
-	if d.Kind == packages.KindLogin {
+	if d.Kind == packages.KindManual {
 		return fmt.Errorf("credential %q is a login, and a login cannot be pushed: run `%s`",
 			Key(d), LoginCommand(d))
 	}
