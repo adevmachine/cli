@@ -36,6 +36,7 @@
         name: claude-code
         apply:
           tags: [claude-code]
+      vars:
         devmachine_claude_code_plugins:
           - one
           - two

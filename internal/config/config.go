@@ -118,10 +118,27 @@ func (w Workspace) LinuxUser() string {
 	return w.Name
 }
 
+// DefaultWorkspacePackages is what `setup` seeds `defaults.workspace` with.
+//
+// It is a seed, not a rule: it is written into the person's own file, where
+// they can change it, and nothing reads it again afterwards.
+var DefaultWorkspacePackages = []string{"workspace", "dev", "zsh", "mise"}
+
+// Defaults are the choices something new gets when nothing says otherwise.
+//
+// They live in the configuration rather than in the binary, so changing one
+// line changes every workspace made afterwards, and two people with different
+// habits do not need two builds.
+type Defaults struct {
+	// Workspace is the package list a new workspace is created with.
+	Workspace []string `yaml:"workspace,omitempty"`
+}
+
 // Config is what config.yml holds.
 type Config struct {
 	Machines    []Machine   `yaml:"machines"`
 	Workspaces  []Workspace `yaml:"workspaces,omitempty"`
+	Defaults    Defaults    `yaml:"defaults,omitempty"`
 	Domain      string      `yaml:"domain,omitempty"`
 	DNSProvider string      `yaml:"dns_provider,omitempty"`
 	// Packages is the release of the packages repository every recipe is read
@@ -654,4 +671,153 @@ func modeOf(path string) os.FileMode {
 		return info.Mode().Perm()
 	}
 	return 0o600
+}
+
+// AddWorkspace appends a workspace to config.yml.
+//
+// Like AddMachine, it edits the document rather than marshalling over the top,
+// so everything the person wrote — comments included — is still there
+// afterwards.
+func AddWorkspace(dir string, w Workspace) error {
+	return editDocument(dir, func(root *yaml.Node) error {
+		workspaces := field(root, "workspaces")
+		if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
+			workspaces = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+			setField(root, "workspaces", workspaces)
+		}
+		for _, entry := range workspaces.Content {
+			if scalar(field(entry, "name")) == w.Name {
+				return fmt.Errorf("a workspace named %q is already configured: pick another name", w.Name)
+			}
+		}
+		node, err := workspaceNode(w)
+		if err != nil {
+			return err
+		}
+		workspaces.Content = append(workspaces.Content, node)
+		return nil
+	})
+}
+
+// UpdateWorkspace writes one workspace's fields back onto its entry.
+//
+// Only what the CLI edits is written: the machine, the account, the package
+// list and the settings. A field left empty is removed rather than written as
+// an empty value, so a workspace that no longer overrides its account reads
+// like one that never did.
+func UpdateWorkspace(dir string, w Workspace) error {
+	return editDocument(dir, func(root *yaml.Node) error {
+		workspaces := field(root, "workspaces")
+		if workspaces != nil && workspaces.Kind == yaml.SequenceNode {
+			for _, entry := range workspaces.Content {
+				if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != w.Name {
+					continue
+				}
+				settings, err := settingsNode(w.Settings)
+				if err != nil {
+					return err
+				}
+				setField(entry, "machine", stringNode(w.Machine))
+				setField(entry, "user", stringNode(w.User))
+				setField(entry, "packages", sequenceNode(w.Packages))
+				setField(entry, "settings", settings)
+				return nil
+			}
+		}
+		return fmt.Errorf("`workspaces` has no entry named %q", w.Name)
+	})
+}
+
+// RemoveWorkspace takes a workspace out of config.yml.
+//
+// It removes the entry and nothing else. The Linux account, its home and its
+// files stay on the machine: a configuration edit is not a licence to delete
+// somebody's work, and `sync` could not put it back.
+func RemoveWorkspace(dir, name string) error {
+	current, err := Load(dir)
+	if err != nil {
+		return err
+	}
+	if _, err := current.Workspace(name); err != nil {
+		return err
+	}
+
+	return editDocument(dir, func(root *yaml.Node) error {
+		workspaces := field(root, "workspaces")
+		if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
+			return fmt.Errorf("`workspaces` has no entry named %q", name)
+		}
+		for i, entry := range workspaces.Content {
+			if scalar(field(entry, "name")) != name {
+				continue
+			}
+			workspaces.Content = append(workspaces.Content[:i], workspaces.Content[i+1:]...)
+			if len(workspaces.Content) == 0 {
+				setField(root, "workspaces", nil)
+			}
+			return nil
+		}
+		return fmt.Errorf("`workspaces` has no entry named %q", name)
+	})
+}
+
+// editDocument reads config.yml as a node tree, hands the root to edit, and
+// writes it back with its permissions and its comments intact.
+func editDocument(dir string, edit func(root *yaml.Node) error) error {
+	path := filepath.Join(dir, FileName)
+
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("there is no %s to edit: run `devmachine setup` for the first machine", path)
+	}
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	var document yaml.Node
+	if err := yaml.Unmarshal(body, &document); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("%s is not a configuration: run `devmachine setup` for the first machine", path)
+	}
+
+	if err := edit(document.Content[0]); err != nil {
+		return err
+	}
+	return writeYAML(path, &document, modeOf(path))
+}
+
+// workspaceNode is a workspace as the file holds it.
+func workspaceNode(w Workspace) (*yaml.Node, error) {
+	settings, err := settingsNode(w.Settings)
+	if err != nil {
+		return nil, err
+	}
+
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	setField(node, "name", stringNode(w.Name))
+	setField(node, "machine", stringNode(w.Machine))
+	setField(node, "user", stringNode(w.User))
+	setField(node, "packages", sequenceNode(w.Packages))
+	setField(node, "settings", settings)
+	return node, nil
+}
+
+// settingsNode renders a settings map with its keys in order, so two runs that
+// set the same things produce the same file.
+func settingsNode(settings map[string]any) (*yaml.Node, error) {
+	if len(settings) == 0 {
+		return nil, nil
+	}
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for _, key := range slices.Sorted(maps.Keys(settings)) {
+		value := &yaml.Node{}
+		if err := value.Encode(settings[key]); err != nil {
+			return nil, fmt.Errorf("writing the setting %q: %w", key, err)
+		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
+	}
+	return node, nil
 }

@@ -341,11 +341,13 @@ func TestGenerateGivesEachWorkspaceItsOwnSettings(t *testing.T) {
 	}
 
 	playbook := string(files["site.yml"])
+	carried := 0
 	for _, task := range tasksIn(t, files["site.yml"]) {
 		vars, ok := task["vars"].(map[string]any)
 		if !ok || vars["devmachine_claude_code_model"] == nil {
 			continue
 		}
+		carried++
 		loop, ok := task["loop"].([]any)
 		if !ok || len(loop) != 1 {
 			t.Fatalf("a setting reached %d workspaces at once:\n%s", len(loop), playbook)
@@ -355,6 +357,11 @@ func TestGenerateGivesEachWorkspaceItsOwnSettings(t *testing.T) {
 		if vars["devmachine_claude_code_model"] != want {
 			t.Fatalf("%v got %v, not %q:\n%s", who, vars["devmachine_claude_code_model"], want, playbook)
 		}
+	}
+	// Without this the loop above passes by never running, which is how the
+	// settings went into include_role's own options and nobody noticed.
+	if carried != 2 {
+		t.Fatalf("%d tasks carried the setting, not 2:\n%s", carried, playbook)
 	}
 }
 
@@ -442,4 +449,38 @@ func tasksIn(t *testing.T, playbook []byte) []map[string]any {
 		t.Fatalf("got hosts %q, become %v", plays[0].Hosts, plays[0].Become)
 	}
 	return plays[0].Tasks
+}
+
+func TestGenerateKeepsASettingOutOfIncludeRolesOwnOptions(t *testing.T) {
+	// `include_role` takes a fixed set of options and refuses the whole play
+	// when it meets one it does not know: "Invalid options for include_role".
+	// A setting is a variable for the role, so it belongs in the task's
+	// `vars:`, not among the options of the thing that includes it.
+	plan := planWithSettings(t, nil, map[string]map[string]any{
+		"alice": {"claude-code.model": "one"},
+	})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	playbook := string(files["site.yml"])
+	found := false
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		options, ok := task["include_role"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for key := range options {
+			if key != "name" && key != "apply" {
+				t.Fatalf("include_role was given %q, which it does not take:\n%s", key, playbook)
+			}
+		}
+		if vars, ok := task["vars"].(map[string]any); ok && vars["devmachine_claude_code_model"] == "one" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the setting reached no task's vars:\n%s", playbook)
+	}
 }

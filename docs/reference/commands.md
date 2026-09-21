@@ -137,6 +137,105 @@ Two limits, both from what a machine on your own computer is:
   work on it. Everything else does: `setup`, `doctor`, `run`, `ssh`, `sync`,
   packages.
 
+## workspaces
+
+```
+devmachine workspaces list
+devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
+devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--check] [--yes]
+devmachine workspaces rm <name> [--yes]
+```
+
+A workspace is one Linux account on one machine. These commands edit
+`config.yml` and touch no machine — `devmachine sync` is what creates or
+changes the account.
+
+`new` takes its package list from `defaults.workspace` in your configuration:
+
+```yaml
+defaults:
+  workspace: [workspace, dev, zsh, mise]
+```
+
+`setup` seeds that list, and changing one line there changes every workspace
+made afterwards. `--packages` overrides it for one workspace; `--like <name>`
+copies another workspace's list instead.
+
+**`--like` copies the packages and nothing else.** Not the Linux account, which
+would collide, and not the machine, which would put one workspace wherever
+another happens to be.
+
+**`new` refuses on a machine with no key.** A workspace is reachable because
+the administrative key is copied into it; with nothing to copy, the account
+would be created with no way in. The fix is `devmachine setup`, which gives the
+machine a key. A machine with no `key:` in `config.yml` is served by your SSH
+agent, so an agent holding nothing is the same situation.
+
+With several machines configured, `new` refuses to guess: pass `--machine`.
+
+`edit` changes one workspace. `--add` and `--rm` take a package name each and
+may be repeated. `--set <package>.<name>=<value>` writes into the workspace's
+`settings:`, which is how a package's variables are set — see
+[packages](../concepts/packages.md). The value is read as YAML, so
+`--set claude-plugins.plugins=[one, two]` sets a list; an empty value,
+`--set zsh.theme=`, takes the setting out again.
+
+A setting for a package the workspace does not install is refused. It would
+reach nothing: the recipe would quietly keep its default, and the machine would
+not be what the configuration says it is.
+
+**Changing `--machine` does not move a workspace.** It looks like it does. The
+next `sync` creates the account on the new machine, and the old one keeps
+everything it had — its home, its files, its account. The command says so.
+
+**`rm` leaves the Linux account, its home and its files on the machine.**
+Deleting a home is not something a configuration edit should do, and `sync`
+could not put it back. Remove them there by hand if you really want them gone.
+
+## aliases
+
+```
+devmachine aliases [--write] [--path p] [--check] [--yes]
+```
+
+Prints one SSH `Host` entry per workspace, so `ssh alice-devmachine` and
+`mosh alice-devmachine` work from an ordinary terminal — no CLI in the way, no
+package on the machine, nothing to install.
+
+```
+# >>> devmachine — generated, do not edit
+Host alice-devmachine
+    HostName 100.64.0.5
+    User alice
+    Port 22
+    IdentityFile /home/you/.config/devmachine/keys/main
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+# <<< devmachine
+```
+
+`--write` puts the block in `~/.ssh/config`, or in the file `--path` names. It
+asks first. **Only the block between the two markers is replaced.** That file
+holds hosts this CLI knows nothing about — a work jump host, a sandbox, a
+client's bastion — and rewriting the whole file deletes them.
+
+Three things the entries do on purpose:
+
+- **`HostKeyAlias` is the same for every alias of one machine.** `known_hosts`
+  is indexed by address, so a machine on two addresses gets two entries and
+  switching between them gives `Host key verification failed`. This indexes by
+  name instead.
+- **`HostName` is the first address that resolves.** A `tailscale:` entry is
+  turned into an address here, the same way every other command does it.
+- **`IdentitiesOnly yes` goes with `IdentityFile`.** Without it ssh offers
+  every key the agent holds first, and a server can cut the connection at
+  `MaxAuthTries` before the one that works is tried. A machine with no `key:`
+  is served by the agent, so neither line is written for it.
+
+A `-pub` alias is written only when there is a second, literal address to fall
+back to and the first one did not already resolve to it. With one address, or
+with the tailnet already down, a second entry would only repeat the first.
+
 ## stats
 
 ```

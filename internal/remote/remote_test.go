@@ -665,3 +665,12 @@ func TestDialWithLeavesAnUnreachableMachineApart(t *testing.T) {
 		t.Fatalf("an unreachable machine was reported as a refused login: %v", err)
 	}
 }
+
+func TestLiteralTellsAnAddressFromANameToResolve(t *testing.T) {
+	if !Literal("203.0.113.10") {
+		t.Fatal("an address is literal")
+	}
+	if Literal("tailscale:main") {
+		t.Fatal("a tailscale entry is not an address ssh can dial")
+	}
+}

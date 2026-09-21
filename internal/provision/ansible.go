@@ -147,6 +147,19 @@ func settingNodes(settings map[string]any, pkg string) ([]*yaml.Node, error) {
 	return out, nil
 }
 
+// varsBlock renders one package's settings as a task's own `vars:`.
+//
+// It is a task option and not one of include_role's: include_role takes a
+// fixed set of options and refuses the whole play when it meets one it does
+// not know.
+func varsBlock(settings map[string]any, pkg string) (string, error) {
+	lines, err := settingLines(settings, pkg, "        ")
+	if err != nil || lines == "" {
+		return "", err
+	}
+	return "      vars:\n" + lines, nil
+}
+
 // settingLines renders one package's settings as the body of a task's `vars:`
 // block, indented to sit inside it.
 func settingLines(settings map[string]any, pkg, indent string) (string, error) {
@@ -292,7 +305,7 @@ func groupBySettings(plan packages.MachinePlan, pkg string) ([]group, error) {
 		if !has(workspace, pkg) {
 			continue
 		}
-		vars, err := settingLines(workspace.Target.Settings, pkg, "        ")
+		vars, err := varsBlock(workspace.Target.Settings, pkg)
 		if err != nil {
 			return nil, fmt.Errorf("workspace %q: %w", workspace.Target.Name, err)
 		}

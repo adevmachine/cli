@@ -1,4 +1,5 @@
 devmachine
+devmachine aliases
 devmachine config
 devmachine config path
 devmachine config show
@@ -32,3 +33,8 @@ devmachine ssh
 devmachine stats
 devmachine sync
 devmachine version
+devmachine workspaces
+devmachine workspaces edit
+devmachine workspaces list
+devmachine workspaces new
+devmachine workspaces rm

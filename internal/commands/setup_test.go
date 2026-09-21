@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -544,5 +545,26 @@ func TestSetupInstallsNothingWhenTheProofFails(t *testing.T) {
 	}
 	if steps.ansible {
 		t.Fatal("it carried on installing on a machine it could not prove it owns")
+	}
+}
+
+func TestSetupSeedsTheDefaultPackagesForAWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "example.com", "1"),
+		setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The default lives in the person's own file, so changing one line
+	// changes every workspace made afterwards.
+	if !slices.Equal(cfg.Defaults.Workspace, config.DefaultWorkspacePackages) {
+		t.Fatalf("got %#v", cfg.Defaults.Workspace)
 	}
 }

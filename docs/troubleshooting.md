@@ -192,3 +192,14 @@ do to a machine you already built, not for previewing the build itself.
 An empty answer is no, and so is a closed input. A command that changes a
 machine defaults to changing nothing. Pass `--yes` to skip the question, or
 `--check` to see what would happen without being asked at all.
+
+## `ERROR! Invalid options for include_role: devmachine_<package>_<name>`
+
+A setting for a workspace package was written among `include_role`'s own
+options instead of in the task's `vars:`. `include_role` takes a fixed set of
+options and refuses the whole play when it meets one it does not know, so the
+run stops before anything happens.
+
+This was a defect in the generated playbook and it is fixed. If you see it,
+your binary predates the fix: build or install a newer one. Nothing on the
+machine is wrong, and nothing was half applied — the play never started.
