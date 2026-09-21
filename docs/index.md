@@ -15,6 +15,8 @@ Set up and operate a personal development VPS.
   and how the CLI finds it.
 - [Packages](concepts/packages.md) — everything a machine gets, including the
   things every machine gets.
+- [Credentials](concepts/credentials.md) — what a workspace has to be signed in
+  to, and which part of that a machine can do for you.
 
 ## How it works
 
@@ -29,6 +31,8 @@ when something behaves in a way that surprises you.
   instead of guessing which machine it runs against.
 - [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — what
   fetching every recipe buys, and the one thing it costs.
+- [Why a login cannot be automated](how-it-works/why-a-login-cannot-be-automated.md)
+  — the first question everybody asks.
 - [Sharing a login](how-it-works/sharing-a-login.md) — why the CLI generates the
   copying itself, and what happens to a workspace that keeps its own account.
 - [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
@@ -39,6 +43,8 @@ when something behaves in a way that surprises you.
 - [Commands](reference/commands.md) — every command, its flags and its output.
 - [The package format](reference/package-format.md) — every `package.yml`
   field, and the message behind every validation rule.
+- [Settings](reference/settings.md) — every variable the published packages
+  accept, generated from their own manifests.
 
 ## Fixing things
 

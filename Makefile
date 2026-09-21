@@ -1,7 +1,7 @@
 BINARY := devmachine
 VERSION ?= dev
 
-.PHONY: build surface test test-vps cover vps-up vps-down fmt lint docs run
+.PHONY: build surface settings test test-vps cover vps-up vps-down fmt lint docs run
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BINARY) ./cmd/devmachine
@@ -42,6 +42,14 @@ fmt:
 
 lint:
 	golangci-lint run
+
+# The settings page is generated from the packages' own manifests, for the same
+# reason SURFACE.txt is: a page kept by hand beside the thing it describes
+# drifts. PACKAGES says where that repository is checked out.
+PACKAGES ?= $(HOME)/dev/packages
+
+settings:
+	go run ./cmd/settings $(PACKAGES)/packages > docs/reference/settings.md
 
 # Every link resolves, and every page is reachable from the index.
 docs:
