@@ -993,3 +993,83 @@ func TestUpdateWorkspaceRefusesOneTheFileDoesNotHave(t *testing.T) {
 		t.Fatal("it edited a workspace that is not there")
 	}
 }
+
+func TestLoadReadsTheCredentialPreferencesAtBothLevels(t *testing.T) {
+	dir := writeConfig(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+credentials:
+  gh: machine
+workspaces:
+  - name: alice
+  - name: bob
+    credentials:
+      gh: own
+`)
+
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Credentials["gh"] != CredentialMachine {
+		t.Fatalf("the setup's default is %#v", c.Credentials)
+	}
+	if c.Workspaces[1].Credentials["gh"] != CredentialOwn {
+		t.Fatalf("bob's own preference is %#v", c.Workspaces[1].Credentials)
+	}
+}
+
+func TestCredentialsForPutsTheWorkspaceFirst(t *testing.T) {
+	c := Config{
+		Credentials: map[string]string{"gh": CredentialMachine, "claude": CredentialMachine},
+		Workspaces: []Workspace{
+			{Name: "bob", Credentials: map[string]string{"gh": CredentialOwn}},
+		},
+	}
+
+	got := c.CredentialsFor(c.Workspaces[0])
+	// Somebody may want most workspaces on one account and one on a client's.
+	if got["gh"] != CredentialOwn {
+		t.Fatalf("bob asked for his own gh, got %q", got["gh"])
+	}
+	if got["claude"] != CredentialMachine {
+		t.Fatalf("bob said nothing about claude, so the setup's default stands: %q", got["claude"])
+	}
+}
+
+func TestCredentialsForDoesNotWriteBackOntoTheConfiguration(t *testing.T) {
+	c := Config{
+		Credentials: map[string]string{"gh": CredentialMachine},
+		Workspaces:  []Workspace{{Name: "bob", Credentials: map[string]string{"gh": CredentialOwn}}},
+	}
+
+	c.CredentialsFor(c.Workspaces[0])
+	if c.Credentials["gh"] != CredentialMachine {
+		t.Fatalf("one workspace's choice changed the setup's default to %q", c.Credentials["gh"])
+	}
+}
+
+func TestValidateRefusesACredentialPreferenceNobodyUnderstands(t *testing.T) {
+	c := Config{
+		Machines:    []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22}},
+		Credentials: map[string]string{"gh": "shared"},
+	}
+
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "machine") || !strings.Contains(err.Error(), "own") {
+		t.Fatalf("the message has to say what the two answers are, got %v", err)
+	}
+}
+
+func TestValidateRefusesAWorkspaceCredentialPreferenceNobodyUnderstands(t *testing.T) {
+	c := Config{
+		Machines:   []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, Port: 22}},
+		Workspaces: []Workspace{{Name: "bob", Credentials: map[string]string{"gh": "yes"}}},
+	}
+
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "bob") {
+		t.Fatalf("the message has to name the workspace, got %v", err)
+	}
+}
