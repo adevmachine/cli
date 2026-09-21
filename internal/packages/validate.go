@@ -214,6 +214,11 @@ func validateCredentials(m Manifest) []Problem {
 
 		switch c.Kind {
 		case KindLogin:
+			if c.Scope == ScopeMachine && !c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q recommends `scope: machine`, so it needs `shareable: true`: one login "+
+						"copied into every workspace only works where a copy of `stored_at` works", c.Name))
+			}
 			if c.Command == "" {
 				at(fmt.Sprintf("credential %q is a login, so it needs the `command` a person runs", c.Name))
 			}
@@ -223,11 +228,21 @@ func validateCredentials(m Manifest) []Problem {
 					c.Name))
 			}
 		case KindSecret:
+			if c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q is a secret, so it cannot be `shareable`: a secret is delivered to each "+
+						"place that wants it, never copied out of one of them", c.Name))
+			}
 			if c.Env == "" && c.Path == "" {
 				at(fmt.Sprintf("credential %q is a secret, so it needs `env` or `path`: somewhere to deliver the value",
 					c.Name))
 			}
 		case KindFile:
+			if c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q is a file, so it cannot be `shareable`: a file is delivered to each place "+
+						"that wants it, never copied out of one of them", c.Name))
+			}
 			if c.Path == "" {
 				at(fmt.Sprintf("credential %q is a file, so it needs the `path` it lands at", c.Name))
 			}

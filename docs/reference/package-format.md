@@ -153,6 +153,24 @@ credentials:
 `stored_at` is a claim, not a guarantee. It is what lets `doctor` look and say
 whether the login worked.
 
+A `login` may also say `shareable: true`, which means a copy of `stored_at`
+works on another account — one GitHub login serving every workspace, say. It is
+a fact about the tool, found by trying: a session file copies, a token bound to
+a device or a browser does not. Left out it is `false`, and the CLI never
+copies it anywhere.
+
+A `login` that recommends `scope: machine` has to be `shareable: true`, because
+`scope: machine` means exactly "one login, copied into every workspace". Saying
+both would be the package asking for something it also says cannot work.
+
+`shareable` belongs to a `login` alone. A `secret` and a `file` are delivered
+to each place that wants them rather than copied out of one of them, so saying
+it there is refused.
+
+`scope` is what the package recommends. Whether a shareable credential is
+actually shared is the operator's call, per workspace, in their own
+configuration — see [Configuration](../concepts/configuration.md).
+
 ### `requires_files`
 
 Files that have to be on the machine before the package runs.
@@ -197,6 +215,8 @@ one cannot invent its own shape.
 | no `tasks/main.yml` | `a package is an Ansible role, so it needs tasks/main.yml` |
 | the `apt` module is used | ``the apt module is not allowed; use `package` so this works beyond Debian`` |
 | a credential says too little | one line per credential, naming it and what it is missing |
+| a `machine` login is not `shareable` | ``credential "X" recommends `scope: machine`, so it needs `shareable: true` `` |
+| a `secret` or a `file` is `shareable` | ``credential "X" is a secret, so it cannot be `shareable` `` |
 | an entrypoint is not executable | `entrypoint "X" is not executable: chmod +x it` |
 | an entrypoint is not Python 3 | `an entrypoint is Python 3 and starts with #!/usr/bin/env python3` |
 | `kind` or `commands` with no entrypoint | ``kind` and `commands` describe an `entrypoint`, and this package declares none`` |

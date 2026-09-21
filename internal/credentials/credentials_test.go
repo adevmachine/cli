@@ -153,11 +153,14 @@ func claudeLogin() packages.Manifest {
 	return packages.Manifest{
 		Name: "claude-code", Scope: packages.ScopeWorkspace,
 		Credentials: []packages.Credential{{
-			Name:     "claude",
-			Kind:     packages.KindLogin,
-			Scope:    packages.ScopeWorkspace,
-			Command:  "claude /login",
-			StoredAt: "~/.claude/.credentials.json",
+			Name:  "claude",
+			Kind:  packages.KindLogin,
+			Scope: packages.ScopeWorkspace,
+			// The session file does copy; accounts usually differ between
+			// workspaces, which is a different thing and the operator's call.
+			Shareable: true,
+			Command:   "claude /login",
+			StoredAt:  "~/.claude/.credentials.json",
 		}},
 	}
 }
@@ -166,11 +169,12 @@ func ghLogin() packages.Manifest {
 	return packages.Manifest{
 		Name: "gh-login", Scope: packages.ScopeWorkspace,
 		Credentials: []packages.Credential{{
-			Name:     "gh",
-			Kind:     packages.KindLogin,
-			Scope:    packages.ScopeMachine,
-			Command:  "gh auth login",
-			StoredAt: "~/.config/gh/hosts.yml",
+			Name:      "gh",
+			Kind:      packages.KindLogin,
+			Scope:     packages.ScopeMachine,
+			Shareable: true,
+			Command:   "gh auth login",
+			StoredAt:  "~/.config/gh/hosts.yml",
 		}},
 	}
 }

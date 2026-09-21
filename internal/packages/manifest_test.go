@@ -99,3 +99,38 @@ func TestParseManifestSaysWhichFileIsMissing(t *testing.T) {
 		t.Fatalf("the error does not name the file: %v", err)
 	}
 }
+
+func TestParseManifestReadsWhetherACredentialTravels(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "package.yml"), `
+format: 1
+name: dev
+scope: workspace
+summary: The GitHub CLI.
+credentials:
+  - name: gh
+    kind: login
+    scope: machine
+    shareable: true
+    command: gh auth login
+    stored_at: ~/.config/gh/hosts.yml
+  - name: claude
+    kind: login
+    scope: workspace
+    command: claude /login
+    stored_at: ~/.claude/.credentials.json
+`)
+
+	m, err := ParseManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.Credentials[0].Shareable {
+		t.Fatalf("gh should be shareable: %#v", m.Credentials[0])
+	}
+	// Left out, a credential does not travel. Which tools tolerate a copied
+	// session is found by trying, so the safe answer is the default.
+	if m.Credentials[1].Shareable {
+		t.Fatalf("claude says nothing, so it should not be shareable: %#v", m.Credentials[1])
+	}
+}

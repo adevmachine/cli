@@ -6,8 +6,10 @@ devmachine_workspaces:
     user: alice
     packages:
       - claude-code
+      - dev
       - sharing
   - name: bob
     user: bob
-    packages: []
+    packages:
+      - dev
 devmachine_caddy_email: someone@example.com

@@ -59,6 +59,29 @@ name: unused
 scope: machine
 summary: A recipe in the store that nothing asks for.
 `,
+	"dev": `format: 1
+name: dev
+scope: workspace
+summary: The GitHub CLI, and the login one account normally shares.
+credentials:
+  - name: gh
+    kind: login
+    scope: machine
+    shareable: true
+    command: gh auth login
+    stored_at: ~/.config/gh/hosts.yml
+`,
+	"vendor-cli": `format: 1
+name: vendor-cli
+scope: workspace
+summary: A tool whose session is bound to the account that made it.
+credentials:
+  - name: vendor
+    kind: login
+    scope: workspace
+    command: vendor login
+    stored_at: ~/.vendor/session
+`,
 	"claude-code": `format: 1
 name: claude-code
 scope: workspace

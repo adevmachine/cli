@@ -244,3 +244,29 @@ func TestResolveNamesAPackageThatDoesNotExist(t *testing.T) {
 		t.Fatalf("the error does not name it: %v", err)
 	}
 }
+
+func TestResolveCarriesTheCredentialAnswersTheWorkspaceEndsUpWith(t *testing.T) {
+	store := storeWith(t, map[string]string{
+		"dev": "format: 1\nname: dev\nscope: workspace\nsummary: x\n",
+	})
+	machine := config.Machine{Name: "main"}
+	cfg := config.Config{
+		Machines:    []config.Machine{machine},
+		Credentials: map[string]string{"gh": config.CredentialMachine},
+		Workspaces: []config.Workspace{
+			{Name: "alice", Packages: []string{"dev"}},
+			{Name: "bob", Packages: []string{"dev"}, Credentials: map[string]string{"gh": config.CredentialOwn}},
+		},
+	}
+
+	plan, err := ResolveMachine(store, cfg, machine, "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := plan.Workspaces[0].Target.Credentials["gh"]; got != config.CredentialMachine {
+		t.Fatalf("alice said nothing, so the setup's default stands: %q", got)
+	}
+	if got := plan.Workspaces[1].Target.Credentials["gh"]; got != config.CredentialOwn {
+		t.Fatalf("bob asked for his own: %q", got)
+	}
+}

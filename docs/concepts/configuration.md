@@ -103,6 +103,45 @@ default, and the machine quietly is not what the configuration says it is. If
 the package arrives through another package's `needs`, name it in `packages:`
 as well — you are configuring it, so say you want it.
 
+## Credentials
+
+A package says how a credential is obtained, and whether a copy of it works on
+another account (`shareable`). Whether you *want* it copied is your call, and
+it is per workspace:
+
+```yaml
+credentials:
+  gh: machine          # the default for this setup
+
+workspaces:
+  - name: alice
+  - name: bob
+    credentials:
+      gh: own          # bob logs in for himself
+```
+
+`machine` means one login, stored under `/etc/devmachine/<name>/` and copied
+into every workspace that wants it. `own` means that workspace logs in by
+itself and nothing is ever copied over it.
+
+Which answer applies, first hit wins:
+
+| Order | Where |
+| --- | --- |
+| 1 | the workspace's `credentials:` |
+| 2 | the configuration's `credentials:` |
+| 3 | the package's own `scope:` |
+
+A package that says `shareable: false` beats all three: asking for `machine` on
+one is refused, naming the package, rather than copying something that would
+not work.
+
+What the copying actually does, and why the CLI generates it rather than any
+package, is in [Sharing a login](../how-it-works/sharing-a-login.md).
+
+This block holds no values and no method. The package still says how a login
+happens and whether it travels; this says only what you want done about it.
+
 ## What is validated
 
 `config show` and every command that touches a machine refuse a configuration
@@ -115,6 +154,7 @@ that cannot work, and say what to change:
 - a workspace with no machine when there are several
 - a setting with no `<package>.` prefix, or for a package the target does not
   install
+- a credential answer that is neither `machine` nor `own`
 
 ## The command log
 

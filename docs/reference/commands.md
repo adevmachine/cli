@@ -346,6 +346,10 @@ prints the plan, asks, then sends everything to the machine and runs Ansible
 | `--yes` | apply without asking |
 | `--tags a,b` | only the packages named, by name |
 
+Beside a tag per package there is one more: `credentials`, which runs only the
+copying of the shared logins. `devmachine sync --tags credentials` is what to
+run after `devmachine login`, instead of the whole machine again.
+
 `--check` never asks, and never writes the lock: a dry run that recorded
 itself as applied would make the lock claim something nobody did.
 

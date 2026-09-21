@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adevmachine/cli/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -404,11 +405,12 @@ func TestGenerateRefusesTwoSettingsWithTheSameVariableName(t *testing.T) {
 
 func TestGenerateMatchesTheGoldenFiles(t *testing.T) {
 	plan := planWith(t, "main", []string{"caddy", "docker"}, map[string][]string{
-		"alice": {"claude-code", "sharing"},
-		"bob":   {},
+		"alice": {"claude-code", "dev", "sharing"},
+		"bob":   {"dev"},
 	})
 	plan.Machine.Settings = map[string]any{"caddy.email": "someone@example.com"}
 	plan.Workspaces[0].Target.Settings = map[string]any{"claude-code.plugins": []string{"one", "two"}}
+	plan.Workspaces[1].Target.Credentials = map[string]string{"gh": config.CredentialOwn}
 
 	files, err := Generate(plan)
 	if err != nil {

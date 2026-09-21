@@ -52,6 +52,15 @@ const (
 	DefaultPort      = 22
 )
 
+// The two answers an operator can give about a credential.
+//
+// CredentialMachine asks for one login to serve every workspace that says so;
+// CredentialOwn makes a workspace log in for itself.
+const (
+	CredentialMachine = "machine"
+	CredentialOwn     = "own"
+)
+
 // Host is one address a machine answers on.
 //
 // An address is either a literal (an IP, or a name DNS resolves) or a
@@ -108,6 +117,9 @@ type Workspace struct {
 	// Settings override the variables a package declares. A key is written
 	// `<package>.<name>`.
 	Settings map[string]any `yaml:"settings,omitempty"`
+	// Credentials is this workspace's own answer, and it overrides the
+	// configuration's.
+	Credentials map[string]string `yaml:"credentials,omitempty"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -144,6 +156,27 @@ type Config struct {
 	// Packages is the release of the packages repository every recipe is read
 	// from, for example "v1".
 	Packages string `yaml:"packages,omitempty"`
+	// Credentials is what the operator wants done about each credential:
+	// CredentialMachine or CredentialOwn, by credential name.
+	//
+	// It holds no values and no method. The package still says how a
+	// credential is obtained and whether a copy of it works anywhere else;
+	// this says only whether the operator wants it copied. The first is a fact
+	// about a tool, the second is a preference, and preferences belong to
+	// whoever has them.
+	Credentials map[string]string `yaml:"credentials,omitempty"`
+}
+
+// CredentialsFor is the operator's answer about each credential for one
+// workspace: the workspace's own preference over the configuration's.
+//
+// The result is a fresh map, so reading one workspace's answer never edits
+// anybody else's.
+func (c Config) CredentialsFor(w Workspace) map[string]string {
+	out := make(map[string]string, len(c.Credentials)+len(w.Credentials))
+	maps.Copy(out, c.Credentials)
+	maps.Copy(out, w.Credentials)
+	return out
 }
 
 // Dir returns the configuration directory and the rule that chose it.
@@ -314,7 +347,14 @@ func (c Config) Validate() error {
 		if err := validateSettings("workspace", w.Name, w.Settings, w.Packages); err != nil {
 			return err
 		}
+		if err := validateCredentials("workspace", w.Name, w.Credentials); err != nil {
+			return err
+		}
 		names[w.Name] = true
+	}
+
+	if err := validateCredentials("the configuration", "", c.Credentials); err != nil {
+		return err
 	}
 
 	// A pin is a release tag, never a branch: `packages: main` would mean the
@@ -364,6 +404,26 @@ func validateSettings(kind, target string, settings map[string]any, installed []
 			return fmt.Errorf(
 				"%s %q sets %q, and does not install the package %q: add %q to its `packages:`, or drop the setting",
 				kind, target, key, pkg, pkg)
+		}
+	}
+	return nil
+}
+
+// validateCredentials refuses an answer nothing knows what to do with.
+//
+// There are two answers and no third, so a typo is caught here rather than
+// read as "leave it alone" and silently ignored.
+func validateCredentials(kind, target string, preferences map[string]string) error {
+	where := kind
+	if target != "" {
+		where = fmt.Sprintf("%s %q", kind, target)
+	}
+	for _, name := range slices.Sorted(maps.Keys(preferences)) {
+		if value := preferences[name]; value != CredentialMachine && value != CredentialOwn {
+			return fmt.Errorf(
+				"%s says `%s: %s`: the answers are %q, for one login shared across the workspaces "+
+					"that want it, and %q, for a workspace that logs in by itself",
+				where, name, value, CredentialMachine, CredentialOwn)
 		}
 	}
 	return nil
