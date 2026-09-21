@@ -1,0 +1,29 @@
+Makefile
+  s_cab674f14f5e3f::t_2d00cb91261aaa 4,46-53
+cmd/settings/main.go
+  s_cab674f14f5e3f::t_765c07fc19cf8f 1-104
+docs/concepts/credentials.md
+  s_cab674f14f5e3f::t_fc8b97e52ddae8 1-102
+docs/how-it-works/why-a-login-cannot-be-automated.md
+  s_cab674f14f5e3f::t_e3e42913b1cbb7 1-59
+docs/index.md
+  s_cab674f14f5e3f::t_495e78252fc8ef 18-19,34-35,46-47
+docs/reference/settings.md
+  s_cab674f14f5e3f::t_63f7e30f445a7e 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "208b5b599ed9b73e0ed514bb1fecc0251fcca423",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
