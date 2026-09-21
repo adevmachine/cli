@@ -1,4 +1,5 @@
 devmachine
+devmachine aliases
 devmachine config
 devmachine config path
 devmachine config show

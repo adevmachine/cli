@@ -192,6 +192,50 @@ everything it had — its home, its files, its account. The command says so.
 Deleting a home is not something a configuration edit should do, and `sync`
 could not put it back. Remove them there by hand if you really want them gone.
 
+## aliases
+
+```
+devmachine aliases [--write] [--path p] [--check] [--yes]
+```
+
+Prints one SSH `Host` entry per workspace, so `ssh alice-devmachine` and
+`mosh alice-devmachine` work from an ordinary terminal — no CLI in the way, no
+package on the machine, nothing to install.
+
+```
+# >>> devmachine — generated, do not edit
+Host alice-devmachine
+    HostName 100.64.0.5
+    User alice
+    Port 22
+    IdentityFile /home/you/.config/devmachine/keys/main
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+# <<< devmachine
+```
+
+`--write` puts the block in `~/.ssh/config`, or in the file `--path` names. It
+asks first. **Only the block between the two markers is replaced.** That file
+holds hosts this CLI knows nothing about — a work jump host, a sandbox, a
+client's bastion — and rewriting the whole file deletes them.
+
+Three things the entries do on purpose:
+
+- **`HostKeyAlias` is the same for every alias of one machine.** `known_hosts`
+  is indexed by address, so a machine on two addresses gets two entries and
+  switching between them gives `Host key verification failed`. This indexes by
+  name instead.
+- **`HostName` is the first address that resolves.** A `tailscale:` entry is
+  turned into an address here, the same way every other command does it.
+- **`IdentitiesOnly yes` goes with `IdentityFile`.** Without it ssh offers
+  every key the agent holds first, and a server can cut the connection at
+  `MaxAuthTries` before the one that works is tried. A machine with no `key:`
+  is served by the agent, so neither line is written for it.
+
+A `-pub` alias is written only when there is a second, literal address to fall
+back to and the first one did not already resolve to it. With one address, or
+with the tailnet already down, a second entry would only repeat the first.
+
 ## stats
 
 ```

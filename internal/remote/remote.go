@@ -59,6 +59,12 @@ type Client interface {
 	Close() error
 }
 
+// Literal reports whether a host entry is an address ssh can dial as written,
+// rather than a name something closer to the network has to resolve.
+func Literal(address string) bool {
+	return !strings.HasPrefix(address, tailscalePrefix)
+}
+
 // Resolve turns the configured hosts into addresses to try, in order.
 //
 // An address that cannot be resolved is dropped rather than fatal: the entries
