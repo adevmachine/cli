@@ -52,19 +52,39 @@ machines:
     user: root             # the administrative login
     port: 22
     key: /keys/main        # optional; without it the SSH agent serves
+    packages: [base, docker, caddy, firewall, fail2ban, ssh_hardening, git]
+    settings:
+      base.timezone: Europe/Lisbon
+      caddy.email: someone@example.com
 
 workspaces:
   - name: alice
     machine: main
+    packages: [workspace, dev, zsh, mise]
   - name: bob
     machine: sandbox
     user: bob-dev          # optional; the name is used by default
+    packages: [workspace, dev]
+    credentials:
+      gh: own              # this one signs in to its own account
 
+# What a new workspace gets when no flag says otherwise. `setup` seeds it.
+defaults:
+  workspace: [workspace, dev, zsh, mise]
+
+# Whether a login is shared across the machine. A workspace may override it.
+credentials:
+  gh: machine
+
+packages: v0.0.1           # the pinned release the recipes come from
 domain: example.com
-dns_provider: manual
 ```
 
 Defaults: `user` is `root`, `port` is `22`. Everything else is what you wrote.
+
+Nothing in this file is a secret. Values live in `devmachine secrets` and are
+delivered to the machine; what is written here is which packages, which
+settings, and which logins you want shared.
 
 ## Settings
 

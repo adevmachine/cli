@@ -11,8 +11,8 @@ fail  configuration  several machines are configured (main, sandbox): say which 
 skip  connection     there is no machine to check
 ```
 
-There is deliberately no `default_machine` setting. The commands coming next
-create users, rewrite a proxy's configuration and converge whole servers. A
+There is deliberately no `default_machine` setting. These commands create
+accounts, rewrite a proxy's configuration and converge whole servers. A
 destructive command that lands on a machine nobody named is how the wrong one
 gets wrecked, and a default in a file you edited months ago is exactly how that
 happens.

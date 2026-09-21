@@ -41,9 +41,19 @@ logs in as. `devmachine ssh` with no workspace logs in as the machine's admin.
 
 ## Host keys
 
-The CLI does not verify the machine's host key today. It reaches a server you
-already own, over a path you chose. Pinning would need a store of known keys
-that does not exist yet; it belongs with the first-contact flow, which is where
-trust is actually established.
+The CLI does not verify the machine's host key. It reaches a server you already
+own, over a path you chose, so pinning would need a store of known keys that
+nothing here keeps.
 
-This is worth knowing if you are on a network you do not trust.
+**`devmachine login` is the exception, and the difference surprises people.** It
+execs the system `ssh` — a login has to reach a person through a real terminal —
+so it reads `~/.ssh/known_hosts` like any other `ssh`. Everything else uses the
+Go client, which does not. So the first `login` against a machine can fail with
+`Host key verification failed` seconds after `doctor`, `run` and `sync` all
+worked.
+
+Connect once with `devmachine ssh` and accept the key, and `login` works from
+then on.
+
+This is worth knowing if you are on a network you do not trust: the commands
+that do the work are the ones not checking.

@@ -2,6 +2,17 @@
 
 Set up and operate a personal development VPS.
 
+Three commands take a server nobody has logged into and make it yours:
+
+```
+devmachine setup      get in, install a key, prove it, harden, install Ansible
+devmachine sync       fetch the recipes and converge the machine
+devmachine workspaces new alice && devmachine sync
+```
+
+No server? `devmachine machines create-local dev` makes one on this computer,
+as a bought one arrives.
+
 ## Start here
 
 - [Getting started](getting-started.md) — install it, point it at a machine, see
