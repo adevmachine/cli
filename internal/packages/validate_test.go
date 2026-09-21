@@ -506,3 +506,72 @@ func TestProblemErrorPointsAtALine(t *testing.T) {
 		t.Fatal("a problem with no line should not print one")
 	}
 }
+
+func TestValidateRefusesAShareableSecret(t *testing.T) {
+	dir := writePackage(t, "hostinger", `format: 1
+name: hostinger
+scope: machine
+summary: x
+credentials:
+  - name: hostinger
+    kind: secret
+    scope: machine
+    shareable: true
+    env: HOSTINGER_TOKEN
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: python3}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A secret is delivered to each place that wants it, not copied from one
+	// of them. `shareable` is about copying a session file, and saying it
+	// here means the author expects something that will not happen.
+	problemAbout(t, problems, "shareable")
+}
+
+func TestValidateRefusesAShareableFile(t *testing.T) {
+	dir := writePackage(t, "vpn", `format: 1
+name: vpn
+scope: machine
+summary: x
+credentials:
+  - name: vpn
+    kind: file
+    scope: machine
+    shareable: true
+    path: /etc/openvpn/client.conf
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: openvpn}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemAbout(t, problems, "shareable")
+}
+
+func TestValidateAllowsAShareableLogin(t *testing.T) {
+	dir := writePackage(t, "dev", `format: 1
+name: dev
+scope: workspace
+summary: x
+credentials:
+  - name: gh
+    kind: login
+    scope: machine
+    shareable: true
+    command: gh auth login
+    stored_at: ~/.config/gh/hosts.yml
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: gh}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("a shareable login is ordinary: %#v", problems)
+	}
+}

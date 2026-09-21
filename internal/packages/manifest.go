@@ -53,9 +53,15 @@ type Variable struct {
 // package is the only thing that knows it: nobody else knows that this tool
 // logs in with one command and leaves its session in one file.
 type Credential struct {
-	Name  string `yaml:"name"`
-	Kind  string `yaml:"kind"`
+	Name string `yaml:"name"`
+	Kind string `yaml:"kind"`
+	// Scope is what this package recommends, and the operator may override it.
 	Scope string `yaml:"scope"`
+	// Shareable says whether a copy of StoredAt works on another account. It
+	// is a fact about the tool, not a preference: a session file copies, and a
+	// token bound to a device or a browser does not. Which is which is found
+	// by trying, so leaving it out means no.
+	Shareable bool `yaml:"shareable"`
 	// Command is the interactive login to run, for KindLogin.
 	Command string `yaml:"command"`
 	// StoredAt is where the tool keeps the result, so doctor can look and a

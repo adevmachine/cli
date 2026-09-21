@@ -223,11 +223,21 @@ func validateCredentials(m Manifest) []Problem {
 					c.Name))
 			}
 		case KindSecret:
+			if c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q is a secret, so it cannot be `shareable`: a secret is delivered to each "+
+						"place that wants it, never copied out of one of them", c.Name))
+			}
 			if c.Env == "" && c.Path == "" {
 				at(fmt.Sprintf("credential %q is a secret, so it needs `env` or `path`: somewhere to deliver the value",
 					c.Name))
 			}
 		case KindFile:
+			if c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q is a file, so it cannot be `shareable`: a file is delivered to each place "+
+						"that wants it, never copied out of one of them", c.Name))
+			}
 			if c.Path == "" {
 				at(fmt.Sprintf("credential %q is a file, so it needs the `path` it lands at", c.Name))
 			}

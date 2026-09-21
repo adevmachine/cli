@@ -153,6 +153,20 @@ credentials:
 `stored_at` is a claim, not a guarantee. It is what lets `doctor` look and say
 whether the login worked.
 
+A `login` may also say `shareable: true`, which means a copy of `stored_at`
+works on another account — one GitHub login serving every workspace, say. It is
+a fact about the tool, found by trying: a session file copies, a token bound to
+a device or a browser does not. Left out it is `false`, and the CLI never
+copies it anywhere.
+
+`shareable` belongs to a `login` alone. A `secret` and a `file` are delivered
+to each place that wants them rather than copied out of one of them, so saying
+it there is refused.
+
+`scope` is what the package recommends. Whether a shareable credential is
+actually shared is the operator's call, per workspace, in their own
+configuration — see [Configuration](../concepts/configuration.md).
+
 ### `requires_files`
 
 Files that have to be on the machine before the package runs.
