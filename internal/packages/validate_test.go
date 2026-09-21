@@ -575,3 +575,27 @@ credentials:
 		t.Fatalf("a shareable login is ordinary: %#v", problems)
 	}
 }
+
+func TestValidateRefusesAMachineLoginThatCannotTravel(t *testing.T) {
+	dir := writePackage(t, "dev", `format: 1
+name: dev
+scope: workspace
+summary: x
+credentials:
+  - name: gh
+    kind: login
+    scope: machine
+    command: gh auth login
+    stored_at: ~/.config/gh/hosts.yml
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: gh}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// `scope: machine` recommends one login copied into every workspace, and
+	// `shareable` left out says a copy does not work. The package is asking
+	// for something it also says is impossible.
+	problemAbout(t, problems, "shareable")
+}

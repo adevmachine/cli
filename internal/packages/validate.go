@@ -214,6 +214,11 @@ func validateCredentials(m Manifest) []Problem {
 
 		switch c.Kind {
 		case KindLogin:
+			if c.Scope == ScopeMachine && !c.Shareable {
+				at(fmt.Sprintf(
+					"credential %q recommends `scope: machine`, so it needs `shareable: true`: one login "+
+						"copied into every workspace only works where a copy of `stored_at` works", c.Name))
+			}
 			if c.Command == "" {
 				at(fmt.Sprintf("credential %q is a login, so it needs the `command` a person runs", c.Name))
 			}

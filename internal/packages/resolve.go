@@ -19,6 +19,9 @@ type Target struct {
 	Packages  []string `json:"packages,omitempty"`
 	// Settings are this target's overrides, keyed `<package>.<name>`.
 	Settings map[string]any `json:"settings,omitempty"`
+	// Credentials is the operator's answer about each credential, by name,
+	// with this target's own choice already over the configuration's.
+	Credentials map[string]string `json:"credentials,omitempty"`
 }
 
 // Resolved is everything a target gets, in the order it has to run.
@@ -69,7 +72,7 @@ func ResolveMachine(store *Store, cfg config.Config, machine config.Machine, cli
 	for _, w := range cfg.WorkspacesOn(machine.Name) {
 		r, err := resolveTarget(store, Target{
 			Kind: ScopeWorkspace, Name: w.Name, LinuxUser: w.LinuxUser(), Packages: w.Packages,
-			Settings: w.Settings,
+			Settings: w.Settings, Credentials: cfg.CredentialsFor(w),
 		}, cliVersion)
 		if err != nil {
 			return plan, err

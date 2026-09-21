@@ -76,10 +76,13 @@ func Wanted(plan packages.MachinePlan) []Declared {
 			add(Declared{Credential: c, Package: found.Manifest.Name})
 		}
 	}
+	// The scope is what the operator settled on, not what the package
+	// recommended: a workspace that keeps its own account has a credential of
+	// its own to obtain, and the shared one is not it.
 	for _, workspace := range plan.Workspaces {
 		for _, found := range workspace.Ordered {
 			for _, c := range found.Manifest.Credentials {
-				if c.Scope != packages.ScopeMachine {
+				if scopeOf(found.Manifest.Name, c, workspace.Target.Credentials) != packages.ScopeMachine {
 					continue
 				}
 				add(Declared{Credential: c, Package: found.Manifest.Name})
@@ -90,7 +93,7 @@ func Wanted(plan packages.MachinePlan) []Declared {
 	for _, workspace := range plan.Workspaces {
 		for _, found := range workspace.Ordered {
 			for _, c := range found.Manifest.Credentials {
-				if c.Scope == packages.ScopeMachine {
+				if scopeOf(found.Manifest.Name, c, workspace.Target.Credentials) == packages.ScopeMachine {
 					continue
 				}
 				add(Declared{
