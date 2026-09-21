@@ -203,3 +203,9 @@ run stops before anything happens.
 This was a defect in the generated playbook and it is fixed. If you see it,
 your binary predates the fix: build or install a newer one. Nothing on the
 machine is wrong, and nothing was half applied — the play never started.
+
+## `credentials list` says `unknown`
+
+The package that declared it never said where its tool keeps the result, so
+there is nowhere to look. The credential may well be there. Add `stored_at:` to
+the package's declaration and the row starts answering.

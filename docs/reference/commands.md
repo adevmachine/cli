@@ -292,6 +292,25 @@ devmachine secrets rm <name>
 With no value, `set` asks without echoing, so the secret never reaches your
 shell history. `list` prints names only.
 
+## credentials
+
+```
+devmachine credentials list [--machine m]
+```
+
+What the packages installed on a machine and its workspaces cannot work
+without, and what is missing.
+
+Every row says the command that fixes it: a missing login says
+`devmachine login <name>`, and a missing secret says `devmachine secrets set
+<name>`, then `devmachine credentials push`. A secret you have already stored
+asks only for the push.
+
+A row reads `unknown` when the package never said where its tool keeps the
+result. There is nowhere to look, and "I cannot tell" is not "it is not there".
+
+The report never prints a value, in either format.
+
 ## packages
 
 ```

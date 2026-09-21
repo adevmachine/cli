@@ -78,6 +78,7 @@ func NewRootCmd() *cobra.Command {
 		newRunCmd(opts),
 		newPackagesCmd(opts),
 		newSyncCmd(opts),
+		newCredentialsCmd(opts),
 	)
 	return root
 }
