@@ -402,3 +402,36 @@ func TestPushAsksBeforeWriting(t *testing.T) {
 		t.Fatalf("it wrote after the answer was no: %#v", client.ran)
 	}
 }
+
+func TestDoctorReportsEachCredentialAndHowToFixIt(t *testing.T) {
+	dir := configWithCredentials(t, "probe-doctor")
+	answering(t,
+		"ID=ubuntu",
+		"gh\tno",
+		"alice/claude\tno",
+		"alice/probe-doctor\tno",
+	)
+
+	out, err := execute(t, "--config", dir, "doctor")
+	if err == nil {
+		t.Fatal("a machine missing every credential should not pass")
+	}
+	for _, want := range []string{"credential: gh", "credential: alice/claude", "devmachine login gh"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the report leaves out %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDoctorSaysNothingAboutCredentialsOnAMachineWithNoPackages(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	answering(t, "ID=ubuntu")
+
+	out, err := execute(t, "--config", dir, "doctor")
+	if err != nil {
+		t.Fatalf("doctor returned %v:\n%s", err, out)
+	}
+	if strings.Contains(out, "credential:") {
+		t.Fatalf("a machine with nothing declared reported a credential:\n%s", out)
+	}
+}

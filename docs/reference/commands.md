@@ -77,9 +77,16 @@ devmachine doctor [--machine m]
 ```
 
 Four checks, in order: the configuration, the connection, the operating system,
-and whether Ansible is installed. Exits non-zero if any failed.
+and whether Ansible is installed. Then one check per credential the installed
+packages declare, named `credential: <key>`, saying what is missing and the
+command that delivers it. Exits non-zero if any failed.
 
-A check that could not run reports `skip` and why.
+A machine whose packages declare no credential reports none, and that is not a
+failure.
+
+A check that could not run reports `skip` and why. A credential whose package
+never said where it is kept reports `skip` too: there is nowhere to look, and
+"I cannot tell" is not "it is not there".
 
 ## config
 
