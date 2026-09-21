@@ -22,7 +22,7 @@ func NewManual(out io.Writer) *Manual {
 }
 
 // Name is how manual is written in a --dns-provider flag.
-func (m *Manual) Name() string { return "manual" }
+func (m *Manual) Name() string { return ProviderManual }
 
 // List cannot work: manual never speaks to a registrar, so it has nothing to
 // read a zone from.
