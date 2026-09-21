@@ -222,3 +222,9 @@ The login command ran and the file the package promised is not there. Either it
 was cancelled or declined, or the tool keeps its session somewhere else than
 the package's `stored_at` says. `stored_at` is a claim by the package, not a
 guarantee — check where the tool really writes, and correct the package.
+
+## `credentials push` says "nothing to deliver" and the value is out of date
+
+`push` writes only what is missing, so a machine that already has the file
+keeps the old value. To replace one, remove the file on the machine — the path
+is in `credentials list` — and push again.

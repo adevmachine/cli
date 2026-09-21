@@ -321,6 +321,7 @@ set`, then `devmachine credentials push`.
 
 ```
 devmachine credentials list [--machine m]
+devmachine credentials push [--machine m] [--check] [--yes]
 ```
 
 What the packages installed on a machine and its workspaces cannot work
@@ -335,6 +336,19 @@ A row reads `unknown` when the package never said where its tool keeps the
 result. There is nowhere to look, and "I cannot tell" is not "it is not there".
 
 The report never prints a value, in either format.
+
+`push` delivers the values the machine is missing, and only those. A login is
+skipped — nobody can push a browser session — and a credential you never stored
+a value for is named, with the `secrets set` that fixes it, because a push that
+quietly does nothing is the failure this command exists to prevent. It exits
+non-zero when it found one.
+
+A value is read from the secret named after the credential. A workspace that
+needs its own value stores it as `<workspace>/<name>`, and that wins over the
+shared one.
+
+`--check` says what it would write and writes nothing. A value is never
+printed, in either format, and the command log records the push without it.
 
 ## packages
 

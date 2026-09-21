@@ -5,6 +5,7 @@ devmachine config path
 devmachine config show
 devmachine credentials
 devmachine credentials list
+devmachine credentials push
 devmachine dns
 devmachine dns status
 devmachine doctor
