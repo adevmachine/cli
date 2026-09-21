@@ -147,7 +147,10 @@ func Write(path, block string) error {
 	stop := strings.LastIndex(current, End)
 	switch {
 	case start >= 0 && stop > start:
-		out = current[:start] + managed + strings.TrimLeft(current[stop+len(End):], "\n")
+		out = current[:start] + managed
+		if rest := strings.TrimLeft(current[stop+len(End):], "\n"); rest != "" {
+			out += "\n" + rest
+		}
 	case current == "":
 		out = managed
 	default:

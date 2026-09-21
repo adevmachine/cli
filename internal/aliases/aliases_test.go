@@ -326,3 +326,14 @@ func TestDefaultPathIsTheUsersOwnSSHConfig(t *testing.T) {
 		t.Fatalf("got %q", path)
 	}
 }
+
+func TestWriteKeepsABlankLineBeforeWhatFollowsTheBlock(t *testing.T) {
+	path := fileWith(t, Begin+"\nHost old-devmachine\n"+End+"\n\nHost sandbox\n    HostName 203.0.113.99\n")
+
+	if err := Write(path, "Host alice-devmachine\n"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, path), End+"\n\nHost sandbox") {
+		t.Fatalf("the host after the block was glued to it:\n%s", read(t, path))
+	}
+}
