@@ -230,3 +230,37 @@ Two ordinary reasons, in this order:
 
 The other direction — a workspace whose own login was overwritten — is the same
 setting read the other way: it had no `own` and the shared login reached it.
+## `credentials list` says `unknown`
+
+The package that declared it never said where its tool keeps the result, so
+there is nowhere to look. The credential may well be there. Add `stored_at:` to
+the package's declaration and the row starts answering.
+
+## "credential X belongs to a workspace: name it with --workspace"
+
+Two workspaces log into the same tool with different accounts, so there is no
+one answer to "log in where". Name the workspace. The list in the error is
+every workspace that asks for it.
+
+## `devmachine login` says "Host key verification failed"
+
+The login runs through the system `ssh`, and that `ssh` has never seen this
+machine before. `doctor`, `run` and `sync` do not hit this: they use the CLI's
+own SSH client, which does not read `~/.ssh/known_hosts`.
+
+Open a session once and accept the key — `devmachine ssh`, and answer `yes` —
+then run the login again. In a script, with nothing able to answer, `ssh` exits
+255 and nothing was run.
+
+## "the login left nothing at …"
+
+The login command ran and the file the package promised is not there. Either it
+was cancelled or declined, or the tool keeps its session somewhere else than
+the package's `stored_at` says. `stored_at` is a claim by the package, not a
+guarantee — check where the tool really writes, and correct the package.
+
+## `credentials push` says "nothing to deliver" and the value is out of date
+
+`push` writes only what is missing, so a machine that already has the file
+keeps the old value. To replace one, remove the file on the machine — the path
+is in `credentials list` — and push again.

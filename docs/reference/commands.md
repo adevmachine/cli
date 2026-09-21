@@ -77,9 +77,16 @@ devmachine doctor [--machine m]
 ```
 
 Four checks, in order: the configuration, the connection, the operating system,
-and whether Ansible is installed. Exits non-zero if any failed.
+and whether Ansible is installed. Then one check per credential the installed
+packages declare, named `credential: <key>`, saying what is missing and the
+command that delivers it. Exits non-zero if any failed.
 
-A check that could not run reports `skip` and why.
+A machine whose packages declare no credential reports none, and that is not a
+failure.
+
+A check that could not run reports `skip` and why. A credential whose package
+never said where it is kept reports `skip` too: there is nowhere to look, and
+"I cannot tell" is not "it is not there".
 
 ## config
 
@@ -291,6 +298,68 @@ devmachine secrets rm <name>
 
 With no value, `set` asks without echoing, so the secret never reaches your
 shell history. `list` prints names only.
+
+## login
+
+```
+devmachine login <credential> [--workspace w] [--machine m]
+```
+
+Runs the login a package declared, in the place that credential belongs. The
+CLI reads the command out of the declaration; it knows nothing about any
+particular tool.
+
+The session is a real terminal (`ssh -t`, the same path `devmachine ssh`
+takes), because a device code or a browser prompt reaches a person or it
+reaches nobody.
+
+A workspace credential is logged into as that workspace, and needs
+`--workspace`: accounts differ between workspaces, so there is no master
+session to copy and the CLI will not pick one for you.
+
+A machine credential is logged into once, as the machine's admin, and what the
+tool wrote is copied into `/etc/devmachine/<name>/`. The next `devmachine sync`
+is what spreads it to the workspaces that declare the package.
+
+A `kind: secret` is refused: nobody logs into a value. Use `devmachine secrets
+set`, then `devmachine credentials push`.
+
+The system `ssh` is what opens the session, so the first login to a machine it
+has never seen asks you to accept the host key. See
+[the troubleshooting page](../troubleshooting.md).
+
+## credentials
+
+```
+devmachine credentials list [--machine m]
+devmachine credentials push [--machine m] [--check] [--yes]
+```
+
+What the packages installed on a machine and its workspaces cannot work
+without, and what is missing.
+
+Every row says the command that fixes it: a missing login says
+`devmachine login <name>`, and a missing secret says `devmachine secrets set
+<name>`, then `devmachine credentials push`. A secret you have already stored
+asks only for the push.
+
+A row reads `unknown` when the package never said where its tool keeps the
+result. There is nowhere to look, and "I cannot tell" is not "it is not there".
+
+The report never prints a value, in either format.
+
+`push` delivers the values the machine is missing, and only those. A login is
+skipped — nobody can push a browser session — and a credential you never stored
+a value for is named, with the `secrets set` that fixes it, because a push that
+quietly does nothing is the failure this command exists to prevent. It exits
+non-zero when it found one.
+
+A value is read from the secret named after the credential. A workspace that
+needs its own value stores it as `<workspace>/<name>`, and that wins over the
+shared one.
+
+`--check` says what it would write and writes nothing. A value is never
+printed, in either format, and the command log records the push without it.
 
 ## packages
 

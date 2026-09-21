@@ -11,12 +11,17 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/credentials"
+	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
 )
 
 type fakeClient struct {
 	out map[string]string
 	err map[string]error
+	// input is the answer to a command fed from standard input, which is how
+	// the credentials are looked for.
+	input string
 }
 
 func (f fakeClient) Run(_ context.Context, command string) (string, error) {
@@ -36,6 +41,9 @@ func (f fakeClient) Stream(ctx context.Context, command string, stdout, _ io.Wri
 }
 
 func (f fakeClient) RunInput(ctx context.Context, command string, _ io.Reader) (string, error) {
+	if f.input != "" {
+		return f.input, nil
+	}
 	return f.Run(ctx, command)
 }
 
@@ -72,7 +80,7 @@ func TestAMissingConfigFailsAndSkipsTheRest(t *testing.T) {
 		return nil, "", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, ""), "", dial)
+	checks := Run(context.Background(), configDir(t, ""), "", dial, nil)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusFail {
 		t.Fatalf("configuration = %q, want fail", got.Status)
@@ -92,7 +100,7 @@ func TestAConfigWithNoHostFailsBeforeDialling(t *testing.T) {
 		return nil, "", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "domain: example.com\n"), "", dial)
+	checks := Run(context.Background(), configDir(t, "domain: example.com\n"), "", dial, nil)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusFail {
 		t.Fatalf("configuration = %q, want fail", got.Status)
@@ -107,7 +115,7 @@ func TestAnUnreachableMachineSkipsTheRemoteChecks(t *testing.T) {
 		return nil, "", errors.New("connection refused")
 	}
 
-	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial, nil)
 
 	if got := find(t, checks, CheckConfiguration); got.Status != StatusPass {
 		t.Fatalf("configuration = %q, want pass", got.Status)
@@ -133,7 +141,7 @@ func TestASupportedOperatingSystemPasses(t *testing.T) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial, nil)
 
 	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass {
 		t.Fatalf("operating system = %q (%s), want pass", got.Status, got.Detail)
@@ -152,7 +160,7 @@ func TestAnUnsupportedOperatingSystemFailsAndSaysWhichItIs(t *testing.T) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial, nil)
 
 	got := find(t, checks, CheckOperatingSystem)
 	if got.Status != StatusFail {
@@ -172,7 +180,7 @@ func TestAMissingAnsibleFailsOnItsOwn(t *testing.T) {
 		return client, "203.0.113.10", nil
 	}
 
-	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial)
+	checks := Run(context.Background(), configDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"), "", dial, nil)
 
 	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass {
 		t.Fatalf("a missing ansible should not fail the OS check: %q", got.Status)
@@ -210,7 +218,7 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 		t.Fatalf("DEVMACHINE_TEST_PORT is not a number: %v", err)
 	}
 
-	checks := Run(context.Background(), dir, "", remote.Dial)
+	checks := Run(context.Background(), dir, "", remote.Dial, nil)
 
 	if got := find(t, checks, CheckConnection); got.Status != StatusPass {
 		t.Fatalf("connection = %q (%s), want pass", got.Status, got.Detail)
@@ -232,7 +240,7 @@ func TestRunReportsEachCheckOnce(t *testing.T) {
 		return nil, "", errors.New("no address answered")
 	}
 	body := "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"
-	checks := Run(context.Background(), configDir(t, body), "", dial)
+	checks := Run(context.Background(), configDir(t, body), "", dial, nil)
 
 	seen := map[string]int{}
 	for _, c := range checks {
@@ -255,7 +263,7 @@ func TestRunRefusesToGuessBetweenSeveralMachines(t *testing.T) {
 		"  - name: main\n    hosts: [203.0.113.10]\n" +
 		"  - name: sandbox\n    hosts: [203.0.113.11]\n"
 
-	checks := Run(context.Background(), configDir(t, body), "", dial)
+	checks := Run(context.Background(), configDir(t, body), "", dial, nil)
 
 	got := find(t, checks, CheckConfiguration)
 	if got.Status != StatusFail {
@@ -282,7 +290,7 @@ func TestRunChecksTheMachineItWasGiven(t *testing.T) {
 		"  - name: main\n    hosts: [203.0.113.10]\n" +
 		"  - name: sandbox\n    hosts: [203.0.113.11]\n"
 
-	Run(context.Background(), configDir(t, body), "sandbox", dial)
+	Run(context.Background(), configDir(t, body), "sandbox", dial, nil)
 
 	if got.Name != "sandbox" {
 		t.Fatalf("it checked machine %q, want sandbox", got.Name)
@@ -296,9 +304,122 @@ func TestTheConfigurationCheckCountsTheWorkspaces(t *testing.T) {
 	body := "machines:\n  - name: main\n    hosts: [203.0.113.10]\n" +
 		"workspaces:\n  - name: alice\n  - name: bob\n"
 
-	checks := Run(context.Background(), configDir(t, body), "", dial)
+	checks := Run(context.Background(), configDir(t, body), "", dial, nil)
 
 	if got := find(t, checks, CheckConfiguration); !strings.Contains(got.Detail, "2 workspace") {
 		t.Fatalf("the detail does not count the workspaces: %q", got.Detail)
+	}
+}
+
+// machineWith is the usual one-machine configuration these checks run against.
+const machineWith = "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"
+
+// working answers every check up to the credentials, so a test can look at
+// what comes after them.
+func working(present string) fakeClient {
+	return fakeClient{
+		out: map[string]string{
+			osReleaseCommand: "ID=ubuntu\n",
+			ansibleCommand:   "/usr/bin/ansible-playbook\n",
+		},
+		input: present,
+	}
+}
+
+func dialling(client remote.Client) Dialer {
+	return func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return client, "203.0.113.10", nil
+	}
+}
+
+func login(name, workspace, user string) credentials.Declared {
+	return credentials.Declared{
+		Credential: packages.Credential{
+			Name: name, Kind: packages.KindLogin,
+			Command: name + " auth login", StoredAt: "~/.config/" + name + "/hosts.yml",
+		},
+		Package: name + "-login", Workspace: workspace, LinuxUser: user,
+	}
+}
+
+func TestACredentialThatIsThereIsItsOwnPassingCheck(t *testing.T) {
+	wanted := []credentials.Declared{login("gh", "", "")}
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("gh\tyes\n")), wanted)
+
+	if got := find(t, checks, "credential: gh"); got.Status != StatusPass {
+		t.Fatalf("credential: gh = %q (%s), want pass", got.Status, got.Detail)
+	}
+}
+
+func TestAMissingCredentialFailsAndSaysHowToFixIt(t *testing.T) {
+	wanted := []credentials.Declared{login("claude", "alice", "alice")}
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("alice/claude\tno\n")), wanted)
+
+	got := find(t, checks, "credential: alice/claude")
+	if got.Status != StatusFail {
+		t.Fatalf("credential = %q, want fail", got.Status)
+	}
+	if !strings.Contains(got.Detail, "devmachine login claude --workspace alice") {
+		t.Fatalf("the detail does not say how to fix it: %q", got.Detail)
+	}
+}
+
+func TestAMissingSecretSaysToStoreItAndPushIt(t *testing.T) {
+	wanted := []credentials.Declared{{
+		Credential: packages.Credential{Name: "token", Kind: packages.KindSecret, Env: "TOKEN"},
+		Package:    "provider",
+	}}
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("token\tno\n")), wanted)
+
+	got := find(t, checks, "credential: token")
+	for _, want := range []string{"devmachine secrets set token", "credentials push"} {
+		if !strings.Contains(got.Detail, want) {
+			t.Fatalf("the detail leaves out %q: %q", want, got.Detail)
+		}
+	}
+}
+
+func TestACredentialWithNowhereToLookIsNotReportedMissing(t *testing.T) {
+	// "I cannot tell" and "it is not there" are different things, and only one
+	// of them is a failure.
+	wanted := []credentials.Declared{{
+		Credential: packages.Credential{Name: "gh", Kind: packages.KindLogin, Command: "gh auth login"},
+		Package:    "gh-login",
+	}}
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("")), wanted)
+
+	if got := find(t, checks, "credential: gh"); got.Status != StatusSkip {
+		t.Fatalf("credential: gh = %q (%s), want skip", got.Status, got.Detail)
+	}
+	if !OK(checks) {
+		t.Fatal("a credential nobody can look for should not fail the machine")
+	}
+}
+
+func TestAMachineWithNothingDeclaredReportsNoCredential(t *testing.T) {
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("")), nil)
+
+	for _, c := range checks {
+		if strings.HasPrefix(c.Name, credentialPrefix) {
+			t.Fatalf("a machine with no packages reported %q", c.Name)
+		}
+	}
+	if !OK(checks) {
+		t.Fatalf("a machine with nothing declared should pass: %#v", checks)
+	}
+}
+
+func TestAnUnreachableMachineSkipsTheCredentialChecks(t *testing.T) {
+	dial := func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("connection refused")
+	}
+	wanted := []credentials.Declared{login("gh", "", "")}
+
+	checks := Run(context.Background(), configDir(t, machineWith), "", dial, wanted)
+
+	// The cascade covers it because it is in `order`, not because anybody
+	// remembered to add it to a list of things to skip.
+	if got := find(t, checks, "credential: gh"); got.Status != StatusSkip {
+		t.Fatalf("credential: gh = %q, want skip", got.Status)
 	}
 }
