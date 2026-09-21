@@ -1,0 +1,40 @@
+package dns
+
+import (
+	"context"
+	"io"
+)
+
+// recordingClient answers a command with canned output and remembers what it
+// was asked to run.
+//
+// It implements the full remote.Client interface, not just Run: the other
+// methods are never exercised by these tests, but a fake that only satisfies
+// part of the interface would not compile against the real one.
+type recordingClient struct {
+	out      string
+	err      error
+	commands []string
+}
+
+func (c *recordingClient) Run(_ context.Context, command string) (string, error) {
+	c.commands = append(c.commands, command)
+	return c.out, c.err
+}
+
+func (c *recordingClient) RunInput(_ context.Context, command string, _ io.Reader) (string, error) {
+	c.commands = append(c.commands, command)
+	return c.out, c.err
+}
+
+func (c *recordingClient) Stream(_ context.Context, command string, stdout, _ io.Writer) error {
+	c.commands = append(c.commands, command)
+	if c.out != "" {
+		_, _ = io.WriteString(stdout, c.out)
+	}
+	return c.err
+}
+
+func (c *recordingClient) Upload(context.Context, string, io.Reader) error { return nil }
+
+func (c *recordingClient) Close() error { return nil }
