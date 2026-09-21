@@ -1,0 +1,39 @@
+SURFACE.txt
+  s_cab674f14f5e3f::t_49da34a99baf8f 6-8,13
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_29cc44793d19c8 80-82,84-89,302-363
+docs/troubleshooting.md
+  s_cab674f14f5e3f::t_78347a30aeb53f 233-266
+internal/commands/credentials.go
+  s_cab674f14f5e3f::t_d8036776d02aaa 1-384
+internal/commands/credentials_test.go
+  s_cab674f14f5e3f::t_ebffd9a5666494 1-437
+internal/commands/doctor.go
+  s_cab674f14f5e3f::t_0c06e4a089816a 7,23-32,42-45,47
+internal/commands/login.go
+  s_cab674f14f5e3f::t_e6730ef2168d0d 1-187
+internal/commands/login_test.go
+  s_cab674f14f5e3f::t_eeeab65446d889 1-165
+internal/commands/root.go
+  s_cab674f14f5e3f::t_87e58c137d953d 81-82
+internal/doctor/doctor.go
+  s_cab674f14f5e3f::t_a40ae72754dc8f 11-12,33-39,72-74,79,86,100,109-110,121-131,138,185-231
+internal/doctor/doctor_test.go
+  s_cab674f14f5e3f::t_d74512c0d20cb4 14-15,22-24,44-46,83,103,118,144,163,183,221,243,266,293,307,313-425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "980b5fd164770005473e2eae92b48a721d299856",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
