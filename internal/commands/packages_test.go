@@ -64,7 +64,7 @@ func TestPackagesValidateAsJSONCarriesEachProblemWithItsPlace(t *testing.T) {
 
 func TestPackagesValidateAcceptsAGoodPackage(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sharing")
-	if err := packages.WriteSkeleton(dir, "sharing", packages.ScopeWorkspace); err != nil {
+	if err := packages.WriteSkeleton(dir, "sharing", packages.ScopeWorkspace, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -150,7 +150,7 @@ func configWithMachineAndWorkspace(t *testing.T) string {
 // where a configuration with no release pin finds everything it has.
 func writeLocalPackage(t *testing.T, configDir, name, scope string) {
 	t.Helper()
-	if err := packages.WriteSkeleton(filepath.Join(packages.LocalDir(configDir), name), name, scope); err != nil {
+	if err := packages.WriteSkeleton(filepath.Join(packages.LocalDir(configDir), name), name, scope, ""); err != nil {
 		t.Fatal(err)
 	}
 }

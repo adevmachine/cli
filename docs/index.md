@@ -54,6 +54,8 @@ when something behaves in a way that surprises you.
 - [Commands](reference/commands.md) — every command, its flags and its output.
 - [The package format](reference/package-format.md) — every `package.yml`
   field, and the message behind every validation rule.
+- [The DNS provider contract](reference/dns-provider-contract.md) — how a DNS
+  provider's entrypoint is called, and what it must answer.
 - [Settings](reference/settings.md) — every variable the published packages
   accept, generated from their own manifests.
 

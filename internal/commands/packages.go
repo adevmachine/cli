@@ -25,7 +25,7 @@ func newPackagesCmd(opts *options) *cobra.Command {
 }
 
 func newPackagesNewCmd(opts *options) *cobra.Command {
-	var scope, into string
+	var scope, kind, into string
 
 	c := &cobra.Command{
 		Use:   "new <name>",
@@ -37,7 +37,7 @@ func newPackagesNewCmd(opts *options) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			dir := filepath.Join(into, name)
-			if err := packages.WriteSkeleton(dir, name, scope); err != nil {
+			if err := packages.WriteSkeleton(dir, name, scope, kind); err != nil {
 				return err
 			}
 			if opts.format == formatJSON {
@@ -45,7 +45,8 @@ func newPackagesNewCmd(opts *options) *cobra.Command {
 					Path  string `json:"path"`
 					Name  string `json:"name"`
 					Scope string `json:"scope"`
-				}{dir, name, scope})
+					Kind  string `json:"kind,omitempty"`
+				}{dir, name, scope, kind})
 			}
 			cmd.Printf("wrote %s\n", dir)
 			return nil
@@ -53,6 +54,7 @@ func newPackagesNewCmd(opts *options) *cobra.Command {
 	}
 	c.Flags().StringVar(&scope, "scope", packages.ScopeMachine,
 		fmt.Sprintf("where it is installed: %s or %s", packages.ScopeMachine, packages.ScopeWorkspace))
+	c.Flags().StringVar(&kind, "kind", "", `the contract its entrypoint answers, for example "dns"`)
 	c.Flags().StringVar(&into, "into", ".", "the directory to write the package into")
 	return c
 }

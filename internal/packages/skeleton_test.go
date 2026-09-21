@@ -1,6 +1,8 @@
 package packages
 
 import (
+	"encoding/json"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -10,7 +12,7 @@ import (
 
 func TestWriteSkeletonProducesSomethingThatValidates(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sharing")
-	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace); err != nil {
+	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -28,7 +30,7 @@ func TestWriteSkeletonProducesSomethingThatValidates(t *testing.T) {
 // machine.
 func TestWriteSkeletonTurnsADashIntoAVariableAnsibleAccepts(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "claude-code")
-	if err := WriteSkeleton(dir, "claude-code", ScopeWorkspace); err != nil {
+	if err := WriteSkeleton(dir, "claude-code", ScopeWorkspace, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,17 +45,17 @@ func TestWriteSkeletonTurnsADashIntoAVariableAnsibleAccepts(t *testing.T) {
 
 func TestWriteSkeletonRefusesToOverwrite(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sharing")
-	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace); err != nil {
+	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace, ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace); err == nil {
+	if err := WriteSkeleton(dir, "sharing", ScopeWorkspace, ""); err == nil {
 		t.Fatal("it overwrote a package that was already there")
 	}
 }
 
 func TestWriteSkeletonRefusesAScopeThatIsNeitherMachineNorWorkspace(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sharing")
-	err := WriteSkeleton(dir, "sharing", "local")
+	err := WriteSkeleton(dir, "sharing", "local", "")
 	if err == nil {
 		t.Fatal("a third scope was accepted")
 	}
@@ -64,8 +66,42 @@ func TestWriteSkeletonRefusesAScopeThatIsNeitherMachineNorWorkspace(t *testing.T
 
 func TestWriteSkeletonRefusesANameThatIsNotAPackageName(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "Sharing")
-	if err := WriteSkeleton(dir, "Sharing", ScopeMachine); err == nil {
+	if err := WriteSkeleton(dir, "Sharing", ScopeMachine, ""); err == nil {
 		t.Fatal("a name with a capital was accepted")
+	}
+}
+
+func TestSkeletonForADNSProviderValidates(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "example-registrar")
+	if err := WriteSkeleton(dir, "example-registrar", ScopeMachine, "dns"); err != nil {
+		t.Fatal(err)
+	}
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("the skeleton does not validate: %#v", problems)
+	}
+}
+
+func TestSkeletonForADNSProviderAnswersTheContract(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "example-registrar")
+	if err := WriteSkeleton(dir, "example-registrar", ScopeMachine, "dns"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A skeleton somebody has to fix before it runs teaches the wrong thing
+	// on the first try.
+	out, err := exec.Command(filepath.Join(dir, "bin", "provider"), "list", "example.com").Output()
+	if err != nil {
+		t.Fatalf("the skeleton does not run: %v", err)
+	}
+	var answer struct {
+		Records []map[string]any `json:"records"`
+	}
+	if err := json.Unmarshal(out, &answer); err != nil {
+		t.Fatalf("the skeleton does not answer JSON: %v\n%s", err, out)
 	}
 }
 

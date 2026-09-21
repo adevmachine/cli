@@ -69,11 +69,59 @@ const skeletonDefaults = `---
 {{.Var}}_packages: []
 `
 
+// skeletonDNSManifest is what `packages new --kind dns` writes instead of
+// skeletonManifest: a package that already declares the contract described in
+// docs/reference/dns-provider-contract.md, so `packages validate` passes
+// before a single line of the provider is edited.
+const skeletonDNSManifest = `format: 1
+name: {{.Name}}
+scope: {{.Scope}}
+summary: Replace this line with what {{.Name}} installs.
+kind: dns
+entrypoint: bin/provider
+commands: [zones, list, upsert, delete, help]
+`
+
+// skeletonDNSProvider already answers docs/reference/dns-provider-contract.md:
+// `list` returns an empty set rather than failing, and `upsert`/`delete`
+// report a clear "not implemented yet" in the shape the contract defines,
+// rather than a file of comments nobody runs.
+const skeletonDNSProvider = `#!/usr/bin/env python3
+import json
+import sys
+
+
+def fail(kind, message):
+    print(json.dumps({"error": {"kind": kind, "message": message}}))
+    sys.exit(1)
+
+
+def main(argv):
+    if len(argv) < 3:
+        fail("invalid_record", "usage: provider list|upsert|delete <zone>")
+
+    command = argv[1]
+
+    if command == "list":
+        print(json.dumps({"records": []}))
+        return
+
+    if command in ("upsert", "delete"):
+        fail("invalid_record", command + " is not implemented yet: edit bin/provider")
+
+    fail("invalid_record", "unknown command " + repr(command))
+
+
+if __name__ == "__main__":
+    main(sys.argv)
+`
+
 // WriteSkeleton writes a new package into dir.
 //
 // It refuses to write over one that is already there: `packages new` is how a
-// package starts, never how one is edited.
-func WriteSkeleton(dir, name, scope string) error {
+// package starts, never how one is edited. kind is empty for an ordinary
+// package, or "dns" for one that already answers the DNS provider contract.
+func WriteSkeleton(dir, name, scope, kind string) error {
 	if !packageName.MatchString(name) {
 		return fmt.Errorf("name %q: use lower case letters, digits, dashes and underscores", name)
 	}
@@ -81,13 +129,21 @@ func WriteSkeleton(dir, name, scope string) error {
 		return fmt.Errorf("scope %q: a package is installed on a %s or in a %s, and there is no third place",
 			scope, ScopeMachine, ScopeWorkspace)
 	}
+	if kind != "" && kind != kindDNS {
+		return fmt.Errorf("kind %q: the only kind so far is %q", kind, kindDNS)
+	}
 	if _, err := os.Stat(ManifestPath(dir)); err == nil {
 		return fmt.Errorf("%s already exists", ManifestPath(dir))
 	}
 
+	manifest := skeletonManifest
+	if kind == kindDNS {
+		manifest = skeletonDNSManifest
+	}
+
 	data := struct{ Name, Scope, Var string }{name, scope, ansibleVariable(name)}
 	for path, body := range map[string]string{
-		FileName:                              skeletonManifest,
+		FileName:                              manifest,
 		filepath.Join("tasks", "main.yml"):    skeletonTasks,
 		filepath.Join("defaults", "main.yml"): skeletonDefaults,
 	} {
@@ -100,6 +156,16 @@ func WriteSkeleton(dir, name, scope string) error {
 			return err
 		}
 		if err := os.WriteFile(target, []byte(rendered), 0o644); err != nil {
+			return err
+		}
+	}
+
+	if kind == kindDNS {
+		target := filepath.Join(dir, "bin", "provider")
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, []byte(skeletonDNSProvider), 0o755); err != nil {
 			return err
 		}
 	}
