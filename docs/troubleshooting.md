@@ -203,3 +203,30 @@ run stops before anything happens.
 This was a defect in the generated playbook and it is fixed. If you see it,
 your binary predates the fix: build or install a newer one. Nothing on the
 machine is wrong, and nothing was half applied — the play never started.
+
+## `credential "X" cannot be shared`
+
+You asked for `X: machine`, and the package that declares it does not say
+`shareable: true`. That is the package saying a copy of its session file does
+not work on another account — a token bound to a device or a browser, usually.
+Sharing it would put a file where the tool looks, the tool would reject it, and
+nothing on the machine would say why.
+
+What to do: ask for `own` instead, and log in once in each workspace. If you
+know a copy does work for that tool, the fix belongs in the package, not in
+your configuration: add `shareable: true` there.
+
+## The shared login did not reach a workspace
+
+Two ordinary reasons, in this order:
+
+- **Nobody has logged in yet.** The copy comes from
+  `/etc/devmachine/<name>/`, and `sync` skips rather than fails when nothing is
+  there. Run `devmachine login <name>`, then `devmachine sync --tags
+  credentials`.
+- **That workspace asked to keep its own.** A workspace with `<name>: own` in
+  its `credentials:` is left out of the copying on purpose, so it never loses
+  the account it logged in with. Remove that line if you meant to share.
+
+The other direction — a workspace whose own login was overwritten — is the same
+setting read the other way: it had no `own` and the shared login reached it.
