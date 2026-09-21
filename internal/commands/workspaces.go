@@ -2,12 +2,14 @@ package commands
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/keys"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 func newWorkspacesCmd(opts *options) *cobra.Command {
@@ -18,6 +20,7 @@ func newWorkspacesCmd(opts *options) *cobra.Command {
 	cmd.AddCommand(
 		newWorkspacesListCmd(opts),
 		newWorkspacesNewCmd(opts),
+		newWorkspacesEditCmd(opts),
 		newWorkspacesRmCmd(opts),
 	)
 	return cmd
@@ -283,4 +286,193 @@ func newWorkspacesRmCmd(opts *options) *cobra.Command {
 	}
 	c.Flags().BoolVar(&yes, "yes", false, "forget it without asking")
 	return c
+}
+
+func newWorkspacesEditCmd(opts *options) *cobra.Command {
+	var e workspaceEditOptions
+
+	c := &cobra.Command{
+		Use:   "edit <name>",
+		Short: "Change a workspace's machine, account, packages or settings",
+		Long: "It edits the configuration and touches no machine. `devmachine " +
+			"sync` is what applies the change.\n\n" +
+			"`--set <package>.<name>=<value>` writes into the workspace's " +
+			"`settings:`, which is how a package's variables are set. An empty " +
+			"value takes the setting out again.\n\n" +
+			"Changing the machine looks like moving a workspace and is not: the " +
+			"next sync creates the account on the new machine, and the old one " +
+			"keeps everything it had.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			e.machine = opts.machine
+			return runWorkspaceEdit(cmd, opts, args[0], e)
+		},
+	}
+	c.Flags().StringVar(&e.user, "user", "", "the Linux account this workspace owns")
+	c.Flags().StringSliceVar(&e.add, "add", nil, "a package to add")
+	c.Flags().StringSliceVar(&e.remove, "rm", nil, "a package to take off")
+	c.Flags().StringArrayVar(&e.set, "set", nil, "a setting, as <package>.<name>=<value>")
+	c.Flags().BoolVar(&e.check, "check", false, "say what would change, and change nothing")
+	c.Flags().BoolVar(&e.yes, "yes", false, "do not ask")
+	return c
+}
+
+type workspaceEditOptions struct {
+	// machine comes from the global --machine, so one flag means the same
+	// thing everywhere: which machine this acts on.
+	machine string
+	user    string
+	add     []string
+	remove  []string
+	set     []string
+	check   bool
+	yes     bool
+}
+
+func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspaceEditOptions) error {
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return err
+	}
+	cfg, err := loadConfig(opts)
+	if err != nil {
+		return err
+	}
+	w, err := cfg.Workspace(name)
+	if err != nil {
+		return err
+	}
+	was := machineNameOf(cfg, w)
+
+	changes, err := applyWorkspaceEdit(cfg, &w, e)
+	if err != nil {
+		return err
+	}
+	if len(changes) == 0 {
+		return fmt.Errorf(
+			"nothing to change on %q: pass --machine, --user, --add, --rm or --set", name)
+	}
+
+	// Validating the whole configuration is what catches a setting for a
+	// package the workspace does not install, which would otherwise reach
+	// nothing and leave the recipe on its default.
+	edited := cfg
+	edited.Workspaces = slices.Clone(cfg.Workspaces)
+	for i := range edited.Workspaces {
+		if edited.Workspaces[i].Name == name {
+			edited.Workspaces[i] = w
+		}
+	}
+	if err := edited.Validate(); err != nil {
+		return err
+	}
+
+	if e.check {
+		for _, line := range changes {
+			cmd.Printf("would %s\n", line)
+		}
+		cmd.Println("Nothing was written.")
+		return nil
+	}
+	if !e.yes {
+		ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(),
+			fmt.Sprintf("On %s: %s?", name, strings.Join(changes, "; ")))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errDeclined
+		}
+	}
+
+	if err := config.UpdateWorkspace(dir, w); err != nil {
+		return err
+	}
+	for _, line := range changes {
+		cmd.Printf("%s: %s\n", name, line)
+	}
+	if e.machine != "" && e.machine != was {
+		cmd.Printf("This moves nothing. The next `devmachine sync` creates the account on %s, "+
+			"and %s keeps everything it had.\n", e.machine, was)
+	}
+	cmd.Println("The machine is untouched until the next `devmachine sync`.")
+	return nil
+}
+
+// applyWorkspaceEdit puts the flags onto the workspace and returns what each
+// one changed, in the words the confirmation and the result both use.
+func applyWorkspaceEdit(cfg config.Config, w *config.Workspace, e workspaceEditOptions) ([]string, error) {
+	var changes []string
+
+	if e.machine != "" {
+		if _, err := cfg.Machine(e.machine); err != nil {
+			return nil, err
+		}
+		if e.machine != machineNameOf(cfg, *w) {
+			changes = append(changes, "move to the machine "+e.machine)
+			w.Machine = e.machine
+		}
+	}
+	if e.user != "" && e.user != w.User {
+		changes = append(changes, "use the account "+e.user)
+		w.User = e.user
+	}
+
+	for _, name := range e.remove {
+		if slices.Contains(e.add, name) {
+			return nil, fmt.Errorf("--add %s and --rm %s say two different things: pass one of them", name, name)
+		}
+	}
+	packages := slices.Clone(w.Packages)
+	for _, name := range e.add {
+		if slices.Contains(packages, name) {
+			continue
+		}
+		packages = append(packages, name)
+		changes = append(changes, "add the package "+name)
+	}
+	for _, name := range e.remove {
+		if !slices.Contains(packages, name) {
+			continue
+		}
+		packages = slices.DeleteFunc(packages, func(n string) bool { return n == name })
+		changes = append(changes, "take off the package "+name)
+	}
+	w.Packages = packages
+
+	settings := maps.Clone(w.Settings)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	for _, raw := range e.set {
+		key, text, ok := strings.Cut(raw, "=")
+		if !ok || key == "" {
+			return nil, fmt.Errorf("--set %q is not a setting: write it as <package>.<name>=<value>", raw)
+		}
+		if text == "" {
+			if _, held := settings[key]; held {
+				delete(settings, key)
+				changes = append(changes, "take out the setting "+key)
+			}
+			continue
+		}
+		settings[key] = settingValue(text)
+		changes = append(changes, "set "+key+" to "+text)
+	}
+	w.Settings = settings
+
+	return changes, nil
+}
+
+// settingValue reads a value the way the file that holds it would.
+//
+// The setting lands in YAML and is handed to a recipe, so a package declaring
+// a list or a flag has to be settable from the command line. Anything that is
+// not valid YAML is taken as the plain string it looks like.
+func settingValue(text string) any {
+	var value any
+	if err := yaml.Unmarshal([]byte(text), &value); err != nil || value == nil {
+		return text
+	}
+	return value
 }

@@ -295,3 +295,190 @@ func TestWorkspacesListSaysWhenThereAreNone(t *testing.T) {
 		t.Fatalf("an empty list should say how to make one: %q", out)
 	}
 }
+
+func TestWorkspacesEditWarnsThatChangingTheMachineMovesNothing(t *testing.T) {
+	dir := configWithKey(t, "  - name: sandbox\n    hosts: [198.51.100.7]\nworkspaces:\n  - name: alice\n    machine: main\n")
+
+	out, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--machine", "sandbox", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The next sync creates the account on the new machine; the old one keeps
+	// everything it had, and nothing is copied across.
+	for _, want := range []string{"sandbox", "main", "sync"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the warning is missing %q: %q", want, out)
+		}
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if w.Machine != "sandbox" {
+		t.Fatalf("got %#v", w)
+	}
+}
+
+func TestWorkspacesEditWritesASettingIntoTheWorkspace(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [claude-plugins]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice",
+		"--set", "claude-plugins.marketplace=github.com/somebody/their-plugins", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if w.Settings["claude-plugins.marketplace"] != "github.com/somebody/their-plugins" {
+		t.Fatalf("got %#v", w.Settings)
+	}
+}
+
+func TestWorkspacesEditRefusesASettingForAPackageItDoesNotHave(t *testing.T) {
+	// A setting that reaches nothing is worse than an error: the recipe keeps
+	// its default and the machine is not what the configuration says it is.
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [zsh]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--set", "caddy.email=a@example.com", "--yes")
+	if err == nil {
+		t.Fatal("it wrote a setting nothing would read")
+	}
+	if !strings.Contains(err.Error(), "caddy") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if len(w.Settings) != 0 {
+		t.Fatalf("it wrote anyway: %#v", w.Settings)
+	}
+}
+
+func TestWorkspacesEditTakesASettingOutWithAnEmptyValue(t *testing.T) {
+	dir := configWithKey(t, `workspaces:
+  - name: alice
+    machine: main
+    packages: [zsh]
+    settings:
+      zsh.theme: plain
+`)
+
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--set", "zsh.theme=", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if len(w.Settings) != 0 {
+		t.Fatalf("the setting survived: %#v", w.Settings)
+	}
+}
+
+func TestWorkspacesEditReadsASettingsValueAsYAML(t *testing.T) {
+	// A package declaring a list variable has to be settable, and the file it
+	// lands in is YAML.
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [claude-plugins]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice",
+		"--set", "claude-plugins.plugins=[one, two]", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	list, ok := w.Settings["claude-plugins.plugins"].([]any)
+	if !ok || len(list) != 2 || list[0] != "one" {
+		t.Fatalf("got %#v", w.Settings["claude-plugins.plugins"])
+	}
+}
+
+func TestWorkspacesEditRefusesASetWithNoValue(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--set", "zsh.theme", "--yes")
+	if err == nil {
+		t.Fatal("it accepted a setting with no value")
+	}
+	if !strings.Contains(err.Error(), "=") {
+		t.Fatalf("the error does not give the shape: %v", err)
+	}
+}
+
+func TestWorkspacesEditAddsAndRemovesPackages(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [workspace, dev]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice",
+		"--add", "zsh", "--rm", "dev", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if !slices.Equal(w.Packages, []string{"workspace", "zsh"}) {
+		t.Fatalf("got %#v", w.Packages)
+	}
+}
+
+func TestWorkspacesEditRefusesToAddAndRemoveTheSamePackage(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [workspace]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--add", "zsh", "--rm", "zsh", "--yes")
+	if err == nil {
+		t.Fatal("it accepted two orders that contradict each other")
+	}
+}
+
+func TestWorkspacesEditWithNothingToChangeSaysSo(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--yes")
+	if err == nil {
+		t.Fatal("it ran with no instruction")
+	}
+	if !strings.Contains(err.Error(), "--set") {
+		t.Fatalf("the error does not say what to pass: %v", err)
+	}
+}
+
+func TestWorkspacesEditCheckWritesNothing(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [workspace]\n")
+
+	out, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--add", "zsh", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "would") {
+		t.Fatalf("a dry run should say what it would do: %q", out)
+	}
+
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if slices.Contains(w.Packages, "zsh") {
+		t.Fatalf("a dry run wrote: %#v", w.Packages)
+	}
+}
+
+func TestWorkspacesEditAsksFirst(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	if _, err := executeWithInput(t, "n\n", "--config", dir, "workspaces", "edit", "alice",
+		"--user", "alice2"); !errors.Is(err, errDeclined) {
+		t.Fatalf("got %v", err)
+	}
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if w.User != "" {
+		t.Fatalf("a no still wrote: %#v", w)
+	}
+}
+
+func TestWorkspacesEditRefusesAMachineThatIsNotConfigured(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice",
+		"--machine", "nowhere", "--yes"); err == nil {
+		t.Fatal("it pointed a workspace at a machine that is not there")
+	}
+}

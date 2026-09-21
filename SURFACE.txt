@@ -33,6 +33,7 @@ devmachine stats
 devmachine sync
 devmachine version
 devmachine workspaces
+devmachine workspaces edit
 devmachine workspaces list
 devmachine workspaces new
 devmachine workspaces rm

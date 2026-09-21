@@ -142,6 +142,7 @@ Two limits, both from what a machine on your own computer is:
 ```
 devmachine workspaces list
 devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
+devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--check] [--yes]
 devmachine workspaces rm <name> [--yes]
 ```
 
@@ -171,6 +172,21 @@ machine a key. A machine with no `key:` in `config.yml` is served by your SSH
 agent, so an agent holding nothing is the same situation.
 
 With several machines configured, `new` refuses to guess: pass `--machine`.
+
+`edit` changes one workspace. `--add` and `--rm` take a package name each and
+may be repeated. `--set <package>.<name>=<value>` writes into the workspace's
+`settings:`, which is how a package's variables are set — see
+[packages](../concepts/packages.md). The value is read as YAML, so
+`--set claude-plugins.plugins=[one, two]` sets a list; an empty value,
+`--set zsh.theme=`, takes the setting out again.
+
+A setting for a package the workspace does not install is refused. It would
+reach nothing: the recipe would quietly keep its default, and the machine would
+not be what the configuration says it is.
+
+**Changing `--machine` does not move a workspace.** It looks like it does. The
+next `sync` creates the account on the new machine, and the old one keeps
+everything it had — its home, its files, its account. The command says so.
 
 **`rm` leaves the Linux account, its home and its files on the machine.**
 Deleting a home is not something a configuration edit should do, and `sync`
