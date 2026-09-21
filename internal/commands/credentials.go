@@ -318,8 +318,8 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 		}
 	}
 
-	if !check {
-		for _, w := range work {
+	for _, w := range work {
+		if !check {
 			value, err := secrets.Get(found.dir, w.secret)
 			if err != nil {
 				return err
@@ -327,12 +327,8 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 			if err := credentials.Push(cmd.Context(), client, w.d, value); err != nil {
 				return err
 			}
-			report.Delivered = append(report.Delivered, credentials.Key(w.d))
 		}
-	} else {
-		for _, w := range work {
-			report.Delivered = append(report.Delivered, credentials.Key(w.d))
-		}
+		report.Delivered = append(report.Delivered, credentials.Key(w.d))
 	}
 	record(opts, target{machine: found.machine}, pushCommandLine(check), true)
 

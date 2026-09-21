@@ -324,6 +324,10 @@ is what spreads it to the workspaces that declare the package.
 A `kind: secret` is refused: nobody logs into a value. Use `devmachine secrets
 set`, then `devmachine credentials push`.
 
+The system `ssh` is what opens the session, so the first login to a machine it
+has never seen asks you to accept the host key. See
+[the troubleshooting page](../troubleshooting.md).
+
 ## credentials
 
 ```

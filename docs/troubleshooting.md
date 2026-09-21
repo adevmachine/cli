@@ -216,6 +216,16 @@ Two workspaces log into the same tool with different accounts, so there is no
 one answer to "log in where". Name the workspace. The list in the error is
 every workspace that asks for it.
 
+## `devmachine login` says "Host key verification failed"
+
+The login runs through the system `ssh`, and that `ssh` has never seen this
+machine before. `doctor`, `run` and `sync` do not hit this: they use the CLI's
+own SSH client, which does not read `~/.ssh/known_hosts`.
+
+Open a session once and accept the key — `devmachine ssh`, and answer `yes` —
+then run the login again. In a script, with nothing able to answer, `ssh` exits
+255 and nothing was run.
+
 ## "the login left nothing at …"
 
 The login command ran and the file the package promised is not there. Either it
