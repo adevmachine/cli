@@ -209,3 +209,16 @@ machine is wrong, and nothing was half applied — the play never started.
 The package that declared it never said where its tool keeps the result, so
 there is nowhere to look. The credential may well be there. Add `stored_at:` to
 the package's declaration and the row starts answering.
+
+## "credential X belongs to a workspace: name it with --workspace"
+
+Two workspaces log into the same tool with different accounts, so there is no
+one answer to "log in where". Name the workspace. The list in the error is
+every workspace that asks for it.
+
+## "the login left nothing at …"
+
+The login command ran and the file the package promised is not there. Either it
+was cancelled or declined, or the tool keeps its session somewhere else than
+the package's `stored_at` says. `stored_at` is a claim by the package, not a
+guarantee — check where the tool really writes, and correct the package.

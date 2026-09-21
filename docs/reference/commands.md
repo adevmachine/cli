@@ -292,6 +292,31 @@ devmachine secrets rm <name>
 With no value, `set` asks without echoing, so the secret never reaches your
 shell history. `list` prints names only.
 
+## login
+
+```
+devmachine login <credential> [--workspace w] [--machine m]
+```
+
+Runs the login a package declared, in the place that credential belongs. The
+CLI reads the command out of the declaration; it knows nothing about any
+particular tool.
+
+The session is a real terminal (`ssh -t`, the same path `devmachine ssh`
+takes), because a device code or a browser prompt reaches a person or it
+reaches nobody.
+
+A workspace credential is logged into as that workspace, and needs
+`--workspace`: accounts differ between workspaces, so there is no master
+session to copy and the CLI will not pick one for you.
+
+A machine credential is logged into once, as the machine's admin, and what the
+tool wrote is copied into `/etc/devmachine/<name>/`. The next `devmachine sync`
+is what spreads it to the workspaces that declare the package.
+
+A `kind: secret` is refused: nobody logs into a value. Use `devmachine secrets
+set`, then `devmachine credentials push`.
+
 ## credentials
 
 ```

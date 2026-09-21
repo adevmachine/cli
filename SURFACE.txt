@@ -9,6 +9,7 @@ devmachine dns
 devmachine dns status
 devmachine doctor
 devmachine help
+devmachine login
 devmachine machines
 devmachine machines add
 devmachine machines create-local
