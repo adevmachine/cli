@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/history"
@@ -357,5 +358,33 @@ func TestRunPackageRefusesAnUndeclaredCommand(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "zones, list") {
 		t.Fatalf("the error does not say what it accepts: %v", err)
+	}
+}
+
+func TestExecCommandContextKillsTheChildItStarted(t *testing.T) {
+	// `tunnel` execs ssh and holds it. Stopping devmachine without killing
+	// that ssh leaves a port forwarded into the machine with nothing on this
+	// computer saying so — found running an hour after the command that
+	// opened it had gone.
+	ctx, cancel := context.WithCancel(t.Context())
+
+	started := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		close(started)
+		done <- execCommandContext(ctx, "sleep", "60")
+	}()
+
+	<-started
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("a cancelled session reported a failure: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the child outlived the context")
 	}
 }

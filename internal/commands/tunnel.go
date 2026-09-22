@@ -57,7 +57,16 @@ func newTunnelCmd(opts *options) *cobra.Command {
 			}
 
 			m, user := tgt.machine, tgt.login()
-			argv := []string{"-p", strconv.Itoa(m.Port)}
+			// The system ssh would read the operator's own known_hosts, and a
+			// machine the CLI made minutes ago is in nobody's. `login` had the
+			// same defect; the Go client pins no host key either. Whether the
+			// CLI pins host keys is one decision for the whole CLI, and until
+			// it is taken this command may not answer it differently.
+			argv := []string{
+				"-p", strconv.Itoa(m.Port),
+				"-o", "StrictHostKeyChecking=no",
+				"-o", "UserKnownHostsFile=/dev/null",
+			}
 			if m.Key != "" {
 				argv = append(argv, "-i", m.Key, "-o", "IdentitiesOnly=yes")
 			}

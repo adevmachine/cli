@@ -110,3 +110,26 @@ func TestTunnelSaysWhenSshIsMissing(t *testing.T) {
 		t.Fatalf("the error does not name what is missing: %v", err)
 	}
 }
+
+func TestTunnelTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
+	// `tunnel` execs the system ssh, which reads the operator's own
+	// known_hosts. A machine the CLI built minutes ago is in nobody's, so
+	// `tunnel` failed on every machine the CLI creates. `login` had exactly
+	// this defect; the Go client pins no host key either. Whether the CLI
+	// pins host keys is one decision for the whole CLI, and until it is
+	// taken no command may answer it differently from the rest.
+	got := captureInteractive(t)
+	dir := configWithWorkspace(t)
+	port := strconv.Itoa(freePort(t))
+
+	if _, err := execute(t, "--config", dir, "tunnel", "alice", port); err != nil {
+		t.Fatalf("tunnel returned %v", err)
+	}
+
+	joined := strings.Join(*got, " ")
+	for _, want := range []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("tunnel cannot reach a machine the CLI just made: %#v", *got)
+		}
+	}
+}

@@ -2,12 +2,15 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/adevmachine/cli/internal/config"
@@ -26,10 +29,32 @@ var (
 	dial            = remote.Dial
 )
 
+// execCommand runs a session-holding command such as ssh, mosh, or a tunnel.
+//
+// It kills the child on SIGINT/SIGTERM rather than relying only on the
+// terminal's own signal delivery: `tunnel` is meant to close with the
+// process that opened it, including when something stops devmachine itself
+// rather than the person pressing Ctrl-C at the terminal, and an ssh left
+// running after that holds the port forever.
 func execCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return execCommandContext(ctx, name, args...)
+}
+
+// execCommandContext is execCommand with the signal handling lifted out, so a
+// test can prove the child dies with the context instead of having to send
+// itself a signal.
+func execCommandContext(ctx context.Context, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return cmd.Run()
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		// Closed on purpose, by the same signal that would have ended an
+		// interactive session anyway: not a failure worth reporting as one.
+		return nil
+	}
+	return err
 }
 
 // loadConfig resolves the directory, reads the configuration and judges it.
