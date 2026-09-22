@@ -79,10 +79,13 @@ devmachine doctor [--machine m]
 Four checks, in order: the configuration, the connection, the operating system,
 and whether Ansible is installed. Then one check per credential the installed
 packages declare, named `credential: <key>`, saying what is missing and the
-command that delivers it. Exits non-zero if any failed.
+command that delivers it. Then one check per installed DNS provider, named
+`dns: <provider>`, asking it what it holds — a stale token is better found
+here than while creating a subdomain. Exits non-zero if any failed.
 
-A machine whose packages declare no credential reports none, and that is not a
-failure.
+A machine whose packages declare no credential reports none, and a machine
+with no DNS provider installed reports none of those either: neither is a
+failure, both are a choice.
 
 A check that could not run reports `skip` and why. A credential whose package
 never said where it is kept reports `skip` too: there is nowhere to look, and

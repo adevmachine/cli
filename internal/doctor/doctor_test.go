@@ -2,13 +2,16 @@ package doctor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/credentials"
@@ -421,5 +424,140 @@ func TestAnUnreachableMachineSkipsTheCredentialChecks(t *testing.T) {
 	// remembered to add it to a list of things to skip.
 	if got := find(t, checks, "credential: gh"); got.Status != StatusSkip {
 		t.Fatalf("credential: gh = %q, want skip", got.Status)
+	}
+}
+
+func writeDNSProviderPackage(t *testing.T, dir, name string) {
+	t.Helper()
+	pkgDir := filepath.Join(packages.LocalDir(dir), name)
+	if err := os.MkdirAll(filepath.Join(pkgDir, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := fmt.Sprintf(
+		"format: 1\nname: %s\nscope: machine\nsummary: A package written by a test.\n"+
+			"kind: dns\nentrypoint: bin/provider\ncommands: [\"*\"]\n"+
+			"credentials:\n  - name: %s\n    kind: secret\n    env: %s_TOKEN\n",
+		name, name, strings.ToUpper(name))
+	if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func lockDNSProviders(t *testing.T, dir, machine string, names ...string) {
+	t.Helper()
+	entries := make([]packages.LockEntry, len(names))
+	for i, n := range names {
+		entries[i] = packages.LockEntry{Name: n, Source: packages.SourceLocal}
+	}
+	lock := packages.Lock{
+		AppliedAt: time.Now().UTC().Format(time.RFC3339),
+		Machines:  map[string][]packages.LockEntry{machine: entries},
+	}
+	if err := packages.SaveLock(dir, lock); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func dirWithTwoProviders(t *testing.T) string {
+	t.Helper()
+	dir := configDir(t, machineWith)
+	writeDNSProviderPackage(t, dir, "hostinger")
+	writeDNSProviderPackage(t, dir, "cloudflare")
+	lockDNSProviders(t, dir, "main", "hostinger", "cloudflare")
+	return dir
+}
+
+func dirWithBrokenProvider(t *testing.T) string {
+	t.Helper()
+	dir := configDir(t, machineWith)
+	writeDNSProviderPackage(t, dir, "hostinger")
+	lockDNSProviders(t, dir, "main", "hostinger")
+	return dir
+}
+
+func dirWithNoProviders(t *testing.T) string {
+	t.Helper()
+	return configDir(t, machineWith)
+}
+
+// dnsAwareClient answers the operating system and ansible checks like any
+// other working machine, and also answers a DNS package's `zones` call: with
+// the zones it holds, or with the error kind it should fail with.
+type dnsAwareClient struct {
+	fakeClient
+	zones map[string][]string
+	fails map[string]string
+}
+
+func (d dnsAwareClient) Run(ctx context.Context, command string) (string, error) {
+	if strings.Contains(command, " zones") {
+		for name, zones := range d.zones {
+			if strings.Contains(command, "/"+name+"/") {
+				body, err := json.Marshal(struct {
+					Zones []string `json:"zones"`
+				}{zones})
+				return string(body), err
+			}
+		}
+		for name, kind := range d.fails {
+			if strings.Contains(command, "/"+name+"/") {
+				return fmt.Sprintf(`{"error":{"kind":%q,"message":"the token was rejected"}}`, kind),
+					errors.New("exit status 1")
+			}
+		}
+	}
+	return d.fakeClient.Run(ctx, command)
+}
+
+func TestDoctorReportsOneCheckPerInstalledProvider(t *testing.T) {
+	client := dnsAwareClient{fakeClient: working(""), zones: map[string][]string{
+		"hostinger": {"example.com"}, "cloudflare": {"client.example.net"},
+	}}
+	checks := Run(context.Background(), dirWithTwoProviders(t), "", dialling(client), nil)
+
+	var seen []string
+	for _, c := range checks {
+		if strings.HasPrefix(c.Name, CheckDNS) {
+			seen = append(seen, c.Name)
+		}
+	}
+	if len(seen) != 2 {
+		t.Fatalf("got %v", seen)
+	}
+}
+
+func TestDoctorNamesTheZonesAProviderHolds(t *testing.T) {
+	client := dnsAwareClient{fakeClient: working(""), zones: map[string][]string{
+		"hostinger": {"example.com"}, "cloudflare": {"client.example.net"},
+	}}
+	checks := Run(context.Background(), dirWithTwoProviders(t), "", dialling(client), nil)
+	c := find(t, checks, "dns: cloudflare")
+	if c.Status != StatusPass {
+		t.Fatalf("got %#v", c)
+	}
+	if !strings.Contains(c.Detail, "client.example.net") {
+		t.Fatalf("the detail does not say what it holds: %#v", c)
+	}
+}
+
+func TestDoctorFailsAProviderWhoseTokenIsGone(t *testing.T) {
+	client := dnsAwareClient{fakeClient: working(""), fails: map[string]string{"hostinger": "unauthenticated"}}
+	checks := Run(context.Background(), dirWithBrokenProvider(t), "", dialling(client), nil)
+	c := find(t, checks, "dns: hostinger")
+	if c.Status != StatusFail {
+		t.Fatalf("got %#v", c)
+	}
+	if !strings.Contains(c.Detail, "secrets set") {
+		t.Fatalf("the detail does not say how to fix it: %#v", c)
+	}
+}
+
+func TestDoctorSaysNothingAboutDNSWhenNoProviderIsInstalled(t *testing.T) {
+	checks := Run(context.Background(), dirWithNoProviders(t), "", dialling(working("")), nil)
+	for _, c := range checks {
+		if strings.HasPrefix(c.Name, CheckDNS) {
+			// Not installing a DNS provider is a choice, not a fault.
+			t.Fatalf("it complained about a provider nobody wanted: %#v", c)
+		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/credentials"
+	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
 )
@@ -28,6 +29,9 @@ const (
 	CheckConnection      = "connection"
 	CheckOperatingSystem = "operating system"
 	CheckAnsible         = "ansible"
+	// CheckDNS prefixes one check per installed DNS provider, named
+	// "dns: <provider>".
+	CheckDNS = "dns"
 )
 
 // credentialPrefix names the check for one credential, so `credential: gh` and
@@ -107,7 +111,8 @@ func Run(ctx context.Context, dir, machine string, dial Dialer, wanted []credent
 		Detail: fmt.Sprintf("connected through %s", address),
 	})
 	checks = append(checks, remoteChecks(ctx, client)...)
-	return append(checks, credentialChecks(ctx, client, wanted)...)
+	checks = append(checks, credentialChecks(ctx, client, wanted)...)
+	return append(checks, dnsChecks(ctx, dir, m.Name, client)...)
 }
 
 func loadAndValidate(dir string) (config.Config, error) {
@@ -227,6 +232,39 @@ func credentialFix(d credentials.Declared) string {
 		return "missing: run `" + credentials.LoginCommand(d) + "`"
 	}
 	return fmt.Sprintf("missing: run `devmachine secrets set %s`, then `devmachine credentials push`", d.Name)
+}
+
+// dnsCheckName is what an installed DNS provider's check is called.
+func dnsCheckName(provider string) string { return CheckDNS + ": " + provider }
+
+// dnsChecks reports one check per installed DNS provider: whether it can
+// still be asked, and the zones it holds when it can.
+//
+// A machine with no DNS provider installed reports nothing here — not
+// installing one is a choice, not a fault.
+func dnsChecks(ctx context.Context, dir, machine string, client remote.Client) []Check {
+	providers, err := dns.Installed(dir, machine, client)
+	if err != nil {
+		return []Check{{Name: CheckDNS, Status: StatusFail, Detail: err.Error()}}
+	}
+
+	var out []Check
+	for _, p := range providers {
+		zones, err := p.Zones(ctx)
+		if err != nil {
+			out = append(out, Check{Name: dnsCheckName(p.Name()), Status: StatusFail, Detail: dnsFix(err)})
+			continue
+		}
+		out = append(out, Check{Name: dnsCheckName(p.Name()), Status: StatusPass, Detail: strings.Join(zones, ", ")})
+	}
+	return out
+}
+
+// dnsFix is what a failed DNS check tells somebody to do about it. A stale
+// token found while creating a subdomain is a token found too late; this is
+// meant to be found here first.
+func dnsFix(err error) string {
+	return fmt.Sprintf("%v (run `devmachine secrets set` for its credential, then `devmachine credentials push`)", err)
 }
 
 // OK reports whether every check passed or was skipped.
