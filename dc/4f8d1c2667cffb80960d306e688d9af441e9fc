@@ -1,0 +1,26 @@
+internal/commands/dns.go
+  s_cab674f14f5e3f::t_83e9f44560d619 4,6,8,10,20,71-156,159-160
+  s_cab674f14f5e3f::t_dade3f1ef9cb9d 157-158
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_9e66b83c802079 292,295-297,299-304
+internal/commands/dns_test.go
+  s_cab674f14f5e3f::t_bc9856c8ebd199 1-100
+SURFACE.txt
+  s_cab674f14f5e3f::t_02d4cc3ef85b58 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dc4f8d1c2667cffb80960d306e688d9af441e9fc",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
