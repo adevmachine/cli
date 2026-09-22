@@ -20,24 +20,19 @@ fail() {
   return 1
 }
 
-# Remove whitespace surrounding a value, without changing whitespace inside
-# it. In particular, spaces inside a short value remain significant ("2 00"
-# is not "200").
+# Remove only line-ending characters. In particular, spaces and tabs inside or
+# around a short value remain significant (" active" is not "active").
 _accept_trim_line_endings() {
   ACCEPT_TRIMMED=$1
   while :; do
-    [ -n "$ACCEPT_TRIMMED" ] || break
-    ACCEPT_FIRST=${ACCEPT_TRIMMED%"${ACCEPT_TRIMMED#?}"}
-    case "$ACCEPT_FIRST" in
-      ' '|$'\t'|$'\n'|$'\r') ACCEPT_TRIMMED=${ACCEPT_TRIMMED#?} ;;
+    case "$ACCEPT_TRIMMED" in
+      $'\n'*|$'\r'*) ACCEPT_TRIMMED=${ACCEPT_TRIMMED#?} ;;
       *) break ;;
     esac
   done
   while :; do
-    [ -n "$ACCEPT_TRIMMED" ] || break
-    ACCEPT_LAST=${ACCEPT_TRIMMED#"${ACCEPT_TRIMMED%?}"}
-    case "$ACCEPT_LAST" in
-      ' '|$'\t'|$'\n'|$'\r') ACCEPT_TRIMMED=${ACCEPT_TRIMMED%?} ;;
+    case "$ACCEPT_TRIMMED" in
+      *$'\n'|*$'\r') ACCEPT_TRIMMED=${ACCEPT_TRIMMED%?} ;;
       *) break ;;
     esac
   done
@@ -110,11 +105,11 @@ destroy_accept_vm() {
     printf 'keeping acceptance VM %s\n' "$accept_vm" >&2
     return 0
   fi
-  if [ -n "${DEVMACHINE_BIN:-}" ]; then
-    "$DEVMACHINE_BIN" machines delete-local --yes "$accept_vm"
-  else
-    devmachine machines delete-local --yes "$accept_vm"
+  if [ -z "${DEVMACHINE_ACCEPT_BIN:-}" ] || [ ! -x "$DEVMACHINE_ACCEPT_BIN" ]; then
+    echo "DEVMACHINE_ACCEPT_BIN must name an executable local CLI" >&2
+    return 1
   fi
+  "$DEVMACHINE_ACCEPT_BIN" machines delete-local --yes "$accept_vm"
 }
 
 accept_reset

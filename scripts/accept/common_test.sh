@@ -18,6 +18,37 @@ accept_reset
 equals "2 00" "200" "internal whitespace stays significant" >/dev/null || true
 [ "$ACCEPT_FAILURES" -eq 1 ]
 
+accept_reset
+equals " active" "active" "leading spaces stay significant" >/dev/null || true
+[ "$ACCEPT_FAILURES" -eq 1 ]
+
+accept_reset
+equals "active " "active" "trailing spaces stay significant" >/dev/null || true
+[ "$ACCEPT_FAILURES" -eq 1 ]
+
+accept_reset
+equals $'\tactive' "active" "leading tabs stay significant" >/dev/null || true
+[ "$ACCEPT_FAILURES" -eq 1 ]
+
+cleanup_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/devmachine-accept-common.XXXXXX")
+cleanup_marker="$cleanup_test_dir/path-fallback-used"
+cat > "$cleanup_test_dir/devmachine" <<EOF
+#!/usr/bin/env bash
+touch "$cleanup_marker"
+EOF
+chmod +x "$cleanup_test_dir/devmachine"
+if DEVMACHINE_ACCEPT_BIN= DEVMACHINE_BIN= PATH="$cleanup_test_dir:$PATH" KEEP_ACCEPT_VM=0 \
+    destroy_accept_vm "devmachine-accept-test" >/dev/null 2>&1; then
+  echo "cleanup accepted an implicit PATH CLI" >&2
+  exit 1
+fi
+[ ! -f "$cleanup_marker" ]
+
+DEVMACHINE_ACCEPT_BIN="$cleanup_test_dir/devmachine" KEEP_ACCEPT_VM=0 \
+  destroy_accept_vm "devmachine-accept-test" >/dev/null 2>&1
+[ -f "$cleanup_marker" ]
+rm -rf "$cleanup_test_dir"
+
 require_accept_vm "devmachine-accept-123-v05"
 if require_accept_vm "fakevps" 2>/dev/null; then
   echo "fakevps passed the acceptance VM guard" >&2
