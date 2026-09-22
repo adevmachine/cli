@@ -70,6 +70,41 @@ Running it again on a machine it already owns is safe: it offers the key it
 made last time, finds that the key works, and skips straight past the
 password.
 
+## setup git
+
+```
+devmachine setup git [--yes] [--check]
+```
+
+Makes the configuration directory a git repository, so it can be pushed to a
+private remote. Only `config.yml` and `packages.lock` are ever committed.
+
+In order:
+
+1. writes `<config>/.gitignore`, **before** `git init` — there is no moment
+   where `git add -A` could pick up a key or a secret;
+2. `git init -b main`;
+3. commits `.gitignore`, `config.yml` and `packages.lock`;
+4. checks what is tracked. A directory that became a repository by hand
+   before this command existed can already be tracking a key — that is
+   **refused**, with the fix (`git rm --cached <path>`) and a reminder that
+   untracking a file does not remove it from a commit that already has it, so
+   the key must be rotated too;
+5. with no remote yet: if `gh` is on `PATH` and logged in, offers to create a
+   **private** repository and push to it; otherwise prints the two commands to
+   run by hand.
+
+The remote must be private, and the command says so: `config.yml` holds real
+hostnames and usernames.
+
+| Flag | Meaning |
+| --- | --- |
+| `--yes` | create the private remote and push without asking |
+| `--check` | say what would happen, and write nothing |
+
+Running it again on a directory that is already a repository skips straight to
+the tracked-files check — it never re-writes `.gitignore` or re-runs `git init`.
+
 ## doctor
 
 ```

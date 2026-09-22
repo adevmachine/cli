@@ -61,6 +61,7 @@ func newSetupCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&s.force, "force", false, "overwrite a configuration that already exists")
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"leave password login on (the key is still installed and proved)")
+	c.AddCommand(newSetupGitCmd(opts))
 	return c
 }
 
