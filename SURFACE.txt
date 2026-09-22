@@ -27,6 +27,7 @@ devmachine machines stop
 devmachine mosh
 devmachine packages
 devmachine packages add
+devmachine packages help
 devmachine packages list
 devmachine packages new
 devmachine packages rm

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/spf13/cobra"
 )
@@ -20,8 +22,63 @@ func newPackagesCmd(opts *options) *cobra.Command {
 		newPackagesNewCmd(opts),
 		newPackagesValidateCmd(opts),
 		newPackagesSchemaCmd(opts),
+		newPackagesHelpCmd(opts),
 	)
 	return cmd
+}
+
+func newPackagesHelpCmd(opts *options) *cobra.Command {
+	var asJSON bool
+
+	c := &cobra.Command{
+		Use:   "help <name>",
+		Short: "Ask an installed package what it accepts",
+		Long: "The package is the source of truth about itself: nothing this " +
+			"prints is written in the CLI or in a document somebody has to keep " +
+			"in sync.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+
+			tgt, err := machineTarget(opts)
+			if err != nil {
+				return err
+			}
+			dir, _, err := config.Dir(opts.configDir)
+			if err != nil {
+				return err
+			}
+			client, _, err := dial(cmd.Context(), tgt.machine, "")
+			if err != nil {
+				return err
+			}
+			defer client.Close()
+
+			ext, err := dns.Any(dir, tgt.machine.Name, name, client)
+			if err != nil {
+				return err
+			}
+
+			commands, err := ext.Help(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			if asJSON || opts.format == formatJSON {
+				return writeJSON(cmd.OutOrStdout(), struct {
+					Name     string        `json:"name"`
+					Commands []dns.Command `json:"commands"`
+				}{name, commands})
+			}
+
+			for _, cmdRow := range commands {
+				cmd.Printf("%-16s %s\n", cmdRow.Name, cmdRow.Summary)
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&asJSON, "json", false, "print the answer as JSON")
+	return c
 }
 
 func newPackagesNewCmd(opts *options) *cobra.Command {

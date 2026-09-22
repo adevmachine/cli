@@ -1,13 +1,17 @@
 package commands
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/history"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/spf13/cobra"
@@ -132,15 +136,34 @@ func interactive(opts *options, binary string, args []string) error {
 }
 
 func newRunCmd(opts *options) *cobra.Command {
-	var workspace string
+	var workspace, pkg string
 
 	c := &cobra.Command{
 		Use:   "run <command>",
-		Short: "Run one command and print its output",
+		Short: "Run one command, or reach a package's entrypoint",
 		Long: "Runs as the machine's admin by default, or inside a workspace " +
-			"with --workspace.",
-		Args: cobra.ExactArgs(1),
+			"with --workspace.\n\n" +
+			"--package reaches an installed package's entrypoint instead of a " +
+			"shell command: `devmachine run --package cloudflare -- zones`. " +
+			"This is the generic door onto a machine — it removes the need to " +
+			"know an address, an account, a port or a key, and it does not " +
+			"limit what a shell can do. `commands:` in the package's manifest " +
+			"is what limits, and only for a package that asked to be limited.",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if pkg != "" {
+				return nil
+			}
+			return cobra.ExactArgs(1)(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if pkg != "" {
+				if workspace != "" {
+					return errors.New(
+						"--package and --workspace name two different targets: pass one of them, not both")
+				}
+				return runPackage(cmd, opts, pkg, args)
+			}
+
 			tgt, err := workspaceTarget(opts, workspace)
 			if err != nil {
 				return err
@@ -162,5 +185,45 @@ func newRunCmd(opts *options) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&workspace, "workspace", "", "run inside this workspace instead of as the machine's admin")
+	c.Flags().StringVar(&pkg, "package", "",
+		"reach this package's entrypoint instead of a shell command; the command follows a `--`")
 	return c
+}
+
+// runPackage reaches an installed package's entrypoint directly: the generic
+// door for whatever `dns`, `packages` and the rest have not grown a verb for
+// yet.
+func runPackage(cmd *cobra.Command, opts *options, name string, args []string) error {
+	dashAt := cmd.ArgsLenAtDash()
+	if dashAt < 0 {
+		return fmt.Errorf("say what to run after `--`, for example: devmachine run --package %s -- <command>", name)
+	}
+	pkgArgs := args[dashAt:]
+
+	tgt, err := machineTarget(opts)
+	if err != nil {
+		return err
+	}
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return err
+	}
+	client, _, err := dial(cmd.Context(), tgt.machine, "")
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	ext, err := dns.Any(dir, tgt.machine.Name, name, client)
+	if err != nil {
+		return err
+	}
+
+	var out bytes.Buffer
+	callErr := ext.Call(cmd.Context(), pkgArgs, &out)
+	record(opts, tgt, fmt.Sprintf("run --package %s -- %s", name, strings.Join(pkgArgs, " ")), callErr == nil)
+	if out.Len() > 0 {
+		cmd.Print(out.String())
+	}
+	return callErr
 }

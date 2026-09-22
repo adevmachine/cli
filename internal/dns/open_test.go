@@ -312,3 +312,37 @@ func TestChooseWithNoMachineReachableIsManualAndNotAnError(t *testing.T) {
 		t.Fatalf("got %#v", got)
 	}
 }
+
+func TestAnyBuildsAPackageOfAnyKind(t *testing.T) {
+	dir := configDirWith(t, providerPackage("cloudflare", "dns"))
+
+	got, err := Any(dir, "main", "cloudflare", &recordingClient{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name() != "cloudflare" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestAnyRefusesAPackageWithNoEntrypoint(t *testing.T) {
+	dir := configDirWith(t, plainPackage("docker"))
+
+	_, err := Any(dir, "main", "docker", &recordingClient{})
+	if err == nil {
+		t.Fatal("a package with no entrypoint was called")
+	}
+	if !strings.Contains(err.Error(), "entrypoint") {
+		t.Fatalf("the error does not say why: %v", err)
+	}
+}
+
+func TestAnySaysHowToInstallAPackageThatIsNotThere(t *testing.T) {
+	_, err := Any(configDirWith(t), "main", "cloudflare", &recordingClient{})
+	if err == nil {
+		t.Fatal("a package that is not installed was used")
+	}
+	if !strings.Contains(err.Error(), "devmachine packages add cloudflare") {
+		t.Fatalf("the error does not say how to install it: %v", err)
+	}
+}

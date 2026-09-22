@@ -277,6 +277,7 @@ Both run the system binary, so your terminal, agent and tmux behave normally.
 
 ```
 devmachine run "<command>" [--workspace w]
+devmachine run --package <name> -- <command> [args...]
 ```
 
 Runs one command and prints its output. Without `--workspace` it runs as the
@@ -284,6 +285,16 @@ machine's admin. The exit code is the command's.
 
 The output of a command that failed is printed before the error, because that
 output is usually the explanation.
+
+`--package` reaches an installed package's entrypoint directly, instead of a
+shell command — everything after `--` is what the package receives. This is
+the generic door onto a machine: it removes the need to know an address, an
+account, a port or a key, and it does not limit what a shell can do.
+`commands:` in the package's manifest is what limits, and only for a package
+that asked to be limited — `run --package` refuses anything the manifest does
+not list, and says what it does accept. `--package` and `--workspace` name
+two different targets and cannot be combined. See [how a package declares an
+entrypoint](../concepts/packages.md).
 
 ## dns
 
@@ -418,6 +429,7 @@ devmachine packages rm  <name> [--machine m | --workspace w] [--check] [--yes]
 devmachine packages new <name> [--scope machine|workspace] [--into <dir>]
 devmachine packages validate <dir>
 devmachine packages schema [--json]
+devmachine packages help <name> [--json]
 ```
 
 `list` reads the recipes and the configuration together, so a package appears
@@ -442,6 +454,11 @@ exits 1 when it found any.
 `schema` prints the `package.yml` format this binary reads. It is the answer
 that cannot drift, because the validator is what enforces it. The whole format
 is in [the package format](package-format.md).
+
+`help` asks an installed package what it accepts, by running its own `help`
+and printing the answer — a table by default, the raw shape under `--json`.
+It refuses a package that declares no `entrypoint`: a package that cannot be
+called has nothing to ask.
 
 ## sync
 

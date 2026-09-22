@@ -149,3 +149,36 @@ what that costs.
 It records what is installed, where, and at which version. That is what makes
 two machines reproducible from the same configuration, and what answers "what is
 actually on this machine" without logging in to look.
+
+## A package can declare an entrypoint
+
+A package may add `kind`, `entrypoint` and `commands` to its manifest: an
+executable the CLI can call on the machine, in a shape it understands. `kind:
+dns` is the only kind so far — see [the DNS provider
+contract](../reference/dns-provider-contract.md). `commands` is what that
+entrypoint accepts, a list, or `["*"]` for anything.
+
+`devmachine run --package <name> -- <command>` reaches it directly:
+
+```
+devmachine run --package cloudflare -- zones
+```
+
+This is the generic door onto a machine — it removes the need to know an
+address, an account, a port or a key, and it does not limit what a shell can
+do. `commands:` is what limits, and only for a package that asked to be
+limited: `run --package` refuses anything the manifest does not list.
+
+`devmachine packages help <name>` asks the package what it accepts, by
+running its own `help` and printing what comes back. The package is the
+source of truth about itself — nothing here is written in the CLI or in a
+document somebody has to keep in sync.
+
+Say plainly what this is not: `run` is not a permission system, and an
+entrypoint with `commands: ["*"]` is exactly as capable as a shell on that
+machine. It is a name for a thing that already runs there, not a fence around
+it.
+
+`run --package` is the way out when no verb fits yet. A week of
+`~/.config/devmachine/history.log` is the list of verbs still missing — a
+better backlog than guessing at one.

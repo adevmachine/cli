@@ -91,14 +91,15 @@ func Installed(dir, machine string, client remote.Client) ([]*External, error) {
 	return out, nil
 }
 
-// One builds a single installed provider by name.
+// lookupInstalled finds a single package this machine's lock says is
+// installed, whatever its kind.
 //
 // Unlike Installed, it reports rather than skips: somebody who named a
-// provider wants to know why it did not work, not silence.
-func One(dir, machine, name string, client remote.Client) (*External, error) {
+// package wants to know why it did not work, not silence.
+func lookupInstalled(dir, machine, name string) (packages.Found, error) {
 	lock, err := packages.LoadLock(dir)
 	if err != nil {
-		return nil, err
+		return packages.Found{}, err
 	}
 
 	installed := false
@@ -109,21 +110,42 @@ func One(dir, machine, name string, client remote.Client) (*External, error) {
 		}
 	}
 	if !installed {
-		return nil, fmt.Errorf(
+		return packages.Found{}, fmt.Errorf(
 			"%s is not installed on %s. Add it with `devmachine packages add %s` and apply with `devmachine sync`",
 			name, machine, name)
 	}
 
 	store, err := packages.Open(context.Background(), dir, lock.Release)
 	if err != nil {
-		return nil, err
+		return packages.Found{}, err
 	}
-	found, err := store.Get(name)
+	return store.Get(name)
+}
+
+// One builds a single installed DNS provider by name.
+func One(dir, machine, name string, client remote.Client) (*External, error) {
+	found, err := lookupInstalled(dir, machine, name)
 	if err != nil {
 		return nil, err
 	}
 	if found.Manifest.Kind != KindDNS {
 		return nil, fmt.Errorf("%s is not a DNS provider (kind %q)", name, found.Manifest.Kind)
+	}
+	return buildExternal(found, client)
+}
+
+// Any builds a single installed package's entrypoint, whatever its kind.
+//
+// One refuses anything that is not a DNS provider, which is right for a
+// command that only makes sense against one. `run --package` reaches any
+// package that declares an entrypoint, and this is the door for that.
+func Any(dir, machine, name string, client remote.Client) (*External, error) {
+	found, err := lookupInstalled(dir, machine, name)
+	if err != nil {
+		return nil, err
+	}
+	if found.Manifest.Entrypoint == "" {
+		return nil, fmt.Errorf("%s declares no entrypoint, so there is nothing to call", name)
 	}
 	return buildExternal(found, client)
 }

@@ -323,3 +323,39 @@ func TestRunRecordsAFailureAgainstTheMachineItRanOn(t *testing.T) {
 		}
 	}
 }
+
+func TestRunPackageReachesTheEntrypoint(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `print("hello from the package")`)
+	dialLocal(t, dir)
+
+	out, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--", "zones")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "hello from the package") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestRunRefusesTwoTargets(t *testing.T) {
+	dialing(t, fakeRemote{})
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nworkspaces:\n  - name: alice\n")
+
+	_, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--workspace", "alice", "--", "ls")
+	if err == nil {
+		t.Fatal("two targets were accepted")
+	}
+}
+
+func TestRunPackageRefusesAnUndeclaredCommand(t *testing.T) {
+	dialing(t, fakeRemote{})
+	dir := configDirWithProviderAccepting(t, "cloudflare", []string{"zones", "list"})
+
+	_, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--", "drop-everything")
+	if err == nil {
+		t.Fatal("an undeclared command ran")
+	}
+	if !strings.Contains(err.Error(), "zones, list") {
+		t.Fatalf("the error does not say what it accepts: %v", err)
+	}
+}

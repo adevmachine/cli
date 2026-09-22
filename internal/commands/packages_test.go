@@ -374,3 +374,61 @@ func TestPackagesListMarksAConfiguredPackageThatDoesNotExist(t *testing.T) {
 		t.Fatalf("a configured package nothing provides is not reported:\n%s", out)
 	}
 }
+
+func TestPackagesHelpAsksThePackage(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `
+import json
+print(json.dumps({"commands": [{"name": "zones", "summary": "The zones this token can see."}]}))
+`)
+	dialLocal(t, dir)
+
+	out, err := execute(t, "--config", dir, "packages", "help", "cloudflare")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The package is the source of truth about itself. Nothing here is
+	// written in the CLI or in a document somebody has to keep in sync.
+	if !strings.Contains(out, "The zones this token can see.") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestPackagesHelpOnAPackageThatCannotBeAskedSaysSo(t *testing.T) {
+	dialing(t, fakeRemote{})
+	dir := configDirWithPlainPackage(t, "docker")
+
+	_, err := execute(t, "--config", dir, "packages", "help", "docker")
+	if err == nil {
+		t.Fatal("a machine package answered help")
+	}
+	// A package that declares no entrypoint has nothing to ask.
+	if !strings.Contains(err.Error(), "entrypoint") {
+		t.Fatalf("the error does not say why: %v", err)
+	}
+}
+
+func TestPackagesHelpJSONIsTheStableContract(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `
+import json
+print(json.dumps({"commands": [{"name": "zones", "summary": "x", "args": ""}]}))
+`)
+	dialLocal(t, dir)
+
+	out, err := execute(t, "--config", dir, "packages", "help", "cloudflare", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Name     string `json:"name"`
+		Commands []struct {
+			Name    string `json:"name"`
+			Summary string `json:"summary"`
+		} `json:"commands"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, out)
+	}
+	if got.Name != "cloudflare" || len(got.Commands) != 1 {
+		t.Fatalf("got %#v", got)
+	}
+}
