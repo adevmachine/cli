@@ -150,3 +150,31 @@ func TestEverySchemaFieldExplainsItself(t *testing.T) {
 		}
 	}
 }
+
+func TestSkeletonDNSProviderAnswersZonesAndHelp(t *testing.T) {
+	// The manifest it writes declares five commands. An entrypoint that
+	// refuses two of them makes `devmachine packages help` fail on a package
+	// the CLI itself generated, which is the worst possible first impression.
+	dir := t.TempDir()
+	if err := WriteSkeleton(dir, "example-registrar", ScopeMachine, kindDNS); err != nil {
+		t.Fatal(err)
+	}
+	entry := filepath.Join(dir, "bin", "provider")
+
+	for _, tc := range []struct{ command, key string }{
+		{"zones", "zones"},
+		{"help", "commands"},
+	} {
+		out, err := exec.Command("python3", entry, tc.command).Output()
+		if err != nil {
+			t.Fatalf("%s: %v", tc.command, err)
+		}
+		var answer map[string]any
+		if err := json.Unmarshal(out, &answer); err != nil {
+			t.Fatalf("%s: %v (%s)", tc.command, err, out)
+		}
+		if _, ok := answer[tc.key]; !ok {
+			t.Fatalf("%s answered %s, with no %q", tc.command, out, tc.key)
+		}
+	}
+}

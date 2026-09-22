@@ -96,11 +96,31 @@ def fail(kind, message):
     sys.exit(1)
 
 
+COMMANDS = [
+    {"name": "zones", "summary": "The zones this token can see."},
+    {"name": "list", "summary": "Every record in a zone.", "args": "<zone>"},
+    {"name": "upsert", "summary": "Make a name hold exactly one value.", "args": "<zone>"},
+    {"name": "delete", "summary": "Remove one value from a name.", "args": "<zone>"},
+    {"name": "help", "summary": "This list."},
+]
+
+
 def main(argv):
-    if len(argv) < 3:
-        fail("invalid_record", "usage: provider list|upsert|delete <zone>")
+    if len(argv) < 2:
+        fail("invalid_record", "usage: provider zones|list|upsert|delete|help [<zone>]")
 
     command = argv[1]
+
+    if command == "zones":
+        print(json.dumps({"zones": []}))
+        return
+
+    if command == "help":
+        print(json.dumps({"commands": COMMANDS}))
+        return
+
+    if len(argv) < 3:
+        fail("invalid_record", "usage: provider " + command + " <zone>")
 
     if command == "list":
         print(json.dumps({"records": []}))

@@ -16,9 +16,38 @@ replace the placeholders, rather than writing an entrypoint from nothing.
 ```
 
 `<entrypoint>` is the package's `entrypoint`, for example `bin/provider`. The
-command is `argv[1]`, the zone is `argv[2]`. `zones` and `help` exist too,
-because `devmachine packages validate` requires a `dns` package to accept
-them, but this page does not cover their shape: nothing calls them yet.
+command is `argv[1]`, the zone is `argv[2]`.
+
+`zones` and `help` take no zone:
+
+```
+<entrypoint> zones
+<entrypoint> help
+```
+
+`zones` answers which zones the credential can see. It is how the CLI works
+out which registrar holds a name, so asking it for a zone first would be
+circular, and a provider that cannot answer it can never be chosen.
+
+```json
+{"zones": ["example.com", "example.net"]}
+```
+
+`help` answers what the entrypoint accepts, and is what `devmachine packages
+help <name>` prints. `args` is left out for a command that takes none.
+
+```json
+{"commands": [
+  {"name": "zones",  "summary": "The zones this token can see."},
+  {"name": "list",   "summary": "Every record in a zone.", "args": "<zone>"},
+  {"name": "upsert", "summary": "Make a name hold exactly one value.", "args": "<zone>"},
+  {"name": "delete", "summary": "Remove one value from a name.", "args": "<zone>"},
+  {"name": "help",   "summary": "This list."}
+]}
+```
+
+Both are mandatory. A manifest that lists a command its entrypoint refuses is
+a lie no validator can catch, because only the entrypoint knows.
 
 ## What it receives
 
