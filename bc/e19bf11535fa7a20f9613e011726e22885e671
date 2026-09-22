@@ -1,0 +1,45 @@
+internal/dns/open.go
+  s_cab674f14f5e3f::t_666aaef242e107 94-95,98-99,102,113,120,122-127,137-149,151
+  s_cab674f14f5e3f::t_0033e80bea9d64 150,152
+docs/concepts/packages.md
+  s_cab674f14f5e3f::t_1edb9d4a63416f 152-184
+internal/commands/packages_helpers_test.go
+  s_cab674f14f5e3f::t_a9ecd9755dc5ca 1-140
+  s_cab674f14f5e3f::t_51c65c8cec39ce 141-163
+internal/commands/shell.go
+  s_cab674f14f5e3f::t_cbe84dfc4a4232 4-5,10,14
+  s_cab674f14f5e3f::t_fb608f80c8d7a4 139,143,145-157,159-166,188-189,192-228
+  s_cab674f14f5e3f::t_e324585b9ba531 229
+internal/commands/packages.go
+  s_cab674f14f5e3f::t_e1b027f7aa98ce 7-8,25,30-81
+  s_cab674f14f5e3f::t_ee49c8340b7a44 82-83
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_2e2fb23282a054 280,289-297
+  s_cab674f14f5e3f::t_be32fdd2648fa4 432
+  s_cab674f14f5e3f::t_25beaebe9a9c13 458-462
+  s_cab674f14f5e3f::t_3580571dd2f840 298
+SURFACE.txt
+  s_cab674f14f5e3f::t_31f104494b6bec 30
+internal/commands/packages_test.go
+  s_cab674f14f5e3f::t_5c569222553806 377-434
+internal/commands/shell_test.go
+  s_cab674f14f5e3f::t_0c7c5cdf4f508f 326-361
+internal/dns/open_test.go
+  s_cab674f14f5e3f::t_0760e165fc882a 315-348
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bce19bf11535fa7a20f9613e011726e22885e671",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
