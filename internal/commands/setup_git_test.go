@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 // fakeGhClient stands in for the `gh` binary, so a test proves what the
@@ -336,27 +335,22 @@ func TestSetupGitKeepsTheOperatorsOwnIgnoreRules(t *testing.T) {
 
 func TestSetupGitDoesNotAskWhereNobodyCanAnswer(t *testing.T) {
 	// Always asking is right; blocking on the answer is not. With stdin not a
-	// terminal — a script, CI, a background job — there is nobody to type y,
-	// and a question asked there hangs forever. `--yes` hung exactly like
-	// this the first time this rule was written.
-	dir := configDirWithSecrets(t)
+	// terminal — a script, CI, a background job — nobody can type y, and the
+	// question waits for an answer that never comes. `setup git --yes` hung
+	// exactly like this the first time this rule was written.
 	gh := installFakeGh(t, true)
+	dir := t.TempDir()
+	git(t, dir, "init", "-q", "-b", "main")
 
-	done := make(chan string, 1)
-	go func() {
-		out, _ := execute(t, "--config", dir, "setup", "git", "--yes")
-		done <- out
-	}()
+	out := &bytes.Buffer{}
+	if err := ensureRemote(t.Context(), dir, strings.NewReader("y\n"), out); err != nil {
+		t.Fatal(err)
+	}
 
-	select {
-	case out := <-done:
-		if gh.lastCall("repo", "create") != nil {
-			t.Fatalf("it created a repository with nobody to ask:\n%s", out)
-		}
-		if !strings.Contains(out, "git remote add origin") {
-			t.Fatalf("it did not say how to add a remote by hand:\n%s", out)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("it is waiting for an answer nobody can give")
+	if gh.lastCall("repo", "create") != nil {
+		t.Fatalf("it created a repository with nobody at a terminal:\n%s", out)
+	}
+	if !strings.Contains(out.String(), "git remote add origin") {
+		t.Fatalf("it did not say how to add a remote by hand:\n%s", out)
 	}
 }
