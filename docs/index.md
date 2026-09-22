@@ -28,6 +28,8 @@ as a bought one arrives.
   things every machine gets.
 - [Credentials](concepts/credentials.md) — what a workspace has to be signed in
   to, and which part of that a machine can do for you.
+- [DNS](concepts/dns.md) — zones, records, how a provider is chosen, and why
+  `dns status` asks a different question from `dns list`.
 
 ## How it works
 
@@ -46,6 +48,8 @@ when something behaves in a way that surprises you.
   — the first question everybody asks.
 - [Sharing a login](how-it-works/sharing-a-login.md) — why the CLI generates the
   copying itself, and what happens to a workspace that keeps its own account.
+- [DNS providers](how-it-works/dns-providers.md) — what each shipped provider
+  does, and the mistakes its API design invites.
 - [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
   never logged into becomes one the CLI owns, and why the order matters.
 
