@@ -289,12 +289,19 @@ output is usually the explanation.
 
 ```
 devmachine dns status [host]
+devmachine dns providers
 ```
 
-Checks a name from outside: it resolves, its certificate is accepted, and it
-answers a request. With no host it uses the configured `domain`.
+`status` checks a name from outside: it resolves, its certificate is
+accepted, and it answers a request. With no host it uses the configured
+`domain`. A 4xx counts as serving — the server answered. A 5xx does not.
 
-A 4xx counts as serving — the server answered. A 5xx does not.
+`providers` lists every installed DNS provider and the zones it can see. It
+is the one read that shows the whole picture, and the first thing to run when
+a DNS command did not do what was expected. A provider that cannot be asked
+(a stale token, for example) is reported with its error rather than failing
+the whole command — that is what this command exists to show. With none
+installed, it says to run `devmachine packages list`.
 
 ## secrets
 
