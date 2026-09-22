@@ -1,0 +1,21 @@
+scripts/accept/common.sh
+  s_dffffb0c69bf4d::t_91abe5054f4b37 112-139
+scripts/accept/common_test.sh
+  s_dffffb0c69bf4d::t_04c7955710ebd7 47-56,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b333ca79d3bf1f10af96593c942d05333a81c0d4",
+  "prompts": {},
+  "sessions": {
+    "s_dffffb0c69bf4d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ca11-b286-7812-bf61-1dc57d6d73de",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
