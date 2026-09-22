@@ -1,0 +1,24 @@
+docs/index.md
+  s_cab674f14f5e3f::t_f228e1dc1bd7d7 51-52
+  s_cab674f14f5e3f::t_c559173ca7bfe3 31-32
+docs/concepts/dns.md
+  s_cab674f14f5e3f::t_cef0255166e1f4 1-106
+docs/how-it-works/dns-providers.md
+  s_cab674f14f5e3f::t_a0f9f39c7ed89a 1-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b970fab5def6bc60482dbe297c5a333b0d84a9d6",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
