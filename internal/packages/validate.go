@@ -36,8 +36,22 @@ var aptModule = regexp.MustCompile(`^\s*(-\s*)?(ansible\.builtin\.)?(apt|apt_key
 
 var packageName = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
-// The one contract a package can answer so far, and the commands it owes.
-const kindDNS = "dns"
+// The kinds a package can declare.
+//
+// A kind classifies always, and demands something only where a command
+// consumes it. `dns` is consumed by `devmachine dns`, so it is a contract: a
+// package declaring it answers a fixed set of commands, and needs an
+// entrypoint to answer them with. `vpn` is a label and nothing reads it yet,
+// so requiring an entrypoint would only stop a package saying what it is.
+const (
+	kindDNS = "dns"
+	kindVPN = "vpn"
+)
+
+var knownKinds = []string{kindDNS, kindVPN}
+
+// contractKinds are the kinds a command consumes, so they owe an entrypoint.
+var contractKinds = []string{kindDNS}
 
 var dnsCommands = []string{"zones", "list", "upsert", "delete", "help"}
 
@@ -137,25 +151,26 @@ func Validate(dir string) ([]Problem, error) {
 //
 // A package with no entrypoint is an ordinary role and none of this applies.
 func validateEntrypoint(dir string, m Manifest) []Problem {
-	if m.Entrypoint == "" {
-		if m.Kind != "" || len(m.Commands) > 0 {
-			return []Problem{{File: FileName, Line: m.Lines["kind"],
-				What: "`kind` and `commands` describe an `entrypoint`, and this package declares none"}}
-		}
-		return nil
-	}
-
 	var problems []Problem
 	at := func(field, what string) {
 		problems = append(problems, Problem{File: FileName, Line: m.Lines[field], What: what})
 	}
 
-	// A kind is a contract: everything that declares one answers the same
-	// commands, which is what lets a later `devmachine dns` find a registrar
-	// nobody named.
-	if m.Kind != "" && m.Kind != kindDNS {
-		at("kind", fmt.Sprintf("the only kind so far is %q, got %q", kindDNS, m.Kind))
+	if m.Kind != "" && !slices.Contains(knownKinds, m.Kind) {
+		at("kind", fmt.Sprintf("the kinds are %q and %q, got %q", kindDNS, kindVPN, m.Kind))
 	}
+
+	if m.Entrypoint == "" {
+		if slices.Contains(contractKinds, m.Kind) {
+			at("kind", fmt.Sprintf(
+				"`kind: %s` is a contract answered by an `entrypoint`, and this package declares none", m.Kind))
+		}
+		if len(m.Commands) > 0 {
+			at("commands", "`commands` say what an `entrypoint` accepts, and this package declares none")
+		}
+		return problems
+	}
+
 	switch {
 	case len(m.Commands) == 0:
 		at("commands", `a package with an entrypoint says what it accepts: a list, or ["*"] for anything`)
@@ -214,7 +229,12 @@ func validateCredentials(m Manifest) []Problem {
 
 		switch c.Kind {
 		case KindManual:
-			if c.Scope == ScopeMachine && !c.Shareable {
+			// `scope: machine` asks for one login copied into every
+			// workspace, so the copy has to work. That only applies where
+			// the package reaches a workspace at all: a machine-only
+			// package's credential is read by the machine itself and is
+			// never copied anywhere.
+			if m.Scope == ScopeWorkspace && c.Scope == ScopeMachine && !c.Shareable {
 				at(fmt.Sprintf(
 					"credential %q recommends `scope: machine`, so it needs `shareable: true`: one login "+
 						"copied into every workspace only works where a copy of `stored_at` works", c.Name))

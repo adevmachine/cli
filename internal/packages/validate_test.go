@@ -599,3 +599,57 @@ credentials:
 	// for something it also says is impossible.
 	problemAbout(t, problems, "shareable")
 }
+
+func TestValidateAllowsAKindNoCommandConsumes(t *testing.T) {
+	// A kind classifies always. `vpn` is a label: no command reads it, so
+	// demanding an entrypoint for it would only stop a package saying what
+	// it is.
+	dir := writePackage(t, "tailscale", "format: 1\nname: tailscale\nscope: machine\nkind: vpn\nsummary: x\n")
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: tailscale}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("a kind with no contract is ordinary: %#v", problems)
+	}
+}
+
+func TestValidateRefusesCommandsWithNoEntrypoint(t *testing.T) {
+	dir := writePackage(t, "git", "format: 1\nname: git\nscope: machine\nsummary: x\ncommands: [list]\n")
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: git}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemAbout(t, problems, "declares none")
+}
+
+func TestValidateAllowsAMachineCredentialThatCannotTravelOnAMachinePackage(t *testing.T) {
+	// A tailnet's state names one machine, so a copy of it is worth nothing
+	// anywhere else. The package never reaches a workspace, so nothing is
+	// asking for the copy that `shareable: false` says cannot be made.
+	dir := writePackage(t, "tailscale", `format: 1
+name: tailscale
+scope: machine
+kind: vpn
+summary: x
+credentials:
+  - name: tailscale
+    kind: manual
+    scope: machine
+    command: tailscale up
+    stored_at: /var/lib/tailscale/tailscaled.state
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n- name: x\n  package: {name: tailscale}\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) != 0 {
+		t.Fatalf("a machine's own credential is not shared with anybody: %#v", problems)
+	}
+}
