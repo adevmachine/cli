@@ -200,7 +200,7 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	out.WriteString("---\n" + header)
 	fmt.Fprintf(&out, "- hosts: %s\n  become: true\n", inventoryHost)
 
-	forWorkspaces, err := workspaceTasks(plan)
+	forWorkspaces, err := workspaceTasks(plan, false)
 	if err != nil {
 		return "", err
 	}
@@ -211,7 +211,20 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tasks := machineTasks(plan) + forWorkspaces + shared + extensionTasks(plan)
+	tasks := machineTasks(plan) + forWorkspaces + shared
+	// A package that READS a copied session sees nothing on the run that
+	// delivered it, so a single pass would leave the machine needing another
+	// `sync` — which is the one thing convergence must not do. The packages
+	// are idempotent by contract, so the second pass costs a run that reports
+	// no change except in whatever was waiting for the copy.
+	if shared != "" {
+		again, err := workspaceTasks(plan, true)
+		if err != nil {
+			return "", err
+		}
+		tasks += again
+	}
+	tasks += extensionTasks(plan)
 	if tasks == "" {
 		out.WriteString("  tasks: []\n")
 		return out.String(), nil
@@ -240,7 +253,7 @@ func machineTasks(plan packages.MachinePlan) string {
 // always preceded by what it needs inside every workspace that has it, so the
 // first appearance of a need is never later than the first appearance of the
 // package that needs it.
-func workspaceTasks(plan packages.MachinePlan) (string, error) {
+func workspaceTasks(plan packages.MachinePlan, again bool) (string, error) {
 	var (
 		out   strings.Builder
 		order []string
@@ -261,7 +274,7 @@ func workspaceTasks(plan packages.MachinePlan) (string, error) {
 			return "", err
 		}
 		for _, group := range groups {
-			fmt.Fprintf(&out, "    - name: %s\n", group.title(name))
+			fmt.Fprintf(&out, "    - name: %s\n", group.title(name, again))
 			out.WriteString(includeRole(name))
 			out.WriteString(group.vars)
 			out.WriteString("      loop:\n")
@@ -288,7 +301,10 @@ type group struct {
 	workspaces []packages.Resolved
 }
 
-func (g group) title(pkg string) string {
+func (g group) title(pkg string, again bool) string {
+	if again {
+		return pkg + " again, now that the shared logins are in place"
+	}
 	if g.vars == "" {
 		return pkg + " for each workspace that declares it"
 	}

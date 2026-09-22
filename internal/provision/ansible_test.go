@@ -486,3 +486,41 @@ func TestGenerateKeepsASettingOutOfIncludeRolesOwnOptions(t *testing.T) {
 		t.Fatalf("the setting reached no task's vars:\n%s", playbook)
 	}
 }
+
+func TestGenerateRunsTheWorkspacePackagesAgainAfterTheCopies(t *testing.T) {
+	// The copies come last, because the account and the tool both have to
+	// exist before a session is put where the tool looks for it. A package
+	// that READS the copied session therefore sees nothing on the run that
+	// delivered it, and only picks it up on the next one. `git-key` is the
+	// first such package: without this second pass, `sync` leaves the machine
+	// needing another `sync`, which is the one thing convergence must not do.
+	plan := planSharing(t)
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	playbook := string(files["site.yml"])
+	copies := strings.Index(playbook, "look for the shared")
+	if copies < 0 {
+		t.Fatalf("no copies were generated:\n%s", playbook)
+	}
+	if !strings.Contains(playbook[copies:], "now that the shared logins are in place") {
+		t.Fatalf("the workspace packages do not run again after the copies:\n%s", playbook)
+	}
+}
+
+func TestGenerateDoesNotRunTheWorkspacePackagesTwiceWithNothingToCopy(t *testing.T) {
+	// A machine with no shared login has nothing to pick up, so the second
+	// pass would be time spent proving what the first pass already proved.
+	plan := planWith(t, "main", nil, map[string][]string{"alice": {"claude-code"}})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	includes := strings.Count(string(files["site.yml"]), "        name: claude-code\n")
+	if includes != 1 {
+		t.Fatalf("claude-code is included %d times, want 1", includes)
+	}
+}
