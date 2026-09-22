@@ -104,6 +104,31 @@ your browser's cache or a proxy. A name that works in the browser and not here
 usually means DNS has not propagated everywhere yet, or something local — a VPN,
 a `/etc/hosts` entry — is resolving it for you and not for anyone else.
 
+## `dns add`/`dns rm`/`dns list`/`dns check` fail with one of these
+
+Every provider reports one of a fixed set of `kind`s, and the CLI turns each
+into the same error whichever provider sent it:
+
+| Error | What it means |
+| --- | --- |
+| `zone not found, or the token cannot see it` | The zone does not exist under this provider, or the token cannot see it. |
+| `the token was rejected` | The credential is wrong or expired. Push a fresh one with `devmachine secrets set` and `devmachine credentials push`. |
+| `the token cannot change this zone` | The token can read the zone but not write to it. |
+| `the record was rejected` | The registrar refused the value — a bad type, a bad value, or a name it will not accept. |
+| `rate limited` | The registrar's API is throttling this token. The CLI never retries a rate limit on its own; wait and run the command again. |
+| `this record type is not supported yet` | Only `A`, `AAAA`, `CNAME` and `TXT` carry one value cleanly across every provider. `MX` and `SRV` are refused by name rather than guessed at. |
+| `the name holds several values` | Two installed providers both claim the zone. Say which one with `--dns-provider`. |
+
+Two more that are not errors, but change what a command does:
+
+- **"no installed provider holds this zone"** — none of the providers this
+  machine has installed listed the zone when asked. This is the ordinary
+  state for a registrar with no package yet: the command falls back to
+  `manual` and prints the record to create by hand.
+- **"the provider failed"**, with what looks like a traceback — this means a
+  bug in the provider package itself, not in the CLI. The package answered
+  something that is not the JSON the [DNS provider
+  contract](reference/dns-provider-contract.md) requires.
 
 ## A sync cannot fetch the release
 

@@ -7,9 +7,11 @@ devmachine credentials
 devmachine credentials list
 devmachine credentials push
 devmachine dns
+devmachine dns add
 devmachine dns check
 devmachine dns list
 devmachine dns providers
+devmachine dns rm
 devmachine dns status
 devmachine doctor
 devmachine help

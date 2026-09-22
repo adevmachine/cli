@@ -29,6 +29,8 @@ func newDNSCmd(opts *options) *cobra.Command {
 	cmd.AddCommand(newDNSProvidersCmd(opts))
 	cmd.AddCommand(newDNSListCmd(opts, &providerFlag, &zoneFlag))
 	cmd.AddCommand(newDNSCheckCmd(opts, &providerFlag, &zoneFlag))
+	cmd.AddCommand(newDNSAddCmd(opts, &providerFlag, &zoneFlag))
+	cmd.AddCommand(newDNSRmCmd(opts, &providerFlag, &zoneFlag))
 	return cmd
 }
 
@@ -325,4 +327,163 @@ func newDNSCheckCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Comman
 			return nil
 		},
 	}
+}
+
+// describeUpsert says what `dns add` would do: the label, the zone, the
+// provider and whatever value is about to be replaced. Naming what is lost is
+// the last chance to catch the record going into the wrong account.
+func describeUpsert(ctx context.Context, choice dns.Choice, rec dns.Record) string {
+	replacing := ""
+	if existing, err := choice.Provider.List(ctx, choice.Zone); err == nil {
+		var values []string
+		for _, r := range existing {
+			if r.Name == rec.Name && r.Type == rec.Type && r.Value != rec.Value {
+				values = append(values, r.Value)
+			}
+		}
+		if len(values) > 0 {
+			replacing = fmt.Sprintf(", replacing %s", strings.Join(values, ", "))
+		}
+	}
+	return fmt.Sprintf("set %s %s %s in %s (provider %s)%s",
+		rec.Name, rec.Type, rec.Value, choice.Zone, choice.Name, replacing)
+}
+
+func newDNSAddCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Command {
+	var check, yes bool
+
+	c := &cobra.Command{
+		Use:   "add <name> <type> <value>",
+		Short: "Make a name hold exactly this one value",
+		Long: "upsert replaces whatever is already at this name and type — it " +
+			"does not add to it. The question names the zone, the provider and " +
+			"whatever value it is about to replace, because writing the right " +
+			"record into the wrong account is the mistake this command can make.",
+		Args: cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name, typ, value := args[0], args[1], args[2]
+
+			normalised, err := dns.SupportedType(typ)
+			if err != nil {
+				return err
+			}
+
+			choice, tgt, err := chooseDNS(cmd.Context(), opts, name, *providerFlag, *zoneFlag, cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
+			announce(cmd.ErrOrStderr(), choice)
+
+			rec := dns.Record{Name: labelFor(name, choice.Zone), Type: normalised, Value: value}
+			line := describeUpsert(cmd.Context(), choice, rec)
+
+			if check {
+				cmd.Printf("would %s\n", line)
+				return nil
+			}
+			if !yes {
+				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Really "+line+"?")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errDeclined
+				}
+			}
+
+			logged := fmt.Sprintf("dns add %s %s %s", name, normalised, value)
+			if err := choice.Provider.Upsert(cmd.Context(), choice.Zone, rec); err != nil {
+				record(opts, tgt, logged, false)
+				return err
+			}
+			record(opts, tgt, logged, true)
+			cmd.Printf("%s\n", line)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&check, "check", false, "say what would change, and change nothing")
+	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
+	return c
+}
+
+func valueOrEveryValue(v string) string {
+	if v == "" {
+		return "every value"
+	}
+	return v
+}
+
+func newDNSRmCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Command {
+	var check, yes bool
+
+	c := &cobra.Command{
+		Use:   "rm <name> <type> [value]",
+		Short: "Remove a value, or every value, at a name and type",
+		Long: "With a value, only that one is removed and the rest of the " +
+			"name's values are left in place — that path is not atomic on every " +
+			"registrar, and the command says so when more than one value is there.",
+		Args: cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name, typ := args[0], args[1]
+			value := ""
+			if len(args) == 3 {
+				value = args[2]
+			}
+
+			normalised, err := dns.SupportedType(typ)
+			if err != nil {
+				return err
+			}
+
+			choice, tgt, err := chooseDNS(cmd.Context(), opts, name, *providerFlag, *zoneFlag, cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
+			announce(cmd.ErrOrStderr(), choice)
+
+			rec := dns.Record{Name: labelFor(name, choice.Zone), Type: normalised, Value: value}
+
+			if existing, listErr := choice.Provider.List(cmd.Context(), choice.Zone); listErr == nil {
+				count := 0
+				for _, r := range existing {
+					if r.Name == rec.Name && r.Type == rec.Type {
+						count++
+					}
+				}
+				if count > 1 {
+					cmd.Printf("%s holds %d values; removing one at a time is not atomic on every registrar.\n",
+						name, count)
+				}
+			}
+
+			line := fmt.Sprintf("remove %s %s %s from %s (provider %s)",
+				rec.Name, rec.Type, valueOrEveryValue(value), choice.Zone, choice.Name)
+
+			if check {
+				cmd.Printf("would %s\n", line)
+				return nil
+			}
+			if !yes {
+				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Really "+line+"?")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errDeclined
+				}
+			}
+
+			logged := fmt.Sprintf("dns rm %s %s %s", name, normalised, value)
+			if err := choice.Provider.Delete(cmd.Context(), choice.Zone, rec); err != nil {
+				record(opts, tgt, logged, false)
+				return err
+			}
+			record(opts, tgt, logged, true)
+			cmd.Printf("%s\n", line)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&check, "check", false, "say what would change, and change nothing")
+	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
+	return c
 }

@@ -145,6 +145,16 @@ func stubChoose(provider, zone string, p dns.Provider) func() {
 	return func() { chooseDNS = orig }
 }
 
+// stubChooseError replaces chooseDNS with one that always fails, for a
+// command that has to stop before touching a provider.
+func stubChooseError(err error) func() {
+	orig := chooseDNS
+	chooseDNS = func(context.Context, *options, string, string, string, io.Writer) (dns.Choice, target, error) {
+		return dns.Choice{}, target{}, err
+	}
+	return func() { chooseDNS = orig }
+}
+
 func TestDNSListPrintsARecordPerLine(t *testing.T) {
 	defer stubChoose("hostinger", "example.com", &fake{records: []dns.Record{
 		{Name: "www", Type: "A", Value: "198.51.100.10", TTL: 3600},
@@ -233,5 +243,139 @@ func TestDNSCheckExitsNonZeroWhenItIsNotPointed(t *testing.T) {
 	// readable from the exit code, not only from the words.
 	if _, err := execute(t, "--config", configDir(t), "dns", "check", "app.client.example.net"); err == nil {
 		t.Fatal("a name that is not pointed exited 0")
+	}
+}
+
+func TestDNSAddWritesNothingUnderCheck(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	out, err := execute(t, "--config", configDir(t),
+		"dns", "add", "www.example.com", "A", "198.51.100.10", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.upserts != 0 {
+		t.Fatalf("--check wrote %d record(s)", p.upserts)
+	}
+	if !strings.Contains(out, "would") {
+		t.Fatalf("a dry run must say what it would do: %q", out)
+	}
+}
+
+func TestDNSAddNamesTheZoneAndProviderInTheQuestion(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("cloudflare", "client.example.net", p)()
+
+	out, _ := executeWithInput(t, "n\n", "--config", configDir(t),
+		"dns", "add", "app.client.example.net", "A", "198.51.100.10")
+
+	// Writing the right record into the wrong account is the mistake this
+	// command can make. The question is the last place to catch it.
+	for _, want := range []string{"client.example.net", "cloudflare"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("the question leaves out %q: %q", want, out)
+		}
+	}
+	if p.upserts != 0 {
+		t.Fatal("it wrote after a refusal")
+	}
+}
+
+func TestDNSAddSendsTheLabelNotTheFullName(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("cloudflare", "client.example.net", p)()
+
+	if _, err := execute(t, "--config", configDir(t),
+		"dns", "add", "app.client.example.net", "A", "198.51.100.10", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	// The provider's model is a label plus a zone. Sending the full name
+	// would create app.client.example.net.client.example.net.
+	if p.lastRecord.Name != "app" {
+		t.Fatalf("wrote name %q, want %q", p.lastRecord.Name, "app")
+	}
+	if p.lastZone != "client.example.net" {
+		t.Fatalf("wrote into zone %q", p.lastZone)
+	}
+}
+
+func TestDNSAddWritesTheApexAsAtSign(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	if _, err := execute(t, "--config", configDir(t),
+		"dns", "add", "example.com", "A", "198.51.100.10", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if p.lastRecord.Name != "@" {
+		t.Fatalf("wrote name %q, want %q", p.lastRecord.Name, "@")
+	}
+}
+
+func TestDNSAddRefusesAnUnsupportedTypeBeforeChoosing(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	_, err := execute(t, "--config", configDir(t),
+		"dns", "add", "example.com", "MX", "10 mail.example.com", "--yes")
+	if !errors.Is(err, dns.ErrUnsupportedType) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestDNSAddStopsWhenTwoProvidersClaimTheZone(t *testing.T) {
+	defer stubChooseError(fmt.Errorf("%w: example.com is held by hostinger and cloudflare. Say which with --dns-provider",
+		dns.ErrAmbiguous))()
+
+	_, err := execute(t, "--config", configDir(t),
+		"dns", "add", "www.example.com", "A", "198.51.100.10", "--yes")
+	if !errors.Is(err, dns.ErrAmbiguous) {
+		t.Fatalf("got %v", err)
+	}
+	if !strings.Contains(err.Error(), "--dns-provider") {
+		t.Fatalf("the error does not say how to resolve it: %v", err)
+	}
+}
+
+func TestDNSRmWarnsBeforeTouchingANameWithSeveralValues(t *testing.T) {
+	defer stubChoose("hostinger", "example.com", &fake{records: []dns.Record{
+		{Name: "www", Type: "A", Value: "198.51.100.10"},
+		{Name: "www", Type: "A", Value: "198.51.100.11"},
+	}})()
+
+	out, err := execute(t, "--config", configDir(t),
+		"dns", "rm", "www.example.com", "A", "198.51.100.10", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "not atomic") {
+		t.Fatalf("no warning about the non-atomic path: %q", out)
+	}
+}
+
+func TestDNSRmRemovesExactlyTheValueGiven(t *testing.T) {
+	p := &fake{records: []dns.Record{{Name: "www", Type: "A", Value: "198.51.100.10"}}}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	if _, err := execute(t, "--config", configDir(t),
+		"dns", "rm", "www.example.com", "A", "198.51.100.10", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if p.lastRecord.Value != "198.51.100.10" || p.lastZone != "example.com" {
+		t.Fatalf("got %#v in %q", p.lastRecord, p.lastZone)
+	}
+}
+
+func TestDNSRmWithNoValueRemovesTheWholeSet(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	if _, err := execute(t, "--config", configDir(t),
+		"dns", "rm", "www.example.com", "A", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if p.lastRecord.Value != "" {
+		t.Fatalf("got %#v", p.lastRecord)
 	}
 }

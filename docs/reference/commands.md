@@ -292,6 +292,8 @@ devmachine dns status [host]
 devmachine dns providers
 devmachine dns list [zone] [--dns-provider p] [--zone z]
 devmachine dns check <name> [--dns-provider p] [--zone z]
+devmachine dns add <name> <type> <value> [--dns-provider p] [--zone z] [--check] [--yes]
+devmachine dns rm  <name> <type> [value] [--dns-provider p] [--zone z] [--check] [--yes]
 ```
 
 `status` checks a name from outside: it resolves, its certificate is
@@ -320,6 +322,19 @@ unable to tell where the label ends and the zone begins.
 
 Which provider answered, and why, is printed to stderr on every one of these
 — stdout is the data, and which provider was asked is diagnostics.
+
+`add` makes a name hold **exactly** one value: `upsert` replaces whatever was
+already there for that name and type, it does not add to it. Before writing,
+the confirmation names the zone, the provider and whatever value it is about
+to replace — writing the right record into the wrong account is the mistake
+this command can make, and that is the last chance to catch it. `--check`
+prints what would change and writes nothing; `--yes` skips the question.
+
+`rm` removes one value, or with none given, every value at that name and
+type. Removing one value out of several is not atomic on every registrar, and
+the command warns before doing it. A name is always the full name (`www.example.com`,
+or the zone itself for the apex) — the CLI turns it into the label the
+provider expects.
 
 ## secrets
 
