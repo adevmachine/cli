@@ -109,7 +109,34 @@ destroy_accept_vm() {
     echo "DEVMACHINE_ACCEPT_BIN must name an executable local CLI" >&2
     return 1
   fi
-  "$DEVMACHINE_ACCEPT_BIN" machines delete-local --yes "$accept_vm"
+  accept_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd) || {
+    echo "cannot determine the acceptance repository root" >&2
+    return 1
+  }
+  case "$DEVMACHINE_ACCEPT_BIN" in
+    /*) ;;
+    *)
+      echo "DEVMACHINE_ACCEPT_BIN must be an absolute repository-local path" >&2
+      return 1
+      ;;
+  esac
+  accept_bin_dir=$(cd "$(dirname "$DEVMACHINE_ACCEPT_BIN")" 2>/dev/null && pwd) || {
+    echo "cannot resolve DEVMACHINE_ACCEPT_BIN" >&2
+    return 1
+  }
+  accept_bin="$accept_bin_dir/$(basename "$DEVMACHINE_ACCEPT_BIN")"
+  case "$accept_bin" in
+    "$accept_root"/*) ;;
+    *)
+      echo "DEVMACHINE_ACCEPT_BIN must be inside the acceptance repository" >&2
+      return 1
+      ;;
+  esac
+  if [ ! -f "$accept_bin" ] || [ ! -x "$accept_bin" ] || [ -L "$accept_bin" ]; then
+    echo "DEVMACHINE_ACCEPT_BIN must be a regular executable in the repository" >&2
+    return 1
+  fi
+  "$accept_bin" machines delete-local --yes "$accept_vm"
 }
 
 accept_reset

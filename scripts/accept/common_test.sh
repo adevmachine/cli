@@ -44,9 +44,19 @@ if DEVMACHINE_ACCEPT_BIN= DEVMACHINE_BIN= PATH="$cleanup_test_dir:$PATH" KEEP_AC
 fi
 [ ! -f "$cleanup_marker" ]
 
-DEVMACHINE_ACCEPT_BIN="$cleanup_test_dir/devmachine" KEEP_ACCEPT_VM=0 \
+if DEVMACHINE_ACCEPT_BIN="$cleanup_test_dir/devmachine" KEEP_ACCEPT_VM=0 \
+    destroy_accept_vm "devmachine-accept-test" >/dev/null 2>&1; then
+  echo "cleanup accepted an executable outside the repository" >&2
+  exit 1
+fi
+
+local_cleanup_bin="$ROOT/scripts/accept/.accept-test-bin"
+cp "$cleanup_test_dir/devmachine" "$local_cleanup_bin"
+chmod +x "$local_cleanup_bin"
+DEVMACHINE_ACCEPT_BIN="$local_cleanup_bin" KEEP_ACCEPT_VM=0 \
   destroy_accept_vm "devmachine-accept-test" >/dev/null 2>&1
 [ -f "$cleanup_marker" ]
+rm -f "$local_cleanup_bin"
 rm -rf "$cleanup_test_dir"
 
 require_accept_vm "devmachine-accept-123-v05"
