@@ -387,6 +387,36 @@ the command warns before doing it. A name is always the full name (`www.example.
 or the zone itself for the apex) — the CLI turns it into the label the
 provider expects.
 
+## expose
+
+**HTTPS only.** Caddy terminates TLS for HTTP; proxying raw TCP or UDP needs
+a plugin and a custom build — the same maintenance cost this project already
+refused for wildcard certificates.
+
+```
+devmachine expose add <workspace> <port> --host <host> [--check] [--yes]
+devmachine expose list
+devmachine expose rm <host> [--check] [--yes]
+```
+
+`add` writes a Caddy block through the `sites.d` extension point the `caddy`
+package declares — never a path this CLI guesses itself. **If `caddy` is not
+on the machine, it refuses and names it**, rather than inventing
+`/etc/caddy/sites.d` and writing there anyway.
+
+Before writing anything, it asks — and the question says whatever is behind
+the port becomes reachable by anybody who learns the hostname. That sentence
+is the point of the command, not decoration: a database studio holding data
+restored from production, a captured-mail inbox showing mail addressed to
+real customers, a queue dashboard that can drain a queue — all three speak
+HTTP, none has its own authentication, and publishing one by habit is how it
+reaches the internet. `--yes` skips the question; `--check` prints what would
+happen and writes nothing.
+
+`list` reads `sites.d` on the machine and prints every host, its port and the
+workspace it belongs to. `rm` removes one site's file and reloads Caddy,
+leaving every other site untouched.
+
 ## secrets
 
 ```

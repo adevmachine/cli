@@ -14,6 +14,10 @@ devmachine dns providers
 devmachine dns rm
 devmachine dns status
 devmachine doctor
+devmachine expose
+devmachine expose add
+devmachine expose list
+devmachine expose rm
 devmachine help
 devmachine login
 devmachine machines
