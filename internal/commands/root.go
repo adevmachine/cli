@@ -71,6 +71,7 @@ func NewRootCmd() *cobra.Command {
 		newSecretsCmd(opts),
 		newDNSCmd(opts),
 		newExposeCmd(opts),
+		newTunnelCmd(opts),
 		newHelpJSONCmd(opts),
 		newDoctorCmd(opts),
 		newStatsCmd(opts),

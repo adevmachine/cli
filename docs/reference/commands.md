@@ -391,7 +391,8 @@ provider expects.
 
 **HTTPS only.** Caddy terminates TLS for HTTP; proxying raw TCP or UDP needs
 a plugin and a custom build — the same maintenance cost this project already
-refused for wildcard certificates.
+refused for wildcard certificates. Anything that is not plain HTTP, or that
+only you should reach, is [`devmachine tunnel`](#tunnel), not `expose`.
 
 ```
 devmachine expose add <workspace> <port> --host <host> [--check] [--yes]
@@ -423,6 +424,34 @@ here rather than left for `dns add` to be remembered separately.
 `list` reads `sites.d` on the machine and prints every host, its port and the
 workspace it belongs to. `rm` removes one site's file and reloads Caddy,
 leaving every other site untouched.
+
+## tunnel
+
+```
+devmachine tunnel <workspace> <port> [--local <port>]
+```
+
+Opens an SSH tunnel so a remote port appears as `localhost:<port>` on this
+computer. **Nothing is published**: no DNS record, no certificate, no Caddy,
+and the encryption is SSH's own.
+
+Three real cases this is for, not `expose`: a database studio holding data
+restored from production, a captured-mail inbox showing mail addressed to
+real customers, a queue dashboard that can drain a queue. All three speak
+HTTP. All three have no authentication of their own. All three are `tunnel`.
+
+| | Anyone | Only you |
+| --- | --- | --- |
+| **HTTP** | `expose` | `tunnel` |
+| **Anything else** | nothing | `tunnel` |
+
+`--local` picks the port on this computer, when the remote port is already
+taken here — a busy port is reported by name, with `--local` offered as the
+way out, rather than a bind error nobody reads.
+
+The command holds the terminal while the tunnel is open. Closing it (Ctrl-C)
+closes the tunnel: there is no state to clean up afterwards and nothing to
+forget about.
 
 ## secrets
 

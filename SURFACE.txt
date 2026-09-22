@@ -48,6 +48,7 @@ devmachine setup git
 devmachine ssh
 devmachine stats
 devmachine sync
+devmachine tunnel
 devmachine version
 devmachine workspaces
 devmachine workspaces edit
