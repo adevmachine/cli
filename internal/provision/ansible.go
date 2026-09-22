@@ -386,6 +386,16 @@ func includeRole(name string) string {
 		name, name)
 }
 
+// RolePath names a file inside a package, on the machine.
+//
+// It is exported because the CLI reaches into a package from outside this
+// package — a DNS provider's entrypoint, a credential's helper — and the
+// overlay rule that picks roles.local over roles must have exactly one
+// implementation. Two would be one rule nobody remembers to change twice.
+func RolePath(source, name string, rest ...string) string {
+	return path.Join(append([]string{RemoteDir, rolesDir(source), name}, rest...)...)
+}
+
 // rolesDir is where a package is unpacked, which is what decides whether the
 // operator's copy or the published one runs.
 func rolesDir(source string) string {

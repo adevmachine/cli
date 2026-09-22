@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/packages"
 	"gopkg.in/yaml.v3"
 )
 
@@ -522,5 +523,17 @@ func TestGenerateDoesNotRunTheWorkspacePackagesTwiceWithNothingToCopy(t *testing
 	includes := strings.Count(string(files["site.yml"]), "        name: claude-code\n")
 	if includes != 1 {
 		t.Fatalf("claude-code is included %d times, want 1", includes)
+	}
+}
+
+func TestRolePathFollowsTheOverlay(t *testing.T) {
+	// Anything that needs to name a file inside a package on the machine has
+	// to agree with roles_path. A second copy of this rule, in another
+	// package, is a rule that has to be changed in two places and will not be.
+	if got := RolePath(packages.SourceLocal, "hostinger", "bin/provider"); got != "/opt/devmachine/roles.local/hostinger/bin/provider" {
+		t.Fatalf("got %q", got)
+	}
+	if got := RolePath(packages.SourceRelease, "hostinger", "bin/provider"); got != "/opt/devmachine/roles/hostinger/bin/provider" {
+		t.Fatalf("got %q", got)
 	}
 }

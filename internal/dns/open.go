@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
 
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 )
 
@@ -16,24 +16,6 @@ const KindDNS = "dns"
 
 // ProviderManual is Manual's name, and what `--dns-provider manual` asks for.
 const ProviderManual = "manual"
-
-// remoteDir and the two roles directories mirror internal/provision's
-// roles_path convention: the operator's own copy of a package is unpacked
-// into roles.local and wins there, exactly as ansible's roles_path search
-// order says. Getting either name wrong here gives "no such file" on a
-// provider `packages list` shows as installed.
-const (
-	remoteDir       = "/opt/devmachine"
-	rolesReleaseDir = "roles"
-	rolesLocalDir   = "roles.local"
-)
-
-func rolesDirFor(source string) string {
-	if source == packages.SourceLocal {
-		return rolesLocalDir
-	}
-	return rolesReleaseDir
-}
 
 // buildExternal wraps a found DNS package as a Provider, sourced from the
 // credential it declares.
@@ -52,7 +34,7 @@ func buildExternal(found packages.Found, client remote.Client) (*External, error
 			"the %s package declares no credential, so there is nothing to source before it runs", m.Name)
 	}
 
-	entrypoint := path.Join(remoteDir, rolesDirFor(found.Source), m.Name, m.Entrypoint)
+	entrypoint := provision.RolePath(found.Source, m.Name, m.Entrypoint)
 	return NewExternal(m.Name, client, entrypoint, credential, m.Commands), nil
 }
 
