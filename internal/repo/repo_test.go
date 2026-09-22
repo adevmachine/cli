@@ -155,3 +155,23 @@ func TestTrackedListsWhatGitFollows(t *testing.T) {
 		t.Fatalf("got %#v, want %#v", got, want)
 	}
 }
+
+func TestCommitUnstagesWhatItRefused(t *testing.T) {
+	// `git add -A` staged it before the guard looked. Refusing the commit and
+	// leaving it staged protects this commit and arms the operator's next
+	// one: they type `git commit`, and the key goes in.
+	git := fakeGit(t, map[string]string{
+		"diff --cached --name-only": "config.yml\nkeys/id_ed25519\n",
+	})
+
+	if err := Commit(t.Context(), git.dir, "chore: something"); err == nil {
+		t.Fatal("it committed a private key")
+	}
+
+	if git.lastCall("reset") == nil {
+		t.Fatalf("nothing was unstaged: %#v", git.calls)
+	}
+	if !slices.Contains(git.lastCall("reset"), "keys/id_ed25519") {
+		t.Fatalf("the key is still staged: %#v", git.lastCall("reset"))
+	}
+}

@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// ignoreHeading explains why the file exists, so a later reader does not
+// IgnoreHeading explains why the file exists, so a later reader does not
 // mistake it for something to prune.
-const ignoreHeading = "# Written by `devmachine setup git`. Everything here is a private key, a\n" +
+const IgnoreHeading = "# Written by `devmachine setup git`. Everything here is a private key, a\n" +
 	"# secret, or a record of which host was touched. None of it belongs in a\n" +
 	"# repository, not even a private one.\n"
 
@@ -20,7 +20,7 @@ func Ignored() []string {
 // GitIgnore renders the file.
 func GitIgnore() string {
 	var b strings.Builder
-	b.WriteString(ignoreHeading)
+	b.WriteString(IgnoreHeading)
 	for _, p := range Ignored() {
 		b.WriteString(p)
 		b.WriteString("\n")

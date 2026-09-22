@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -84,4 +85,23 @@ func initedRepo(t *testing.T) string {
 		}
 	}
 	return dir
+}
+
+func TestAutoCommitSaysSoWhenTheGuardRefused(t *testing.T) {
+	// It never fails the command that called it — a workspace that exists on
+	// the machine and not in the history is a nuisance, and a `workspaces new`
+	// that fails after creating the account is worse. But a refusal is not a
+	// quiet condition: it means the directory holds something that must never
+	// be committed, and a line in history.log is not where anybody looks.
+	git := fakeGit(t, map[string]string{
+		"diff --cached --name-only": "config.yml\nkeys/id_ed25519\n",
+		"rev-parse --git-dir":       ".git\n",
+	})
+	var stderr bytes.Buffer
+
+	AutoCommitTo(t.Context(), git.dir, "chore(config): add workspace alice", &stderr)
+
+	if !strings.Contains(stderr.String(), "keys/id_ed25519") {
+		t.Fatalf("the refusal was silent: %q", stderr.String())
+	}
 }

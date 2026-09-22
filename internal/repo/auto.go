@@ -2,6 +2,9 @@ package repo
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/adevmachine/cli/internal/history"
@@ -17,10 +20,19 @@ import (
 // history.log instead, which already exists to say what ran and whether it
 // worked.
 func AutoCommit(ctx context.Context, dir, message string) {
+	AutoCommitTo(ctx, dir, message, os.Stderr)
+}
+
+// AutoCommitTo is AutoCommit with somewhere to complain to.
+//
+// A refusal is not a quiet condition: it means the directory holds something
+// that must never be committed, and history.log is not where anybody looks.
+func AutoCommitTo(ctx context.Context, dir, message string, warn io.Writer) {
 	if !IsRepo(dir) {
 		return
 	}
 	if err := Commit(ctx, dir, message); err != nil {
+		fmt.Fprintf(warn, "the configuration was not committed: %v\n", err)
 		history.Append(dir, history.Entry{
 			At:      time.Now(),
 			Target:  "git",

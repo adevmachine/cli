@@ -7,7 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+
+	"golang.org/x/term"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/repo"
@@ -79,17 +82,27 @@ func newSetupGitCmd(opts *options) *cobra.Command {
 // after, there is a window where `git add -A` picks up a private key, and
 // removing it from a history afterwards is work most people do badly.
 func runSetupGit(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupGitOptions) error {
-	if !repo.IsRepo(dir) {
-		if opts.check {
+	fresh := !repo.IsRepo(dir)
+	if opts.check {
+		if fresh {
 			fmt.Fprintf(out, "would write %s and start a git repository in %s\n",
 				filepath.Join(dir, ".gitignore"), dir)
-			return nil
+		} else {
+			fmt.Fprintf(out, "would make sure %s covers every path that must never be committed\n",
+				filepath.Join(dir, ".gitignore"))
 		}
+		return nil
+	}
 
-		ignorePath := filepath.Join(dir, ".gitignore")
-		if err := os.WriteFile(ignorePath, []byte(repo.GitIgnore()), 0o644); err != nil {
-			return fmt.Errorf("writing %s: %w", ignorePath, err)
-		}
+	// Before `git init`, and before anything is staged — but also on a
+	// directory that has been a repository for months, which is the case the
+	// operator's own configuration is in. Skipping it there leaves the CLI
+	// writing keys/ and secrets.json into a tree that tracks everything.
+	if err := ensureIgnoreFile(dir); err != nil {
+		return err
+	}
+
+	if fresh {
 		if err := repo.Init(ctx, dir); err != nil {
 			return err
 		}
@@ -114,17 +127,13 @@ func runSetupGit(ctx context.Context, dir string, in io.Reader, out io.Writer, o
 
 	fmt.Fprintf(out, "\nThe remote for %s must be private: it holds real hostnames and usernames.\n", dir)
 
-	if opts.check {
-		return nil
-	}
-
-	return ensureRemote(ctx, dir, in, out, opts.yes)
+	return ensureRemote(ctx, dir, in, out)
 }
 
 // ensureRemote offers a private remote when there is none yet. It never turns
 // an existing remote into a push: that decision belongs to a person who typed
 // `git push`, not to a passing `setup git`.
-func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer, yes bool) error {
+func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer) error {
 	remote, err := repo.HasRemote(ctx, dir)
 	if err != nil {
 		return err
@@ -144,15 +153,24 @@ func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer, 
 		return nil
 	}
 
-	if !yes {
-		ok, err := confirm(in, out, "Create a private repository with `gh` and push this configuration to it?")
-		if err != nil {
-			return err
-		}
-		if !ok {
-			printManualRemoteInstructions(out)
-			return nil
-		}
+	// Always asks, `--yes` or not. That flag means "do not ask me about the
+	// writes in this directory"; it has never meant "publish". Creating a
+	// repository on somebody's account is not the same class of action as
+	// writing a local file, and one flag covering both is how a repository
+	// gets created by a script nobody was watching.
+	//
+	// Where there is no terminal there is nobody to answer, and a question
+	// asked there waits for an answer that never comes — `setup git --yes`
+	// in a script hung exactly like that. The commands are printed instead.
+	if !fromATerminal(in) {
+		printManualRemoteInstructions(out)
+		return nil
+	}
+
+	ok, err := confirm(in, out, "Create a private repository with `gh` and push this configuration to it?")
+	if err != nil || !ok {
+		printManualRemoteInstructions(out)
+		return nil //nolint:nilerr // no answer is a no, not a failure
 	}
 
 	if _, err := runGh(ctx, dir, "repo", "create", "--private", "--source", ".", "--remote", "origin", "--push"); err != nil {
@@ -166,4 +184,46 @@ func printManualRemoteInstructions(out io.Writer) {
 	fmt.Fprintf(out, "\nCreate a private repository yourself, then run:\n")
 	fmt.Fprintf(out, "  git remote add origin <url-of-a-private-repository>\n")
 	fmt.Fprintf(out, "  git -C . push -u origin main\n")
+}
+
+// ensureIgnoreFile makes sure .gitignore covers every path that must never be
+// committed, adding only what is missing: a rule somebody else wrote is not
+// ours to drop.
+func ensureIgnoreFile(dir string) error {
+	path := filepath.Join(dir, ".gitignore")
+	body, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(path, []byte(repo.GitIgnore()), 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", path, err)
+		}
+		return nil
+	}
+
+	have := strings.Split(string(body), "\n")
+	var missing []string
+	for _, rule := range repo.Ignored() {
+		if !slices.Contains(have, rule) {
+			missing = append(missing, rule)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	out := strings.TrimRight(string(body), "\n") + "\n\n" + repo.IgnoreHeading +
+		strings.Join(missing, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	return nil
+}
+
+// fromATerminal says whether somebody is there to answer a question. It is a
+// variable so a test can stand in for a terminal it cannot have.
+var fromATerminal = func(in io.Reader) bool {
+	f, ok := in.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
 }

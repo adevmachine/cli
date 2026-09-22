@@ -3,12 +3,14 @@ package commands
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeGhClient stands in for the `gh` binary, so a test proves what the
@@ -192,7 +194,11 @@ func TestSetupGitCreatesAPrivateRepository(t *testing.T) {
 	dir := configDirWithSecrets(t)
 	gh := installFakeGh(t, true)
 
-	if _, err := execute(t, "--config", dir, "setup", "git", "--yes"); err != nil {
+	// Answered, not assumed: creating a repository always asks, so the yes
+	// has to come from a person at a terminal.
+	t.Cleanup(swap(&fromATerminal, func(io.Reader) bool { return true }))
+
+	if _, err := executeWithInput(t, "y\n", "--config", dir, "setup", "git"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -261,5 +267,96 @@ func TestSetupGitSkipsInitWhenAlreadyARepository(t *testing.T) {
 	// recreate .gitignore from scratch.
 	if _, err := execute(t, "--config", dir, "setup", "git", "--yes"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSetupGitNeverCreatesARepositoryUnderYes(t *testing.T) {
+	// --yes means "do not ask me about the writes in this directory". It has
+	// never meant "publish". Creating a repository on somebody's account is
+	// not the same class of action as writing a local file, and one flag
+	// covering both is how a repository gets created by a script nobody was
+	// watching.
+	dir := configDirWithSecrets(t)
+	gh := installFakeGh(t, true)
+
+	out, err := execute(t, "--config", dir, "setup", "git", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gh.lastCall("repo", "create") != nil {
+		t.Fatalf("--yes created a repository:\n%s", out)
+	}
+	if !strings.Contains(out, "git remote add origin") {
+		t.Fatalf("it neither created one nor said how to:\n%s", out)
+	}
+}
+
+func TestSetupGitWritesTheIgnoreFileIntoADirectoryThatIsAlreadyARepository(t *testing.T) {
+	// The conversion case: the configuration directory has been a git
+	// repository for months. Skipping the ignore file there leaves the CLI
+	// writing keys/ and secrets.json into a tree that tracks everything.
+	dir := configDirWithSecrets(t)
+	withoutGh(t)
+	git(t, dir, "init", "-q", "-b", "main")
+
+	if _, err := execute(t, "--config", dir, "setup", "git", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if err != nil {
+		t.Fatalf("no .gitignore in a directory that was already a repository: %v", err)
+	}
+	for _, want := range []string{"keys/", "secrets.json", "cache/", "history.log", "*.env"} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("the ignore file leaves out %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestSetupGitKeepsTheOperatorsOwnIgnoreRules(t *testing.T) {
+	// A rule somebody wrote is not ours to drop.
+	dir := configDirWithSecrets(t)
+	withoutGh(t)
+	git(t, dir, "init", "-q", "-b", "main")
+	mustWrite(t, filepath.Join(dir, ".gitignore"), "notes.md\n")
+
+	if _, err := execute(t, "--config", dir, "setup", "git", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	body, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if !strings.Contains(string(body), "notes.md") {
+		t.Fatalf("it dropped a rule it did not write:\n%s", body)
+	}
+	if !strings.Contains(string(body), "secrets.json") {
+		t.Fatalf("it did not add the rules that were missing:\n%s", body)
+	}
+}
+
+func TestSetupGitDoesNotAskWhereNobodyCanAnswer(t *testing.T) {
+	// Always asking is right; blocking on the answer is not. With stdin not a
+	// terminal — a script, CI, a background job — there is nobody to type y,
+	// and a question asked there hangs forever. `--yes` hung exactly like
+	// this the first time this rule was written.
+	dir := configDirWithSecrets(t)
+	gh := installFakeGh(t, true)
+
+	done := make(chan string, 1)
+	go func() {
+		out, _ := execute(t, "--config", dir, "setup", "git", "--yes")
+		done <- out
+	}()
+
+	select {
+	case out := <-done:
+		if gh.lastCall("repo", "create") != nil {
+			t.Fatalf("it created a repository with nobody to ask:\n%s", out)
+		}
+		if !strings.Contains(out, "git remote add origin") {
+			t.Fatalf("it did not say how to add a remote by hand:\n%s", out)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("it is waiting for an answer nobody can give")
 	}
 }

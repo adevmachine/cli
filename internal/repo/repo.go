@@ -73,6 +73,11 @@ func Commit(ctx context.Context, dir, message string) error {
 	}
 
 	if unsafe := Unsafe(splitLines(staged)); len(unsafe) > 0 {
+		// `git add -A` staged it before the guard looked. Leaving it there
+		// protects this commit and arms the next one somebody types by hand.
+		if _, err := run(ctx, dir, append([]string{"reset", "--"}, unsafe...)...); err != nil {
+			return fmt.Errorf("unstaging %s: %w", strings.Join(unsafe, " "), err)
+		}
 		names := strings.Join(unsafe, " ")
 		return fmt.Errorf(
 			"refusing to commit %s: it must never reach this history\n"+
