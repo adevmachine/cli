@@ -1,0 +1,25 @@
+docs/troubleshooting.md
+  s_cab674f14f5e3f::t_525be2ab214c9c 292-312
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_dd902a60e90642 80-82
+docs/index.md
+  s_cab674f14f5e3f::t_d0ff96df6edd93 55-57
+docs/how-it-works/versioning-your-configuration.md
+  s_cab674f14f5e3f::t_db98bdefddea34 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "958ec42cd5ffdf6106c98bf422bd03b608dc1222",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
