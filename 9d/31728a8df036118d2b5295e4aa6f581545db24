@@ -1,0 +1,23 @@
+internal/dns/open.go
+  s_cab674f14f5e3f::t_6ff4aaee3fe602 10,37
+internal/provision/ansible.go
+  s_cab674f14f5e3f::t_a90d29f9732a98 389-398
+internal/provision/ansible_test.go
+  s_cab674f14f5e3f::t_46db386355ce0c 14,528-539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9d31728a8df036118d2b5295e4aa6f581545db24",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
