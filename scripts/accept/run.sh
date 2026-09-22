@@ -40,7 +40,7 @@ fi
 export DEVMACHINE_ACCEPT_BIN
 
 if [ "$#" -eq 0 ]; then
-  set -- setup-git
+  set -- setup-git v05-packages-credentials-dns
 fi
 
 for scenario in "$@"; do
