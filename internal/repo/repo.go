@@ -86,7 +86,11 @@ func Commit(ctx context.Context, dir, message string) error {
 			names, names)
 	}
 
-	if _, err := run(ctx, dir, "commit", "-S", "-m", message); err != nil {
+	// No -S. Whether a commit is signed is the operator's own git
+	// configuration, and forcing it here breaks every machine that has no
+	// signing key — which is most of them, including CI — while overriding a
+	// setting that was never ours to override.
+	if _, err := run(ctx, dir, "commit", "-m", message); err != nil {
 		if strings.Contains(err.Error(), "nothing to commit") {
 			return nil
 		}
