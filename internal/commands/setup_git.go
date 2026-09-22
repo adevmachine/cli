@@ -127,19 +127,23 @@ func runSetupGit(ctx context.Context, dir string, in io.Reader, out io.Writer, o
 
 	fmt.Fprintf(out, "\nThe remote for %s must be private: it holds real hostnames and usernames.\n", dir)
 
-	return ensureRemote(ctx, dir, in, out)
+	return ensureRemote(ctx, dir, in, out, opts.yes)
 }
 
 // ensureRemote offers a private remote when there is none yet. It never turns
 // an existing remote into a push: that decision belongs to a person who typed
 // `git push`, not to a passing `setup git`.
-func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer) error {
+func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer, yes bool) error {
 	remote, err := repo.HasRemote(ctx, dir)
 	if err != nil {
 		return err
 	}
 	if remote != "" {
 		fmt.Fprintf(out, "origin is already %s\n", remote)
+		return nil
+	}
+	if yes {
+		printManualRemoteInstructions(out)
 		return nil
 	}
 
@@ -153,7 +157,7 @@ func ensureRemote(ctx context.Context, dir string, in io.Reader, out io.Writer) 
 		return nil
 	}
 
-	// Always asks, `--yes` or not. That flag means "do not ask me about the
+	// Always asks before publishing. `--yes` means "do not ask me about the
 	// writes in this directory"; it has never meant "publish". Creating a
 	// repository on somebody's account is not the same class of action as
 	// writing a local file, and one flag covering both is how a repository

@@ -1,7 +1,13 @@
 BINARY := devmachine
 VERSION ?= dev
 
-.PHONY: build surface settings test test-vps cover vps-up vps-down fmt lint docs run
+.PHONY: accept accept-shell build surface settings test test-vps cover vps-up vps-down fmt lint docs run
+
+accept:
+	scripts/accept/run.sh
+
+accept-shell:
+	bash scripts/accept/common_test.sh
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BINARY) ./cmd/devmachine

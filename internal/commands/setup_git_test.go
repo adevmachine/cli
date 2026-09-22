@@ -285,6 +285,9 @@ func TestSetupGitNeverCreatesARepositoryUnderYes(t *testing.T) {
 	if gh.lastCall("repo", "create") != nil {
 		t.Fatalf("--yes created a repository:\n%s", out)
 	}
+	if len(gh.calls) != 0 {
+		t.Fatalf("--yes invoked gh before declining to publish: %#v", gh.calls)
+	}
 	if !strings.Contains(out, "git remote add origin") {
 		t.Fatalf("it neither created one nor said how to:\n%s", out)
 	}
@@ -343,7 +346,7 @@ func TestSetupGitDoesNotAskWhereNobodyCanAnswer(t *testing.T) {
 	git(t, dir, "init", "-q", "-b", "main")
 
 	out := &bytes.Buffer{}
-	if err := ensureRemote(t.Context(), dir, strings.NewReader("y\n"), out); err != nil {
+	if err := ensureRemote(t.Context(), dir, strings.NewReader("y\n"), out, false); err != nil {
 		t.Fatal(err)
 	}
 

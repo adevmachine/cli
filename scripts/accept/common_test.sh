@@ -68,3 +68,7 @@ if require_accept_vm "main" 2>/dev/null; then
   echo "an arbitrary machine passed the acceptance VM guard" >&2
   exit 1
 fi
+
+[ -x "$ROOT/scripts/accept/run.sh" ]
+[ -x "$ROOT/scripts/accept/setup-git.sh" ]
+grep -q '^accept:' "$ROOT/Makefile"
