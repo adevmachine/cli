@@ -453,6 +453,31 @@ The command holds the terminal while the tunnel is open. Closing it (Ctrl-C)
 closes the tunnel: there is no state to clean up afterwards and nothing to
 forget about.
 
+## machine
+
+```
+devmachine machine setup
+devmachine machine doctor
+```
+
+The operator's own computer — the one thing about this setup that still
+needs installing by hand, once.
+
+`doctor` checks, in order: `ssh` on `PATH`; `mosh` on `PATH` (a warning, not
+a failure — `ssh` is enough without it); an SSH agent or a key in the
+configuration; and whether `~/.ssh/config` holds the devmachine block and is
+current with what `devmachine aliases --write` would produce now. A
+workspace added after the last write is not reachable by name, and this is
+what says so.
+
+`setup` installs what is missing, through Homebrew on a Mac. On Linux it
+**says what to install** rather than guessing a package manager.
+
+**What this deliberately does not do:** it does not install an editor, shell
+plugins or language runtimes. Those are one person's taste, and taste stays
+in that person's own configuration, not in a machine this CLI provisions for
+anybody.
+
 ## secrets
 
 ```

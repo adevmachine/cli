@@ -20,6 +20,9 @@ devmachine expose list
 devmachine expose rm
 devmachine help
 devmachine login
+devmachine machine
+devmachine machine doctor
+devmachine machine setup
 devmachine machines
 devmachine machines add
 devmachine machines create-local
