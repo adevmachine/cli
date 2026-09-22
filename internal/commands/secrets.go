@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/secrets"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -21,8 +22,39 @@ func newSecretsCmd(opts *options) *cobra.Command {
 		Use:   "secrets",
 		Short: "Tokens the CLI needs, kept in the OS keychain",
 	}
-	cmd.AddCommand(newSecretsSetCmd(opts), newSecretsListCmd(opts), newSecretsRmCmd(opts))
+	cmd.AddCommand(newSecretsSetCmd(opts), newSecretsListCmd(opts), newSecretsRmCmd(opts),
+		newSecretsExampleCmd(opts))
 	return cmd
+}
+
+func newSecretsExampleCmd(opts *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "example",
+		Short: "List the secret values a machine's packages need, with no values",
+		Long: "One `<NAME>=` line per secret, in the shape `secrets set` expects the " +
+			"name in. It never reads a stored value, so it prints one whether or " +
+			"not anything has been set yet.\n\n" +
+			"It writes to standard output, on purpose, and never to a file: a file " +
+			"named `.env.example` sits one typo away from `.env`, in a directory " +
+			"that may be a git repository, and that is not a trap this command sets.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			d, err := credentialsOnMachine(cmd.Context(), opts)
+			if err != nil {
+				return err
+			}
+
+			seen := map[string]bool{}
+			for _, c := range d.wanted {
+				if c.Kind != packages.KindSecret || c.Env == "" || seen[c.Env] {
+					continue
+				}
+				seen[c.Env] = true
+				cmd.Printf("%s=\n", c.Env)
+			}
+			return nil
+		},
+	}
 }
 
 func secretsDir(opts *options) (string, error) {

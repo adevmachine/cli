@@ -391,10 +391,18 @@ provider expects.
 devmachine secrets set <name> [value] [--stdin]
 devmachine secrets list
 devmachine secrets rm <name>
+devmachine secrets example
 ```
 
 With no value, `set` asks without echoing, so the secret never reaches your
 shell history. `list` prints names only.
+
+`example` lists what a machine's packages need as `<NAME>=`, one per line, with
+no value — the record of **which** secrets a machine needs, never what they
+are. It never reads a stored value, and it always writes to standard output,
+never to a file: a file named `.env.example` sits one typo away from `.env`,
+in a directory that may be a git repository, and that is a trap the operator
+sets themselves, by redirecting the output where they want it.
 
 ## login
 

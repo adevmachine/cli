@@ -35,6 +35,7 @@ devmachine packages schema
 devmachine packages validate
 devmachine run
 devmachine secrets
+devmachine secrets example
 devmachine secrets list
 devmachine secrets rm
 devmachine secrets set
