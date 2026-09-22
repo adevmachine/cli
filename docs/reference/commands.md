@@ -413,6 +413,13 @@ HTTP, none has its own authentication, and publishing one by habit is how it
 reaches the internet. `--yes` skips the question; `--check` prints what would
 happen and writes nothing.
 
+It also points the hostname at the machine, reusing the same path `dns add`
+uses: an installed provider gets the record written, and with none
+installed, the exact record to create by hand is printed instead of
+refusing. A name that does not resolve yet fails minutes later, in Caddy's
+certificate log, where nobody is looking — this is why the record is offered
+here rather than left for `dns add` to be remembered separately.
+
 `list` reads `sites.d` on the machine and prints every host, its port and the
 workspace it belongs to. `rm` removes one site's file and reloads Caddy,
 leaving every other site untouched.

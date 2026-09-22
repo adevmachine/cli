@@ -204,6 +204,41 @@ func TestExposeAddWritesThroughTheExtensionPoint(t *testing.T) {
 	}
 }
 
+func TestExposeAddSaysWhatToCreateWhenNobodyHoldsTheZone(t *testing.T) {
+	// With no DNS provider installed, it prints the record rather than
+	// refusing to publish.
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--yes")
+	if err != nil {
+		t.Fatalf("expose add returned %v", err)
+	}
+	if !strings.Contains(out, "app.example.com") || !strings.Contains(out, "A") {
+		t.Fatalf("it did not print the record to create by hand: %q", out)
+	}
+}
+
+func TestExposeAddOffersToCreateTheRecord(t *testing.T) {
+	// The name has to point at the machine before Caddy can get a
+	// certificate for it. Failing later, in a log, is the alternative.
+	client := &exposeClient{zones: []string{"example.com"}}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+
+	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--yes"); err != nil {
+		t.Fatalf("expose add returned %v", err)
+	}
+	if client.upserts != 1 {
+		t.Fatalf("the record was not written through the installed provider: %d upserts", client.upserts)
+	}
+}
+
 func TestExposeAddRefusesAHostThatWouldEscapeTheFileName(t *testing.T) {
 	dialExpose(t, &exposeClient{})
 	dir := configWithCaddy(t)

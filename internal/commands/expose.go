@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
@@ -132,6 +133,10 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			}
 			record(opts, tgt, fmt.Sprintf("expose add %s %d --host %s", workspace, port, host), true)
 
+			if err := pointDNSAtMachine(cmd.Context(), dir, tgt, host, client, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
+
 			cmd.Printf("published https://%s -> 127.0.0.1:%d on %s\n", host, port, tgt.machine.Name)
 			return nil
 		},
@@ -151,6 +156,26 @@ func writeSite(ctx context.Context, client remote.Client, sitesDir, fileName, bl
 		return fmt.Errorf("writing %s on the machine: %w", full, err)
 	}
 	return nil
+}
+
+// pointDNSAtMachine reuses the same dns.Choose and Upsert path `dns add`
+// uses: an installed provider gets the record written, and with none
+// installed, the exact record to create by hand is printed instead of
+// refusing. A name that does not resolve yet fails minutes later, in Caddy's
+// certificate log, where nobody is looking.
+func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out interface {
+	Write([]byte) (int, error)
+}) error {
+	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, host, "", client, out)
+	if err != nil {
+		return err
+	}
+	address, err := firstAddress(tgt.machine)
+	if err != nil {
+		return err
+	}
+	rec := dns.Record{Name: labelFor(host, choice.Zone), Type: "A", Value: address}
+	return choice.Provider.Upsert(ctx, choice.Zone, rec)
 }
 
 // site is one row `expose list` reports.
