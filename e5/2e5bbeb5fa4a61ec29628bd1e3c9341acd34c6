@@ -1,0 +1,31 @@
+scripts/accept/v05-packages-credentials-dns.sh
+  s_5a1ab89fc28171::t_a45e8860ce38f3 1-187
+scripts/accept/common_test.sh
+  s_dcaac586c4814e::t_c0cc45fe892862 74
+scripts/accept/run.sh
+  s_dcaac586c4814e::t_9944179514f703 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e52e5bbeb5fa4a61ec29628bd1e3c9341acd34c6",
+  "prompts": {},
+  "sessions": {
+    "s_5a1ab89fc28171": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c978-8a72-7241-9c82-6ebf916e6e48",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_dcaac586c4814e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ca1c-ceca-7653-a8c5-02f716607be1",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
