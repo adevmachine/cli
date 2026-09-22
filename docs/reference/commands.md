@@ -290,6 +290,8 @@ output is usually the explanation.
 ```
 devmachine dns status [host]
 devmachine dns providers
+devmachine dns list [zone] [--dns-provider p] [--zone z]
+devmachine dns check <name> [--dns-provider p] [--zone z]
 ```
 
 `status` checks a name from outside: it resolves, its certificate is
@@ -302,6 +304,22 @@ a DNS command did not do what was expected. A provider that cannot be asked
 (a stale token, for example) is reported with its error rather than failing
 the whole command — that is what this command exists to show. With none
 installed, it says to run `devmachine packages list`.
+
+`list` and `check` ask the registrar, through whichever installed provider
+holds the zone — a different question from `dns status`, which asks the
+public internet. A record can exist at the registrar and not have propagated
+yet, and it can resolve while sitting in a zone nobody manages through this
+CLI. `list` prints every record for a zone; with no zone it falls back to the
+configured `domain`. `check` says whether one name is pointed, and exits
+non-zero when it is not — readable from a script, not only from the words.
+
+`--dns-provider` acts through a named provider instead of asking which
+installed one holds the zone. `--zone` is rarely needed: it exists for a zone
+a provider's token cannot list, when `--dns-provider` alone leaves the CLI
+unable to tell where the label ends and the zone begins.
+
+Which provider answered, and why, is printed to stderr on every one of these
+— stdout is the data, and which provider was asked is diagnostics.
 
 ## secrets
 

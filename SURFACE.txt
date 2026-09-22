@@ -7,6 +7,8 @@ devmachine credentials
 devmachine credentials list
 devmachine credentials push
 devmachine dns
+devmachine dns check
+devmachine dns list
 devmachine dns providers
 devmachine dns status
 devmachine doctor
