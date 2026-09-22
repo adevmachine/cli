@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/adevmachine/cli/internal/config"
 )
 
 // loggingIn drives a login without opening a session and without a machine: it
@@ -161,5 +164,32 @@ func TestLoginRecordsWhatWasAskedOfTheMachine(t *testing.T) {
 	line := historyLines(t, dir)[0]
 	if !strings.Contains(line, "login gh") {
 		t.Fatalf("the log line leaves the login out: %q", line)
+	}
+}
+
+func TestLoginTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
+	// `login` hands the connection to the system ssh, which reads the
+	// operator's own known_hosts. Every other command dials with the Go
+	// client, which pins nothing (remote.go). A machine the CLI created
+	// minutes ago is in nobody's known_hosts, so leaving the default made
+	// `login` fail on every machine the CLI builds, with "Host key
+	// verification failed". Whether the CLI pins host keys at all is one
+	// decision for the whole CLI; until it is made, one command may not
+	// answer it differently from the rest.
+	args := loginArgs(config.Machine{Port: 2222}, "root", "127.0.0.1", "gh auth login")
+
+	joined := strings.Join(args, " ")
+	for _, want := range []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("login does not reach a machine the CLI just made: %#v", args)
+		}
+	}
+}
+
+func TestLoginStillAsksForATerminal(t *testing.T) {
+	// The whole point is that a person types into the session.
+	args := loginArgs(config.Machine{Port: 22}, "root", "127.0.0.1", "gh auth login")
+	if !slices.Contains(args, "-t") {
+		t.Fatalf("got %#v", args)
 	}
 }
