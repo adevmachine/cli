@@ -26,6 +26,14 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # `setup git` makes a commit, and a runner has no git identity of its
+      # own. Without this the tests fail with "Author identity unknown", which
+      # says nothing about the code.
+      - name: A git identity to commit as
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "ci"
+
       # The tests that need a machine skip when there is none, so this runs the
       # whole suite without a VM. The integration tests run locally through
       # `make test-vps`.
