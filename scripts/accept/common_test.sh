@@ -72,4 +72,5 @@ fi
 [ -x "$ROOT/scripts/accept/run.sh" ]
 [ -x "$ROOT/scripts/accept/setup-git.sh" ]
 [ -x "$ROOT/scripts/accept/v05-packages-credentials-dns.sh" ]
+[ -x "$ROOT/scripts/accept/v06-expose-tunnel.sh" ]
 grep -q '^accept:' "$ROOT/Makefile"
