@@ -1,0 +1,23 @@
+docs/reference/dns-provider-contract.md
+  s_cab674f14f5e3f::t_c944a13f938186 19-50
+internal/packages/skeleton.go
+  s_cab674f14f5e3f::t_e78c86381acb66 99-107,109-110,114-124
+internal/packages/skeleton_test.go
+  s_cab674f14f5e3f::t_a5e3538adc6c9c 153-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "043dcd504017ab186fa00f6ec867e68625d39359",
+  "prompts": {},
+  "sessions": {
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
