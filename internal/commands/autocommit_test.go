@@ -23,6 +23,14 @@ func gitRepoDir(t *testing.T, dir string) string {
 	if out, err := exec.Command("git", "-C", dir, "init", "-q", "-b", "main").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
+	// A machine with no git identity cannot commit at all, and AutoCommit
+	// swallows that by design — so without this the test reads an empty log
+	// and blames the message.
+	for _, kv := range [][2]string{{"user.email", "test@example.com"}, {"user.name", "test"}} {
+		if out, err := exec.Command("git", "-C", dir, "config", kv[0], kv[1]).CombinedOutput(); err != nil {
+			t.Fatalf("git config %s: %v\n%s", kv[0], err, out)
+		}
+	}
 	return dir
 }
 
