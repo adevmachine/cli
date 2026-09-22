@@ -1,0 +1,35 @@
+docs/index.md
+  s_cab674f14f5e3f::t_ca667199c483e5 33-34
+docs/reference/commands.md
+  s_cab674f14f5e3f::t_5f78164ad131df 428-430
+docs/troubleshooting.md
+  s_cab674f14f5e3f::t_e930da693bbf65 133-158
+docs/concepts/publishing.md
+  s_cab674f14f5e3f::t_9812a5e7f1eb98 52-53
+  s_cab674f14f5e3f::t_2b27ea39c0f808 49-51
+  s_0533529f777ddc::t_260f049e3fc651 1-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "47523169ae9a1faadcec5e44b03798aa8be86e65",
+  "prompts": {},
+  "sessions": {
+    "s_0533529f777ddc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aab21ae30def580d6",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_cab674f14f5e3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd5021d0-4808-4af3-adb9-b4a4809bf18c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
