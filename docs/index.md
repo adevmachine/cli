@@ -52,6 +52,9 @@ when something behaves in a way that surprises you.
   does, and the mistakes its API design invites.
 - [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
   never logged into becomes one the CLI owns, and why the order matters.
+- [Versioning your configuration](how-it-works/versioning-your-configuration.md)
+  — what `devmachine setup git` commits, why the remote must be private, and
+  why the `.gitignore` comes first.
 
 ## Reference
 

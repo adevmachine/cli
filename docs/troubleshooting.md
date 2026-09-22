@@ -289,3 +289,24 @@ guarantee — check where the tool really writes, and correct the package.
 `push` writes only what is missing, so a machine that already has the file
 keeps the old value. To replace one, remove the file on the machine — the path
 is in `credentials list` — and push again.
+
+## I already committed a key
+
+Untracking it is not enough. `git rm --cached` takes a file out of the next
+commit, but it stays in every commit that already has it — anyone with a clone,
+or the history itself if the remote is ever made public, still has it.
+
+1. **Rotate the key first.** Generate a new one and get it authorised wherever
+   the old one was, so the copy sitting in your history stops being able to get
+   in anywhere.
+2. Then untrack it: `git rm --cached <path>`, commit that, and add it to
+   `.gitignore` if `devmachine setup git` had not already.
+3. If the repository was ever pushed anywhere, rewriting history
+   (`git filter-repo`, or deleting and recreating the remote) removes the key
+   from the copy other people can see — but the key is still compromised the
+   moment it was committed, whatever you do to the history afterwards. Step 1
+   is the one that actually fixes anything.
+
+`devmachine setup git` refuses to run against a directory that already tracks
+one of these paths, and its error says exactly this — see
+[versioning your configuration](how-it-works/versioning-your-configuration.md).

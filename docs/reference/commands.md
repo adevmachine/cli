@@ -77,7 +77,9 @@ devmachine setup git [--yes] [--check]
 ```
 
 Makes the configuration directory a git repository, so it can be pushed to a
-private remote. Only `config.yml` and `packages.lock` are ever committed.
+private remote. Only `config.yml` and `packages.lock` are ever committed — see
+[versioning your configuration](../how-it-works/versioning-your-configuration.md)
+for the full table of what is kept and what never is.
 
 In order:
 
