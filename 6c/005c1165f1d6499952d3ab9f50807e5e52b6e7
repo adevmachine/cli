@@ -1,0 +1,37 @@
+scripts/accept/run.sh
+  s_3c1e24ba9f2fdc::t_9f3d8d107f1267 1-55
+scripts/accept/setup-git.sh
+  s_3c1e24ba9f2fdc::t_095c59f29a0e3b 1-148
+Makefile
+  s_beaa6acc994e3e::t_5199e7aaf79baf 4-10
+internal/commands/setup_git.go
+  s_beaa6acc994e3e::t_11348d3fe9cdad 130,136,145-148,160
+internal/commands/setup_git_test.go
+  s_beaa6acc994e3e::t_53a7492ed99adf 288-290,349
+scripts/accept/common_test.sh
+  s_beaa6acc994e3e::t_6d1d202086afb8 71-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6c005c1165f1d6499952d3ab9f50807e5e52b6e7",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_beaa6acc994e3e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ca17-ea26-7410-85e1-9348ce15a932",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
