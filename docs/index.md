@@ -30,6 +30,8 @@ as a bought one arrives.
   to, and which part of that a machine can do for you.
 - [DNS](concepts/dns.md) — zones, records, how a provider is chosen, and why
   `dns status` asks a different question from `dns list`.
+- [Publishing](concepts/publishing.md) — `expose` and `tunnel`, and why the
+  question is who should reach a port rather than which protocol it speaks.
 
 ## How it works
 

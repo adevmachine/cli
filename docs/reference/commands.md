@@ -425,6 +425,9 @@ here rather than left for `dns add` to be remembered separately.
 workspace it belongs to. `rm` removes one site's file and reloads Caddy,
 leaving every other site untouched.
 
+See [Publishing](../concepts/publishing.md) for the three real cases this
+question exists to catch.
+
 ## tunnel
 
 ```

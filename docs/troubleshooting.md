@@ -130,6 +130,32 @@ Two more that are not errors, but change what a command does:
   something that is not the JSON the [DNS provider
   contract](reference/dns-provider-contract.md) requires.
 
+## A certificate never arrives after `expose add`
+
+Caddy only gets a certificate for a name that already resolves to the
+machine. Two ordinary causes:
+
+- **The name does not resolve yet.** DNS can take a few minutes to
+  propagate, even when `expose add` wrote the record (or printed it for you
+  to create by hand) a moment ago. Caddy retries on its own — there is
+  nothing to do but wait, and `devmachine dns status <host>` says when it
+  has caught up.
+- **Caddy has not noticed the new site yet.** It watches `sites.d`, but a
+  reload can be missed on a busy machine. Force one:
+
+  ```
+  devmachine run --machine <name> -- 'systemctl reload caddy'
+  ```
+
+## `expose add` served, and the response is "Blocked request"
+
+This is the application's own host check, not Caddy and not `expose`. Many
+frameworks refuse a `Host` header they do not recognise, by default, as a
+guard against a different kind of attack — and a name that was just
+published is exactly the kind of header the app has never seen. Add the
+published hostname to the application's own list of allowed hosts; `expose`
+has nothing to do with that list.
+
 ## A sync cannot fetch the release
 
 ```
