@@ -8,6 +8,7 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/keys"
+	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -177,6 +178,7 @@ func runWorkspaceNew(cmd *cobra.Command, opts *options, name string, o workspace
 	if err := config.AddWorkspace(dir, w); err != nil {
 		return err
 	}
+	repo.AutoCommit(cmd.Context(), dir, "chore(config): add workspace "+name)
 	cmd.Printf("%s is in the configuration, on %s, with %s.\n", name, machine.Name, describePackages(list))
 	cmd.Println("The machine is untouched: `devmachine sync` is what creates the account.")
 	return nil
@@ -276,6 +278,7 @@ func newWorkspacesRmCmd(opts *options) *cobra.Command {
 			if err := config.RemoveWorkspace(dir, w.Name); err != nil {
 				return err
 			}
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): remove workspace "+w.Name)
 
 			cmd.Printf("%s is out of the configuration.\n", w.Name)
 			cmd.Printf("The account %s, its home and its files are still on the machine %s.\n",
@@ -395,6 +398,7 @@ func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspac
 	if err := config.UpdateWorkspace(dir, w); err != nil {
 		return err
 	}
+	repo.AutoCommit(cmd.Context(), dir, "chore(config): update workspace "+name)
 	for _, line := range changes {
 		cmd.Printf("%s: %s\n", name, line)
 	}

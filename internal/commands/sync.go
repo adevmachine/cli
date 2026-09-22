@@ -10,6 +10,7 @@ import (
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
+	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -122,6 +123,7 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 		if err := packages.SaveLock(dir, lock.WithPlan(plan, store, time.Now())); err != nil {
 			return err
 		}
+		repo.AutoCommit(cmd.Context(), dir, "chore(config): lock packages for "+machine.Name)
 	}
 	return reportSync(cmd, opts, machine.Name, check, summary, result)
 }

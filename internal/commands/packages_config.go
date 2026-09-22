@@ -10,6 +10,7 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -164,6 +165,7 @@ func editPackage(cmd *cobra.Command, opts *options, name, workspace string, add,
 	if err := config.Save(dir, cfg); err != nil {
 		return err
 	}
+	repo.AutoCommit(cmd.Context(), dir, "chore(config): "+packageCommitVerb(add)+" package "+name)
 	return reportEdit(cmd, opts, name, target, true,
 		fmt.Sprintf("%sed %s %s %s", verbFor(add), name, preposition(add), target.label()))
 }
@@ -173,6 +175,15 @@ func verbFor(add bool) string {
 		return "add"
 	}
 	return "remov"
+}
+
+// packageCommitVerb is what AutoCommit's message says happened, matching how
+// `machines add`/`rm` and `workspaces new`/`rm` already word theirs.
+func packageCommitVerb(add bool) string {
+	if add {
+		return "add"
+	}
+	return "remove"
 }
 
 func preposition(add bool) string {

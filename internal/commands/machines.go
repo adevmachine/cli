@@ -11,6 +11,7 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/local"
+	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -121,6 +122,7 @@ func newMachinesRmCmd(opts *options) *cobra.Command {
 			if err := config.RemoveMachine(dir, args[0]); err != nil {
 				return err
 			}
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): remove machine "+args[0])
 			cmd.Printf("%s is out of the configuration.\n", args[0])
 			cmd.Printf("The server itself is untouched and still running: nothing on it was " +
 				"changed or deleted, and the key still gets in.\n")
@@ -164,6 +166,7 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err := config.AddMachine(dir, m); err != nil {
 		return err
 	}
+	repo.AutoCommit(ctx, dir, "chore(config): add machine "+m.Name)
 	fmt.Fprintf(out, "\nadded %s to %s\n\n", m.Name, filepath.Join(dir, config.FileName))
 
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
