@@ -1,0 +1,63 @@
+docs/concepts/dns.md
+  s_aa299511c5a915::t_31d2f3add726a4 92-95
+docs/concepts/publishing.md
+  s_aa299511c5a915::t_ff74729236fb98 48-52
+docs/getting-started.md
+  s_aa299511c5a915::t_443a1ae7278b54 65
+docs/reference/commands.md
+  s_aa299511c5a915::t_c36a327740d3aa 378,414-416,432,448-450
+docs/reference/settings.md
+  s_3c1e24ba9f2fdc::t_216caf972f95a1 35,39,65,68,72,80
+HANDOFF.md
+  s_ad29e4893e2b5c::t_babfa5f160f4e5 25-26,41,43-46,48-53,55,61,69
+docs/how-it-works/dns-providers.md
+  s_ad29e4893e2b5c::t_bcf97676c1ffb7 71-74,81-91
+internal/commands/dns.go
+  s_ad29e4893e2b5c::t_43749f2a36321b 353,384,405-406
+internal/commands/dns_test.go
+  s_ad29e4893e2b5c::t_99285fa8884569 285-318,324,342
+internal/commands/expose.go
+  s_ad29e4893e2b5c::t_36ced6df352d02 65,115,146-147
+internal/commands/expose_test.go
+  s_ad29e4893e2b5c::t_00709167040031 6,155-190,228,252,271
+internal/dns/external.go
+  s_ad29e4893e2b5c::t_c96d12398a325e 167-170
+internal/dns/external_test.go
+  s_ad29e4893e2b5c::t_5adf88451fd403 8-10,92-120
+scripts/accept/v05-packages-credentials-dns.sh
+  s_ad29e4893e2b5c::t_1184950ac4821b 178
+scripts/accept/v06-expose-tunnel.sh
+  s_ad29e4893e2b5c::t_8b825c03d3211c 167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d8fe46c494d372c478a69bd637483ef355006f8a",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_aa299511c5a915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c5c9f4e-b5ec-476a-b9a0-dd6a31086ba5",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
