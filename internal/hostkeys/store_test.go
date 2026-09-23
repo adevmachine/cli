@@ -102,6 +102,28 @@ func TestCheckDistinguishesMatchingAndDifferentKeys(t *testing.T) {
 	}
 }
 
+func TestKeyReturnsThePinnedKeyAndReportsAnUnknownMachine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := ed25519Key(t)
+	if err := store.Put("main", 22, want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Key("main", 22)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Marshal(), want.Marshal()) {
+		t.Fatal("Key returned a different public key")
+	}
+	if _, err := store.Key("other", 22); err == nil {
+		t.Fatal("Key returned no error for an unknown machine")
+	}
+}
+
 func TestOpenReportsMalformedInputWithFileContext(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "known_hosts")
 	if err := os.WriteFile(path, []byte("main-devmachine not-a-public-key\n"), 0o600); err != nil {

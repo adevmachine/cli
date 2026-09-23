@@ -18,12 +18,15 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // tailscalePrefix marks an address that something closer to the network has to
@@ -41,6 +44,8 @@ var (
 	lookPath        = realLookPath
 	realTailscaleIP = tailscaleIPFromStatus
 	tailscaleIP     = realTailscaleIP
+	realDialContext = dialContext
+	dialSSH         = realDialContext
 )
 
 // Client runs commands on the machine.
@@ -143,6 +148,12 @@ type peer struct {
 // caller can tell them apart without matching strings.
 var ErrAuthRefused = errors.New("the machine refused the login")
 
+// ErrHostKeyUnknown says no identity has been trusted for the machine.
+var ErrHostKeyUnknown = errors.New("the SSH host key is not trusted")
+
+// ErrHostKeyChanged says the machine presented a key different from its pin.
+var ErrHostKeyChanged = errors.New("the SSH host key changed")
+
 // Auth says how to authenticate. Exactly one field is set.
 //
 // Never more than one: a server counts every method offered against
@@ -173,11 +184,15 @@ func (a Auth) describe() string {
 // user is who to log in as. Empty means the machine's administrative login;
 // a workspace passes its own Linux account instead.
 func Dial(ctx context.Context, m config.Machine, user string) (Client, string, error) {
+	callback, algorithms, err := hostKeyPolicy(m)
+	if err != nil {
+		return nil, "", err
+	}
 	a, err := authFor(m)
 	if err != nil {
 		return nil, "", err
 	}
-	return DialWith(ctx, m, user, a)
+	return dialWithPolicy(ctx, m, user, a, callback, algorithms)
 }
 
 // authFor is what a machine's configuration implies: its own key when it has
@@ -196,6 +211,14 @@ func authFor(m config.Machine) (Auth, error) {
 // is what the bootstrap needs: a password before any key exists, then the key
 // alone to prove it.
 func DialWith(ctx context.Context, m config.Machine, user string, a Auth) (Client, string, error) {
+	callback, algorithms, err := hostKeyPolicy(m)
+	if err != nil {
+		return nil, "", err
+	}
+	return dialWithPolicy(ctx, m, user, a, callback, algorithms)
+}
+
+func dialWithPolicy(ctx context.Context, m config.Machine, user string, a Auth, callback ssh.HostKeyCallback, algorithms []string) (Client, string, error) {
 	auth, err := authMethods(a)
 	if err != nil {
 		return nil, "", err
@@ -209,14 +232,11 @@ func DialWith(ctx context.Context, m config.Machine, user string, a Auth) (Clien
 	}
 
 	cfg := &ssh.ClientConfig{
-		User: user,
-		Auth: auth,
-		// The CLI reaches a machine the operator already owns, over a path
-		// they chose. Pinning a host key would need a store the CLI does not
-		// have yet; that belongs with the first-contact bootstrap, which is
-		// where trust is actually established.
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         dialTimeout,
+		User:              user,
+		Auth:              auth,
+		HostKeyCallback:   callback,
+		HostKeyAlgorithms: algorithms,
+		Timeout:           dialTimeout,
 	}
 
 	var (
@@ -225,9 +245,12 @@ func DialWith(ctx context.Context, m config.Machine, user string, a Auth) (Clien
 	)
 	for _, address := range addresses {
 		target := net.JoinHostPort(address, fmt.Sprint(m.Port))
-		conn, err := dialContext(ctx, target, cfg)
+		conn, err := dialSSH(ctx, target, cfg)
 		if err == nil {
 			return &sshClient{conn: conn}, address, nil
+		}
+		if errors.Is(err, ErrHostKeyUnknown) || errors.Is(err, ErrHostKeyChanged) {
+			return nil, "", err
 		}
 		// A machine that answers and then refuses the login is a different
 		// problem from one that never answered, and the fix is different too.
@@ -243,6 +266,91 @@ func DialWith(ctx context.Context, m config.Machine, user string, a Auth) (Clien
 		return nil, "", authErr
 	}
 	return nil, "", fmt.Errorf("machine %q: no address answered: %s", m.Name, strings.Join(failures, "; "))
+}
+
+func hostKeyPolicy(m config.Machine) (ssh.HostKeyCallback, []string, error) {
+	trustCommand := fmt.Sprintf("devmachine machines trust %s", m.Name)
+	if m.KnownHostsFile == "" {
+		return nil, nil, fmt.Errorf("%w for machine %q: run `%s`", ErrHostKeyUnknown, m.Name, trustCommand)
+	}
+	store, err := hostkeys.Open(m.KnownHostsFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	pinned, err := store.Key(m.Name, m.Port)
+	if err != nil {
+		var keyErr *knownhosts.KeyError
+		if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
+			return nil, nil, fmt.Errorf("%w for machine %q: run `%s`", ErrHostKeyUnknown, m.Name, trustCommand)
+		}
+		return nil, nil, err
+	}
+	callback, err := knownhosts.New(m.KnownHostsFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading SSH host trust from %s: %w", m.KnownHostsFile, err)
+	}
+	wrapped := func(hostname string, remote net.Addr, presented ssh.PublicKey) error {
+		aliasAddress := net.JoinHostPort(hostkeys.Alias(m.Name), strconv.Itoa(m.Port))
+		if err := callback(aliasAddress, remote, presented); err != nil {
+			var keyErr *knownhosts.KeyError
+			if errors.As(err, &keyErr) {
+				if len(keyErr.Want) == 0 {
+					return fmt.Errorf("%w for machine %q: run `%s`", ErrHostKeyUnknown, m.Name, trustCommand)
+				}
+				address := hostname
+				if host, _, splitErr := net.SplitHostPort(hostname); splitErr == nil {
+					address = host
+				}
+				return fmt.Errorf("%w for machine %q at %s: expected %s, received %s; verify the address, then run `%s --replace` only for a deliberate rebuild",
+					ErrHostKeyChanged, m.Name, address, hostkeys.Fingerprint(pinned), hostkeys.Fingerprint(presented), trustCommand)
+			}
+			return err
+		}
+		return nil
+	}
+	return wrapped, hostkeys.Algorithms(pinned), nil
+}
+
+// ScanHostKey reads a server's public host key without offering any
+// authentication method.
+func ScanHostKey(ctx context.Context, m config.Machine) (ssh.PublicKey, string, error) {
+	addresses, err := Resolve(m)
+	if err != nil {
+		return nil, "", err
+	}
+	user := m.User
+	if user == "" {
+		user = config.DefaultAdminUser
+	}
+	var failures []string
+	for _, address := range addresses {
+		target := net.JoinHostPort(address, strconv.Itoa(m.Port))
+		conn, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "tcp", target)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s (%v)", address, err))
+			continue
+		}
+		var presented ssh.PublicKey
+		cfg := &ssh.ClientConfig{
+			User: user,
+			HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+				presented = key
+				return nil
+			},
+			Timeout: dialTimeout,
+		}
+		clientConn, _, _, handshakeErr := ssh.NewClientConn(conn, target, cfg)
+		if clientConn != nil {
+			clientConn.Close()
+		} else {
+			_ = conn.Close()
+		}
+		if presented != nil {
+			return presented, address, nil
+		}
+		return nil, "", fmt.Errorf("machine %q answered on %s but did not present an SSH host key: %w", m.Name, address, handshakeErr)
+	}
+	return nil, "", fmt.Errorf("machine %q: no address answered while scanning its SSH host key: %s", m.Name, strings.Join(failures, "; "))
 }
 
 // isAuthFailure reports whether the connection was made and the login was

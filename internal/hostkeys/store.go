@@ -66,6 +66,37 @@ func (s *Store) Check(machine string, port int, key ssh.PublicKey) error {
 	return callback(net.JoinHostPort(Alias(machine), strconv.Itoa(port)), remote, key)
 }
 
+// Key returns the single public key pinned to a machine identity.
+func (s *Store) Key(machine string, port int) (ssh.PublicKey, error) {
+	lines, err := s.lines()
+	if err != nil {
+		return nil, err
+	}
+	lookup := Lookup(machine, port)
+	var found ssh.PublicKey
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		_, hosts, key, _, _, err := ssh.ParseKnownHosts([]byte(line + "\n"))
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", s.path, err)
+		}
+		if !slices.Contains(hosts, lookup) {
+			continue
+		}
+		if found != nil && !bytes.Equal(found.Marshal(), key.Marshal()) {
+			return nil, fmt.Errorf("%s contains more than one key for %s", s.path, lookup)
+		}
+		found = key
+	}
+	if found == nil {
+		return nil, &knownhosts.KeyError{}
+	}
+	return found, nil
+}
+
 // Put atomically replaces the selected machine entry while preserving every
 // other line in the trust store.
 func (s *Store) Put(machine string, port int, key ssh.PublicKey) error {

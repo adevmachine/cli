@@ -29,6 +29,7 @@ cd "$(dirname "$0")/.."
 VM="${DEVMACHINE_FAKE_VPS:-fakevps}"
 KEY_DIR="${DEVMACHINE_TEST_HOME:-$HOME/.config/devmachine-test}/keys"
 KEY="$KEY_DIR/fake_vps_ed25519"
+KNOWN_HOSTS="${DEVMACHINE_TEST_HOME:-$HOME/.config/devmachine-test}/known_hosts"
 
 # The CLI under test, not one installed somewhere else.
 DEVMACHINE=(go run ./cmd/devmachine)
@@ -73,7 +74,23 @@ cmd_up() {
   limactl shell "$VM" -- sudo tee /root/.ssh/authorized_keys >/dev/null < "$KEY.pub"
   limactl shell "$VM" -- sudo chmod 600 /root/.ssh/authorized_keys
 
-  echo "up: root@127.0.0.1 port $(vm_port), key $KEY"
+  # Read the key through Lima's control channel, before SSH is trusted. This
+  # is deterministic test-fixture setup, not trust-on-first-use over the same
+  # network path the integration tests are meant to verify.
+  host_key=$(limactl shell "$VM" -- sudo cat /etc/ssh/ssh_host_ed25519_key.pub)
+  key_type=${host_key%% *}
+  key_body=${host_key#* }
+  key_body=${key_body%% *}
+  port=$(vm_port)
+  lookup="[sandbox-devmachine]:$port"
+  if [ "$port" = 22 ]; then
+    lookup="sandbox-devmachine"
+  fi
+  mkdir -p "$(dirname "$KNOWN_HOSTS")"
+  umask 077
+  printf '%s %s %s\n' "$lookup" "$key_type" "$key_body" > "$KNOWN_HOSTS"
+
+  echo "up: root@127.0.0.1 port $port, key $KEY"
 }
 
 cmd_env() {
@@ -82,6 +99,7 @@ cmd_env() {
   echo "export DEVMACHINE_TEST_PORT=$(vm_port)"
   echo "export DEVMACHINE_TEST_USER=root"
   echo "export DEVMACHINE_TEST_KEY=$KEY"
+  echo "export DEVMACHINE_TEST_KNOWN_HOSTS=$KNOWN_HOSTS"
 }
 
 case "${1:-}" in

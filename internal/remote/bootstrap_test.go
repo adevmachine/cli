@@ -115,7 +115,7 @@ func TestProveKeyOpensANewConnection(t *testing.T) {
 	// Reusing the session that installed the key proves nothing: that session
 	// was authenticated by a password.
 	server := sshServerAccepting(t, "publickey")
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	if err := ProveKey(context.Background(), m, "root", throwawayKey(t)); err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestProveKeyOpensANewConnection(t *testing.T) {
 
 func TestProveKeySaysWhatToCheckWhenItFails(t *testing.T) {
 	server := sshServerRejecting(t)
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	err := ProveKey(context.Background(), m, "root", throwawayKey(t))
 	if err == nil {
@@ -312,7 +312,7 @@ func TestHardeningDropInIsValidToARealSshd(t *testing.T) {
 // not on the password session that is about to stop working.
 func TestProveAuthHandsBackTheConnectionItProved(t *testing.T) {
 	server := sshServerAccepting(t, "publickey")
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	client, err := ProveAuth(context.Background(), m, "root", Auth{KeyPath: throwawayKey(t)})
 	if err != nil {

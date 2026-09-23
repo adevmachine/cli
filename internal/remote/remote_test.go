@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -144,7 +145,8 @@ func testMachine(t *testing.T) config.Machine {
 	host := os.Getenv("DEVMACHINE_TEST_HOST")
 	port := os.Getenv("DEVMACHINE_TEST_PORT")
 	key := os.Getenv("DEVMACHINE_TEST_KEY")
-	if host == "" || port == "" || key == "" {
+	knownHosts := os.Getenv("DEVMACHINE_TEST_KNOWN_HOSTS")
+	if host == "" || port == "" || key == "" || knownHosts == "" {
 		t.Skip("no test VPS: run `eval \"$(scripts/fake-vps.sh env)\"` first")
 	}
 	n, err := strconv.Atoi(port)
@@ -157,11 +159,12 @@ func testMachine(t *testing.T) config.Machine {
 		user = "root"
 	}
 	return config.Machine{
-		Name:  "sandbox",
-		Hosts: []config.Host{{Address: host}},
-		User:  user,
-		Port:  n,
-		Key:   key,
+		Name:           "sandbox",
+		Hosts:          []config.Host{{Address: host}},
+		User:           user,
+		Port:           n,
+		Key:            key,
+		KnownHostsFile: knownHosts,
 	}
 }
 
@@ -236,6 +239,8 @@ func TestDialSaysEveryAddressFailed(t *testing.T) {
 		Port:  22,
 		Key:   throwawayKey(t),
 	}
+	m.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
+	trustMachine(t, m, newHostKey(t).PublicKey())
 
 	_, _, err := Dial(context.Background(), m, "")
 	if err == nil {
@@ -305,6 +310,8 @@ func TestDialSaysWhatToDoWithNoKeyAndNoAgent(t *testing.T) {
 		User:  "root",
 		Port:  22,
 	}
+	m.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
+	trustMachine(t, m, newHostKey(t).PublicKey())
 
 	_, _, err := Dial(context.Background(), m, "")
 	if err == nil {
@@ -325,6 +332,8 @@ func TestDialRejectsAKeyItCannotRead(t *testing.T) {
 		Port:  22,
 		Key:   filepath.Join(t.TempDir(), "absent"),
 	}
+	m.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
+	trustMachine(t, m, newHostKey(t).PublicKey())
 
 	_, _, err := Dial(context.Background(), m, "")
 	if err == nil {
@@ -447,6 +456,7 @@ func TestShellQuoteSurvivesAQuoteInThePath(t *testing.T) {
 // connection of its own.
 type fakeSSHServer struct {
 	addr string
+	key  ssh.PublicKey
 
 	mu          sync.Mutex
 	methods     []string
@@ -504,7 +514,9 @@ func sshServer(t *testing.T, accept string) *fakeSSHServer {
 			return &ssh.Permissions{}, nil
 		},
 	}
-	cfg.AddHostKey(serverHostKey(t))
+	signer := serverHostKey(t)
+	s.key = signer.PublicKey()
+	cfg.AddHostKey(signer)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -558,10 +570,10 @@ func serverHostKey(t *testing.T) ssh.Signer {
 	return signer
 }
 
-func machineAt(t *testing.T, addr string) config.Machine {
+func machineAt(t *testing.T, server *fakeSSHServer) config.Machine {
 	t.Helper()
 
-	host, port, err := net.SplitHostPort(addr)
+	host, port, err := net.SplitHostPort(server.addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,12 +581,21 @@ func machineAt(t *testing.T, addr string) config.Machine {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return config.Machine{
-		Name:  "sandbox",
-		Hosts: []config.Host{{Address: host}},
-		User:  "root",
-		Port:  n,
+	machine := config.Machine{
+		Name:           "sandbox",
+		Hosts:          []config.Host{{Address: host}},
+		User:           "root",
+		Port:           n,
+		KnownHostsFile: filepath.Join(t.TempDir(), "known_hosts"),
 	}
+	store, err := hostkeys.Open(machine.KnownHostsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put(machine.Name, machine.Port, server.key); err != nil {
+		t.Fatal(err)
+	}
+	return machine
 }
 
 func TestDialWithOffersOnlyThePasswordWhenOneIsGiven(t *testing.T) {
@@ -582,7 +603,7 @@ func TestDialWithOffersOnlyThePasswordWhenOneIsGiven(t *testing.T) {
 	// MaxAuthTries before the password is ever tried. Offering one method is
 	// the whole reason this does not shell out to ssh.
 	server := sshServerAccepting(t, "password")
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	client, _, err := DialWith(context.Background(), m, "root", Auth{Password: "devmachine"})
 	if err != nil {
@@ -597,7 +618,7 @@ func TestDialWithOffersOnlyThePasswordWhenOneIsGiven(t *testing.T) {
 
 func TestDialWithOffersOnlyTheKeyWhenOneIsGiven(t *testing.T) {
 	server := sshServerAccepting(t, "publickey")
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	client, _, err := DialWith(context.Background(), m, "root", Auth{KeyPath: throwawayKey(t)})
 	if err != nil {
@@ -611,7 +632,9 @@ func TestDialWithOffersOnlyTheKeyWhenOneIsGiven(t *testing.T) {
 }
 
 func TestDialWithRefusesMoreThanOneMethod(t *testing.T) {
-	_, _, err := DialWith(context.Background(), config.Machine{}, "root",
+	machine := config.Machine{Name: "main", Port: 22, KnownHostsFile: filepath.Join(t.TempDir(), "known_hosts")}
+	trustMachine(t, machine, newHostKey(t).PublicKey())
+	_, _, err := DialWith(context.Background(), machine, "root",
 		Auth{KeyPath: "/k", Password: "p"})
 	if err == nil {
 		t.Fatal("two methods were accepted")
@@ -620,7 +643,7 @@ func TestDialWithRefusesMoreThanOneMethod(t *testing.T) {
 
 func TestDialWithSaysAPasswordWasRefused(t *testing.T) {
 	server := sshServerRejecting(t)
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 
 	_, _, err := DialWith(context.Background(), m, "root", Auth{Password: "wrong"})
 	if !errors.Is(err, ErrAuthRefused) {
@@ -635,7 +658,7 @@ func TestDialWithSaysAPasswordWasRefused(t *testing.T) {
 
 func TestDialWithSaysAKeyWasRefused(t *testing.T) {
 	server := sshServerRejecting(t)
-	m := machineAt(t, server.addr)
+	m := machineAt(t, server)
 	key := throwawayKey(t)
 
 	_, _, err := DialWith(context.Background(), m, "root", Auth{KeyPath: key})
@@ -656,6 +679,8 @@ func TestDialWithLeavesAnUnreachableMachineApart(t *testing.T) {
 		User:  "root",
 		Port:  22,
 	}
+	m.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
+	trustMachine(t, m, newHostKey(t).PublicKey())
 
 	_, _, err := DialWith(context.Background(), m, "root", Auth{Password: "devmachine"})
 	if err == nil {
