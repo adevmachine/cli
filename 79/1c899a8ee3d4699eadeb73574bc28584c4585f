@@ -1,0 +1,23 @@
+docs/development.md
+  s_7515646552fac3::t_45387516913911 51-84
+docs/releasing.md
+  s_7515646552fac3::t_e658932f09c177 11-20
+scripts/accept/common_test.sh
+  s_7515646552fac3::t_13f5ec8610b7a7 77-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "791c899a8ee3d4699eadeb73574bc28584c4585f",
+  "prompts": {},
+  "sessions": {
+    "s_7515646552fac3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ca3f-655f-73f3-b818-b15ad838096a",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
