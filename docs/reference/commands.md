@@ -143,6 +143,7 @@ a configuration.
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden]     take over another machine and record it
+devmachine machines trust [name] [--check] [--replace] [--yes]   inspect or update its SSH host key
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on this computer
 devmachine machines start <name>          start a local machine
@@ -154,6 +155,16 @@ devmachine machines delete-local <name> [--yes]   destroy it and everything on i
 same questions, minus the domain, and runs the same bootstrap: the key first, a
 password only if the key is refused, the proof on a connection of its own, then
 hardening and Ansible. See [setup](#setup) for what each step is for.
+
+`trust` reads the public host key without authenticating. A missing key asks
+before adding it; an existing match writes nothing; a changed key refuses
+unless `--replace` is explicit. `--check` compares without writing, and `--yes`
+skips only the local-file confirmation. Naming a machine positionally and with
+`--machine` is allowed only when both names agree.
+
+With `--format json`, the stable fields are `machine`, `address`, `status`,
+`key_type`, optional `current_fingerprint`, `presented_fingerprint`, `check`
+and `changed`.
 
 `rm` takes a machine out of `config.yml` and **does nothing at all to the
 server** — it keeps running, with everything on it, and the key still gets in.
