@@ -44,7 +44,6 @@ func newTunnelCmd(opts *options) *cobra.Command {
 			if _, err := lookPath("ssh"); err != nil {
 				return errors.New("ssh is not installed on this computer")
 			}
-
 			// A bind error nobody reads is the worst way to find out a port
 			// is already in use; naming it and offering --local is the point.
 			ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", local))
@@ -55,21 +54,12 @@ func newTunnelCmd(opts *options) *cobra.Command {
 			if err := ln.Close(); err != nil {
 				return err
 			}
+			if err := verifySystemHost(cmd.Context(), tgt.machine); err != nil {
+				return err
+			}
 
 			m, user := tgt.machine, tgt.login()
-			// The system ssh would read the operator's own known_hosts, and a
-			// machine the CLI made minutes ago is in nobody's. `login` had the
-			// same defect; the Go client pins no host key either. Whether the
-			// CLI pins host keys is one decision for the whole CLI, and until
-			// it is taken this command may not answer it differently.
-			argv := []string{
-				"-p", strconv.Itoa(m.Port),
-				"-o", "StrictHostKeyChecking=no",
-				"-o", "UserKnownHostsFile=/dev/null",
-			}
-			if m.Key != "" {
-				argv = append(argv, "-i", m.Key, "-o", "IdentitiesOnly=yes")
-			}
+			argv := strictSSHArgs(m)
 			argv = append(argv, "-N", "-L", fmt.Sprintf("%d:127.0.0.1:%d", local, remotePort), user+"@"+address)
 
 			cmd.Printf("tunnel open: localhost:%d -> %s:%d on %s. Ctrl-C to close.\n",

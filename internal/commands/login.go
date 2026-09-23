@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
@@ -52,6 +51,9 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 	if _, err := lookPath("ssh"); err != nil {
 		return fmt.Errorf("ssh is not installed on this machine")
 	}
+	if err := verifySystemHost(cmd.Context(), found.machine); err != nil {
+		return err
+	}
 
 	cmd.Printf("opening a session on %s to run: %s\n", found.machine.Name, d.Command)
 	runErr := runInteractive("ssh", loginArgs(found.machine, tgt.login(), address, d.Command)...)
@@ -72,20 +74,7 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 // `-t` is the whole point: without a terminal a device code prints into a pipe
 // nobody is reading, and a prompt waits for an answer that can never come.
 func loginArgs(m config.Machine, user, address, command string) []string {
-	// The system ssh would read the operator's own known_hosts, where a
-	// machine the CLI made minutes ago does not appear. Every other command
-	// dials with the Go client, which pins no host key either (see the note
-	// in internal/remote). Whether the CLI pins host keys is one decision for
-	// the whole CLI, and until it is taken this command may not answer it
-	// differently from the rest.
-	args := []string{
-		"-t", "-p", strconv.Itoa(m.Port),
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-	}
-	if m.Key != "" {
-		args = append(args, "-i", m.Key, "-o", "IdentitiesOnly=yes")
-	}
+	args := append([]string{"-t"}, strictSSHArgs(m)...)
 	return append(args, user+"@"+address, command)
 }
 

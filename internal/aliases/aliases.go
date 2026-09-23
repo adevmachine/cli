@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/remote"
 )
 
@@ -48,7 +49,9 @@ type Alias struct {
 	// indexed by address, so a machine on two addresses gets two entries and
 	// switching between them gives "Host key verification failed". This
 	// indexes by name instead.
-	HostKeyAlias string `json:"host_key_alias"`
+	HostKeyAlias       string `json:"host_key_alias"`
+	UserKnownHostsFile string `json:"user_known_hosts_file"`
+	HostKeyAlgorithms  string `json:"host_key_algorithms"`
 }
 
 // List returns the aliases a configuration describes, workspace by workspace.
@@ -64,11 +67,21 @@ func List(cfg config.Config) ([]Alias, error) {
 		if err != nil || len(addresses) == 0 {
 			return nil, errNoAddress(machine.Name)
 		}
+		store, err := hostkeys.Open(machine.KnownHostsFile)
+		if err != nil {
+			return nil, err
+		}
+		key, err := store.Key(machine.Name, machine.Port)
+		if err != nil {
+			return nil, fmt.Errorf("reading SSH host trust for machine %q: %w", machine.Name, err)
+		}
 
 		entry := Alias{
 			Name: w.Name + suffix, Host: addresses[0], User: w.LinuxUser(),
 			Port: machine.Port, IdentityFile: machine.Key,
-			HostKeyAlias: machine.Name + suffix,
+			HostKeyAlias:       hostkeys.Lookup(machine.Name, machine.Port),
+			UserKnownHostsFile: machine.KnownHostsFile,
+			HostKeyAlgorithms:  strings.Join(hostkeys.Algorithms(key), ","),
 		}
 		out = append(out, entry)
 
@@ -114,13 +127,21 @@ func Render(cfg config.Config) (string, error) {
 		fmt.Fprintf(&b, "    User %s\n", a.User)
 		fmt.Fprintf(&b, "    Port %d\n", a.Port)
 		if a.IdentityFile != "" {
-			fmt.Fprintf(&b, "    IdentityFile %s\n", a.IdentityFile)
+			fmt.Fprintf(&b, "    IdentityFile %s\n", quoteSSHConfig(a.IdentityFile))
 			// Without this, ssh offers every key the agent holds first, and a
 			// server can cut the connection at MaxAuthTries before the one
 			// that works is ever tried.
 			fmt.Fprintf(&b, "    IdentitiesOnly yes\n")
 		}
 		fmt.Fprintf(&b, "    HostKeyAlias %s\n", a.HostKeyAlias)
+		fmt.Fprintf(&b, "    StrictHostKeyChecking yes\n")
+		fmt.Fprintf(&b, "    UserKnownHostsFile %s\n", quoteSSHConfig(a.UserKnownHostsFile))
+		fmt.Fprintf(&b, "    GlobalKnownHostsFile /dev/null\n")
+		fmt.Fprintf(&b, "    UpdateHostKeys no\n")
+		fmt.Fprintf(&b, "    CheckHostIP no\n")
+		fmt.Fprintf(&b, "    VerifyHostKeyDNS no\n")
+		fmt.Fprintf(&b, "    KnownHostsCommand none\n")
+		fmt.Fprintf(&b, "    HostKeyAlgorithms %s\n", a.HostKeyAlgorithms)
 	}
 	return b.String(), nil
 }
@@ -141,20 +162,19 @@ func Write(path, block string) error {
 
 	managed := Begin + "\n" + strings.TrimRight(block, "\n") + "\n" + End + "\n"
 
-	var out string
+	var user string
 	current := string(body)
 	start := strings.Index(current, Begin)
 	stop := strings.LastIndex(current, End)
 	switch {
 	case start >= 0 && stop > start:
-		out = current[:start] + managed
-		if rest := strings.TrimLeft(current[stop+len(End):], "\n"); rest != "" {
-			out += "\n" + rest
-		}
-	case current == "":
-		out = managed
+		user = strings.Trim(current[:start]+"\n"+current[stop+len(End):], "\n")
 	default:
-		out = strings.TrimRight(current, "\n") + "\n\n" + managed
+		user = strings.Trim(current, "\n")
+	}
+	out := managed
+	if user != "" {
+		out += "\n" + user + "\n"
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -170,6 +190,10 @@ func Write(path, block string) error {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	return nil
+}
+
+func quoteSSHConfig(value string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) + `"`
 }
 
 // DefaultPath is the person's own SSH configuration.

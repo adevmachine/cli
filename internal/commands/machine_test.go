@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/aliases"
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 )
 
 var errNotFound = errors.New("not found")
@@ -58,6 +60,13 @@ func TestMachineDoctorSaysTheAliasesAreStale(t *testing.T) {
 
 	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
 		"workspaces:\n  - name: alice\n")
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, commandHostKey(t)); err != nil {
+		t.Fatal(err)
+	}
 
 	out, err := execute(t, "--config", dir, "machine", "doctor")
 	if err == nil {

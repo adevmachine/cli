@@ -9,10 +9,25 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/aliases"
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 )
 
+func configWithTrustedKey(t *testing.T, extra string) string {
+	t.Helper()
+	dir := configWithKey(t, extra)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, commandHostKey(t)); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func TestAliasesPrintsTheBlockAndWritesNothing(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 
 	out, err := execute(t, "--config", dir, "aliases")
 	if err != nil {
@@ -26,7 +41,7 @@ func TestAliasesPrintsTheBlockAndWritesNothing(t *testing.T) {
 }
 
 func TestAliasesWritesOnlyItsOwnBlock(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 	path := filepath.Join(t.TempDir(), "ssh_config")
 	if err := os.WriteFile(path, []byte("Host work-jump\n    HostName jump.example.com\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -48,7 +63,7 @@ func TestAliasesWritesOnlyItsOwnBlock(t *testing.T) {
 }
 
 func TestAliasesAsksBeforeTouchingTheFile(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 	path := filepath.Join(t.TempDir(), "ssh_config")
 
 	out, err := executeWithInput(t, "n\n", "--config", dir, "aliases", "--write", "--path", path)
@@ -64,7 +79,7 @@ func TestAliasesAsksBeforeTouchingTheFile(t *testing.T) {
 }
 
 func TestAliasesCheckWritesNothing(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 	path := filepath.Join(t.TempDir(), "ssh_config")
 
 	out, err := execute(t, "--config", dir, "aliases", "--write", "--path", path, "--check")
@@ -80,7 +95,7 @@ func TestAliasesCheckWritesNothing(t *testing.T) {
 }
 
 func TestAliasesPathWithoutWriteIsRefused(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 
 	_, err := execute(t, "--config", dir, "aliases", "--path", filepath.Join(t.TempDir(), "ssh_config"))
 	if err == nil {
@@ -92,7 +107,7 @@ func TestAliasesPathWithoutWriteIsRefused(t *testing.T) {
 }
 
 func TestAliasesAsJSONCarriesEachEntry(t *testing.T) {
-	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 
 	out, err := execute(t, "--config", dir, "--format", "json", "aliases")
 	if err != nil {

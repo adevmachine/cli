@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -103,7 +102,7 @@ func newSSHCmd(opts *options) *cobra.Command {
 			"and tmux behave exactly as they do when you run ssh yourself.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return interactive(opts, "ssh", args)
+			return interactive(cmd.Context(), opts, "ssh", args)
 		},
 	}
 }
@@ -116,12 +115,12 @@ func newMoshCmd(opts *options) *cobra.Command {
 			"broken pipe. It needs mosh on both sides.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return interactive(opts, "mosh", args)
+			return interactive(cmd.Context(), opts, "mosh", args)
 		},
 	}
 }
 
-func interactive(opts *options, binary string, args []string) error {
+func interactive(ctx context.Context, opts *options, binary string, args []string) error {
 	var name string
 	if len(args) == 1 {
 		name = args[0]
@@ -139,22 +138,18 @@ func interactive(opts *options, binary string, args []string) error {
 	}
 
 	m, user := tgt.machine, tgt.login()
+	if err := verifySystemHost(ctx, m); err != nil {
+		return err
+	}
 
 	var argv []string
 	switch binary {
 	case "mosh":
 		// mosh takes the remote ssh command as one string, which is where the
 		// port and the key have to go.
-		ssh := "ssh -p " + strconv.Itoa(m.Port)
-		if m.Key != "" {
-			ssh += " -i " + m.Key
-		}
-		argv = []string{"--ssh=" + ssh, user + "@" + address}
+		argv = []string{"--ssh=" + strictSSHCommand(m), user + "@" + address}
 	default:
-		argv = []string{"-p", strconv.Itoa(m.Port)}
-		if m.Key != "" {
-			argv = append(argv, "-i", m.Key, "-o", "IdentitiesOnly=yes")
-		}
+		argv = strictSSHArgs(m)
 		argv = append(argv, user+"@"+address)
 	}
 	return runInteractive(binary, argv...)

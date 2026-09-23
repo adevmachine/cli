@@ -25,7 +25,12 @@ func captureInteractive(t *testing.T) *[]string {
 		return nil
 	}
 	lookPath = func(string) (string, error) { return "/usr/bin/fake", nil }
-	t.Cleanup(func() { runInteractive = realExecCommand; lookPath = realLookPath })
+	verifySystemHost = func(context.Context, config.Machine) error { return nil }
+	t.Cleanup(func() {
+		runInteractive = realExecCommand
+		lookPath = realLookPath
+		verifySystemHost = realVerifySystemHost
+	})
 	return &got
 }
 
@@ -78,7 +83,7 @@ func TestMoshPassesThePortThroughItsSSHOption(t *testing.T) {
 
 	line := strings.Join(*got, " ")
 	// mosh does not take -p or -i itself; they have to travel inside --ssh.
-	if !strings.Contains(line, "--ssh=ssh -p 2222 -i /keys/id_ed25519") {
+	if !strings.Contains(line, "'-p' '2222'") || !strings.Contains(line, "'-i' '/keys/id_ed25519'") {
 		t.Fatalf("the port and key did not reach mosh's ssh command: %q", line)
 	}
 	if !strings.Contains(line, "root@203.0.113.10") {

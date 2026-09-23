@@ -168,20 +168,13 @@ func TestLoginRecordsWhatWasAskedOfTheMachine(t *testing.T) {
 }
 
 func TestLoginTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
-	// `login` hands the connection to the system ssh, which reads the
-	// operator's own known_hosts. Every other command dials with the Go
-	// client, which pins nothing (remote.go). A machine the CLI created
-	// minutes ago is in nobody's known_hosts, so leaving the default made
-	// `login` fail on every machine the CLI builds, with "Host key
-	// verification failed". Whether the CLI pins host keys at all is one
-	// decision for the whole CLI; until it is made, one command may not
-	// answer it differently from the rest.
-	args := loginArgs(config.Machine{Port: 2222}, "root", "127.0.0.1", "gh auth login")
+	m, _ := pinnedMachine(t, 2222, true)
+	args := loginArgs(m, "root", "127.0.0.1", "gh auth login")
 
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"} {
+	for _, want := range []string{"StrictHostKeyChecking=yes", "UserKnownHostsFile=" + m.KnownHostsFile, "HostKeyAlias=[main-devmachine]:2222"} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("login does not reach a machine the CLI just made: %#v", args)
+			t.Fatalf("login does not enforce %q: %#v", want, args)
 		}
 	}
 }

@@ -3,10 +3,13 @@ package commands
 import (
 	"errors"
 	"net"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/adevmachine/cli/internal/config"
 )
 
 func freePort(t *testing.T) int {
@@ -112,12 +115,6 @@ func TestTunnelSaysWhenSshIsMissing(t *testing.T) {
 }
 
 func TestTunnelTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
-	// `tunnel` execs the system ssh, which reads the operator's own
-	// known_hosts. A machine the CLI built minutes ago is in nobody's, so
-	// `tunnel` failed on every machine the CLI creates. `login` had exactly
-	// this defect; the Go client pins no host key either. Whether the CLI
-	// pins host keys is one decision for the whole CLI, and until it is
-	// taken no command may answer it differently from the rest.
 	got := captureInteractive(t)
 	dir := configWithWorkspace(t)
 	port := strconv.Itoa(freePort(t))
@@ -127,9 +124,9 @@ func TestTunnelTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
 	}
 
 	joined := strings.Join(*got, " ")
-	for _, want := range []string{"StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null"} {
+	for _, want := range []string{"StrictHostKeyChecking=yes", "UserKnownHostsFile=" + filepath.Join(dir, config.KnownHostsFileName), "HostKeyAlias=[main-devmachine]:2222"} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("tunnel cannot reach a machine the CLI just made: %#v", *got)
+			t.Fatalf("tunnel does not enforce %q: %#v", want, *got)
 		}
 	}
 }

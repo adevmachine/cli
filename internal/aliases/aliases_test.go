@@ -1,12 +1,16 @@
 package aliases
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
+	"golang.org/x/crypto/ssh"
 )
 
 // withResolver replaces the address lookup, so a test of what is written does
@@ -41,12 +45,39 @@ func read(t *testing.T, path string) string {
 	return string(body)
 }
 
+func pinMachine(t *testing.T, m *config.Machine, spaced bool) {
+	t.Helper()
+	dir := t.TempDir()
+	if spaced {
+		dir = filepath.Join(dir, "config with spaces")
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m.KnownHostsFile = filepath.Join(dir, "known hosts")
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := ssh.NewPublicKey(private.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := hostkeys.Open(m.KnownHostsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put(m.Name, m.Port, key); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // twoAddresses is a machine reached over a tailnet first and a public address
 // when that is down.
 func twoAddresses(t *testing.T) config.Config {
 	t.Helper()
 	withResolver(t, map[string][]string{"main": {"100.64.0.5"}})
-	return config.Config{
+	cfg := config.Config{
 		Machines: []config.Machine{{
 			Name:  "main",
 			Hosts: []config.Host{{Address: "tailscale:main"}, {Address: "203.0.113.10"}},
@@ -54,18 +85,22 @@ func twoAddresses(t *testing.T) config.Config {
 		}},
 		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
 	}
+	pinMachine(t, &cfg.Machines[0], false)
+	return cfg
 }
 
 func oneAddress(t *testing.T) config.Config {
 	t.Helper()
 	withResolver(t, map[string][]string{"main": {"203.0.113.10"}})
-	return config.Config{
+	cfg := config.Config{
 		Machines: []config.Machine{{
 			Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}},
 			User: "root", Port: 22,
 		}},
 		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
 	}
+	pinMachine(t, &cfg.Machines[0], false)
+	return cfg
 }
 
 func TestWriteReplacesOnlyTheManagedBlock(t *testing.T) {
@@ -100,7 +135,7 @@ Host sandbox
 	}
 }
 
-func TestWriteAppendsWhenThereIsNoBlockYet(t *testing.T) {
+func TestWritePrependsWhenThereIsNoBlockYet(t *testing.T) {
 	path := fileWith(t, "Host work-jump\n    HostName jump.example.com\n")
 
 	if err := Write(path, "Host alice-devmachine\n"); err != nil {
@@ -113,6 +148,9 @@ func TestWriteAppendsWhenThereIsNoBlockYet(t *testing.T) {
 	}
 	if !strings.Contains(body, Begin) {
 		t.Fatalf("the block is not marked:\n%s", body)
+	}
+	if strings.Index(body, Begin) > strings.Index(body, "Host work-jump") {
+		t.Fatalf("managed defaults must come before user defaults:\n%s", body)
 	}
 }
 
@@ -177,6 +215,32 @@ func TestRenderGivesEveryAliasTheSameHostKeyAlias(t *testing.T) {
 	}
 }
 
+func TestRenderPinsEveryHostKeySourceAndQuotesKnownHostsPath(t *testing.T) {
+	cfg := oneAddress(t)
+	pinMachine(t, &cfg.Machines[0], true)
+	block, err := Render(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"StrictHostKeyChecking yes",
+		`UserKnownHostsFile "` + cfg.Machines[0].KnownHostsFile + `"`,
+		"GlobalKnownHostsFile /dev/null",
+		"HostKeyAlias main-devmachine",
+		"UpdateHostKeys no", "CheckHostIP no", "VerifyHostKeyDNS no",
+		"KnownHostsCommand none", "HostKeyAlgorithms ssh-ed25519",
+	} {
+		if !strings.Contains(block, want) {
+			t.Fatalf("missing %q:\n%s", want, block)
+		}
+	}
+	for _, forbidden := range []string{"StrictHostKeyChecking no", "accept-new", "UserKnownHostsFile /dev/null"} {
+		if strings.Contains(block, forbidden) {
+			t.Fatalf("unsafe %q:\n%s", forbidden, block)
+		}
+	}
+}
+
 func TestRenderWritesAPubAliasOnlyWhenThereIsAFallback(t *testing.T) {
 	// Somebody with one address never sees a `-pub` alias.
 	block, err := Render(oneAddress(t))
@@ -214,6 +278,7 @@ func TestRenderLeavesOutAPubAliasThatWouldRepeatThePrimary(t *testing.T) {
 		}},
 		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
 	}
+	pinMachine(t, &cfg.Machines[0], false)
 
 	block, err := Render(cfg)
 	if err != nil {
@@ -230,6 +295,7 @@ func TestRenderNamesTheWorkspaceUser(t *testing.T) {
 		Machines:   []config.Machine{{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}, User: "root", Port: 2222}},
 		Workspaces: []config.Workspace{{Name: "alice", Machine: "main", User: "alice2"}},
 	}
+	pinMachine(t, &cfg.Machines[0], false)
 
 	block, err := Render(cfg)
 	if err != nil {
@@ -247,7 +313,7 @@ func TestRenderOffersTheMachinesKeyAndOnlyThat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(block, "IdentityFile /keys/main") {
+	if !strings.Contains(block, `IdentityFile "/keys/main"`) {
 		t.Fatalf("got:\n%s", block)
 	}
 	// An agent holding many keys makes a server cut the connection at
