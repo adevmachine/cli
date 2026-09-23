@@ -72,6 +72,8 @@ type Check struct {
 // Dialer opens a connection to a machine. It is a parameter so the tests do
 // not need one.
 type Dialer func(context.Context, config.Machine, string) (remote.Client, string, error)
+
+// Scanner reads a machine's presented host key without authenticating.
 type Scanner func(context.Context, config.Machine) (ssh.PublicKey, string, error)
 
 var scanHostKey = remote.ScanHostKey

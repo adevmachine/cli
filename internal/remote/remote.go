@@ -341,7 +341,7 @@ func ScanHostKey(ctx context.Context, m config.Machine) (ssh.PublicKey, string, 
 		}
 		clientConn, _, _, handshakeErr := ssh.NewClientConn(conn, target, cfg)
 		if clientConn != nil {
-			clientConn.Close()
+			_ = clientConn.Close()
 		} else {
 			_ = conn.Close()
 		}
