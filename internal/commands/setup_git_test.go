@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/adevmachine/cli/internal/config"
 )
 
 // fakeGhClient stands in for the `gh` binary, so a test proves what the
@@ -69,6 +71,7 @@ func configDirWithSecrets(t *testing.T) string {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "config.yml"), "machines: {}\n")
 	mustWrite(t, filepath.Join(dir, "packages.lock"), "{}\n")
+	mustWrite(t, filepath.Join(dir, config.KnownHostsFileName), "main-devmachine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest\n")
 	if err := os.MkdirAll(filepath.Join(dir, "keys"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +160,7 @@ func TestSetupGitWritesTheIgnoreFileBeforeInit(t *testing.T) {
 	}
 }
 
-func TestSetupGitCommitsOnlyTheTwoSafeFiles(t *testing.T) {
+func TestSetupGitCommitsThePublicTrustStoreButNotThePrivateKey(t *testing.T) {
 	dir := configDirWithSecrets(t)
 	withoutGh(t)
 
@@ -166,7 +169,7 @@ func TestSetupGitCommitsOnlyTheTwoSafeFiles(t *testing.T) {
 	}
 
 	got := trackedFiles(t, dir)
-	want := []string{".gitignore", "config.yml", "packages.lock"}
+	want := []string{".gitignore", "config.yml", "known_hosts", "packages.lock"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("tracked %#v, want %#v", got, want)
 	}

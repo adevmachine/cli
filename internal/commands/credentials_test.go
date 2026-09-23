@@ -10,9 +10,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/adevmachine/cli/internal/secrets"
+	"golang.org/x/crypto/ssh"
 )
 
 // recordingRemote answers like fakeRemote and keeps every command it was
@@ -92,6 +95,19 @@ workspaces:
 			"    command: claude /login\n    stored_at: ~/.claude/.credentials.json\n")
 	writeCredentialPackage(t, dir, secret, packages.ScopeWorkspace,
 		fmt.Sprintf("  - name: %s\n    kind: secret\n    scope: workspace\n    env: PROBE_TOKEN\n", secret))
+	key := commandHostKey(t)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, key); err != nil {
+		t.Fatal(err)
+	}
+	wasScan := scanHostKey
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		return key, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { scanHostKey = wasScan })
 	return dir
 }
 
@@ -424,7 +440,7 @@ func TestDoctorReportsEachCredentialAndHowToFixIt(t *testing.T) {
 }
 
 func TestDoctorSaysNothingAboutCredentialsOnAMachineWithNoPackages(t *testing.T) {
-	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	dir := configWithTrustedKey(t, "")
 	answering(t, "ID=ubuntu")
 
 	out, err := execute(t, "--config", dir, "doctor")

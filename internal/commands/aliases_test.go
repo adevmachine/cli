@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/adevmachine/cli/internal/aliases"
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/hostkeys"
+	"golang.org/x/crypto/ssh"
 )
 
 func configWithTrustedKey(t *testing.T, extra string) string {
@@ -20,9 +22,15 @@ func configWithTrustedKey(t *testing.T, extra string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Put("main", 22, commandHostKey(t)); err != nil {
+	key := commandHostKey(t)
+	if err := store.Put("main", 22, key); err != nil {
 		t.Fatal(err)
 	}
+	wasScan := scanHostKey
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		return key, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { scanHostKey = wasScan })
 	return dir
 }
 

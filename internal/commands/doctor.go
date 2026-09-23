@@ -29,7 +29,7 @@ func newDoctorCmd(opts *options) *cobra.Command {
 				wanted = found.wanted
 			}
 
-			checks := doctor.Run(cmd.Context(), dir, opts.machine, dial, wanted)
+			checks := doctor.RunWithScanner(cmd.Context(), dir, opts.machine, dial, scanHostKey, wanted)
 
 			if opts.format == formatJSON {
 				if err := writeJSON(cmd.OutOrStdout(), struct {

@@ -1,13 +1,16 @@
 package doctor
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,8 +18,10 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/credentials"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
+	"golang.org/x/crypto/ssh"
 )
 
 type fakeClient struct {
@@ -62,7 +67,34 @@ func configDir(t *testing.T, body string) string {
 			t.Fatal(err)
 		}
 	}
+	key := doctorKey(t, 1)
+	if cfg, err := config.Load(dir); err == nil {
+		for _, m := range cfg.Machines {
+			store, openErr := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+			if openErr != nil {
+				t.Fatal(openErr)
+			}
+			if putErr := store.Put(m.Name, m.Port, key); putErr != nil {
+				t.Fatal(putErr)
+			}
+		}
+	}
+	wasScan := scanHostKey
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		return key, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { scanHostKey = wasScan })
 	return dir
+}
+
+func doctorKey(t *testing.T, fill byte) ssh.PublicKey {
+	t.Helper()
+	private := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{fill}, ed25519.SeedSize))
+	key, err := ssh.NewPublicKey(private.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
 }
 
 func find(t *testing.T, checks []Check, name string) Check {
@@ -74,6 +106,90 @@ func find(t *testing.T, checks []Check, name string) Check {
 	}
 	t.Fatalf("no check named %q in %#v", name, checks)
 	return Check{}
+}
+
+func TestMissingHostKeyTrustSkipsAuthenticatedConnection(t *testing.T) {
+	dir := configDir(t, machineWith)
+	if err := os.Remove(filepath.Join(dir, config.KnownHostsFileName)); err != nil {
+		t.Fatal(err)
+	}
+	dialled := false
+	checks := Run(t.Context(), dir, "", func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		dialled = true
+		return nil, "", nil
+	}, nil)
+
+	got := find(t, checks, CheckHostKey)
+	if got.Status != StatusFail || !strings.Contains(got.Detail, "machines trust main") {
+		t.Fatalf("host key = %#v", got)
+	}
+	if find(t, checks, CheckConnection).Status != StatusSkip || dialled {
+		t.Fatal("authenticated connection ran without a trusted host key")
+	}
+}
+
+func TestMalformedHostKeyTrustSkipsAuthenticatedConnection(t *testing.T) {
+	dir := configDir(t, machineWith)
+	if err := os.WriteFile(filepath.Join(dir, config.KnownHostsFileName), []byte("not a known-host line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dialled := false
+	checks := Run(t.Context(), dir, "", func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		dialled = true
+		return nil, "", nil
+	}, nil)
+
+	if got := find(t, checks, CheckHostKey); got.Status != StatusFail || !strings.Contains(got.Detail, config.KnownHostsFileName) {
+		t.Fatalf("host key = %#v", got)
+	}
+	if dialled {
+		t.Fatal("authenticated connection ran with malformed trust")
+	}
+}
+
+func TestChangedHostKeyTrustSkipsAuthenticatedConnection(t *testing.T) {
+	dir := configDir(t, machineWith)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, doctorKey(t, 2)); err != nil {
+		t.Fatal(err)
+	}
+	dialled := false
+	checks := Run(t.Context(), dir, "", func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		dialled = true
+		return nil, "", nil
+	}, nil)
+
+	got := find(t, checks, CheckHostKey)
+	if got.Status != StatusFail || !strings.Contains(got.Detail, "--replace") {
+		t.Fatalf("host key = %#v", got)
+	}
+	if dialled {
+		t.Fatal("authenticated connection ran after a changed host key")
+	}
+}
+
+func TestMatchingHostKeyIsScannedBeforeAuthenticatedConnection(t *testing.T) {
+	dir := configDir(t, machineWith)
+	var events []string
+	key := doctorKey(t, 1)
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		events = append(events, "scan")
+		return key, "203.0.113.10", nil
+	}
+	checks := Run(t.Context(), dir, "", func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		events = append(events, "dial")
+		return working(""), "203.0.113.10", nil
+	}, nil)
+
+	if got := find(t, checks, CheckHostKey); got.Status != StatusPass {
+		t.Fatalf("host key = %#v", got)
+	}
+	if !slices.Equal(events, []string{"scan", "dial"}) {
+		t.Fatalf("events = %#v", events)
+	}
 }
 
 func TestAMissingConfigFailsAndSkipsTheRest(t *testing.T) {
@@ -208,13 +324,21 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 	host := os.Getenv("DEVMACHINE_TEST_HOST")
 	port := os.Getenv("DEVMACHINE_TEST_PORT")
 	key := os.Getenv("DEVMACHINE_TEST_KEY")
-	if host == "" || port == "" || key == "" {
+	knownHosts := os.Getenv("DEVMACHINE_TEST_KNOWN_HOSTS")
+	if host == "" || port == "" || key == "" || knownHosts == "" {
 		t.Skip("no test VPS: run `eval \"$(scripts/fake-vps.sh env)\"` first")
 	}
 
 	dir := t.TempDir()
 	body := "machines:\n  - name: sandbox\n    hosts: [" + host + "]\n    port: " + port + "\n    user: root\n    key: " + key + "\n"
 	if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	trusted, err := os.ReadFile(knownHosts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, config.KnownHostsFileName), trusted, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := strconv.Atoi(port); err != nil {

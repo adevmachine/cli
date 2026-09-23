@@ -4,14 +4,18 @@ package doctor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/credentials"
 	"github.com/adevmachine/cli/internal/dns"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // The status of one check.
@@ -26,6 +30,7 @@ const (
 // The checks, in the order they run.
 const (
 	CheckConfiguration   = "configuration"
+	CheckHostKey         = "host key"
 	CheckConnection      = "connection"
 	CheckOperatingSystem = "operating system"
 	CheckAnsible         = "ansible"
@@ -67,6 +72,9 @@ type Check struct {
 // Dialer opens a connection to a machine. It is a parameter so the tests do
 // not need one.
 type Dialer func(context.Context, config.Machine, string) (remote.Client, string, error)
+type Scanner func(context.Context, config.Machine) (ssh.PublicKey, string, error)
+
+var scanHostKey = remote.ScanHostKey
 
 // Run checks one machine and returns the results in order. It never returns an
 // error: a failed check is the result, not an exception.
@@ -74,6 +82,13 @@ type Dialer func(context.Context, config.Machine, string) (remote.Client, string
 // machine names which one to check. Empty means the only configured machine,
 // and with several it is an error rather than a guess.
 func Run(ctx context.Context, dir, machine string, dial Dialer, wanted []credentials.Declared) []Check {
+	return RunWithScanner(ctx, dir, machine, dial, scanHostKey, wanted)
+}
+
+// RunWithScanner is Run with the unauthenticated host-key probe supplied by
+// the caller. Commands use the same seam as setup and machines trust; tests
+// can prove ordering without opening a network connection.
+func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan Scanner, wanted []credentials.Declared) []Check {
 	reported := order(wanted)
 
 	cfg, err := loadAndValidate(dir)
@@ -97,6 +112,11 @@ func Run(ctx context.Context, dir, machine string, dial Dialer, wanted []credent
 		Detail: fmt.Sprintf("machine %q, %d address(es), admin %s, port %d, %d workspace(s)",
 			m.Name, len(m.Hosts), m.User, m.Port, len(cfg.WorkspacesOn(m.Name))),
 	}}
+	trust := hostKeyCheck(ctx, m, scan)
+	checks = append(checks, trust)
+	if trust.Status != StatusPass {
+		return append(checks, skipRest(reported, CheckHostKey, "the SSH host identity is not trusted")...)
+	}
 
 	client, address, err := dial(ctx, m, "")
 	if err != nil {
@@ -128,11 +148,44 @@ func loadAndValidate(dir string) (config.Config, error) {
 // remembering to — including one credential's, which only this run knows the
 // name of.
 func order(wanted []credentials.Declared) []string {
-	out := []string{CheckConfiguration, CheckConnection, CheckOperatingSystem, CheckAnsible}
+	out := []string{CheckConfiguration, CheckHostKey, CheckConnection, CheckOperatingSystem, CheckAnsible}
 	for _, d := range wanted {
 		out = append(out, CredentialCheck(d))
 	}
 	return out
+}
+
+func hostKeyCheck(ctx context.Context, m config.Machine, scan Scanner) Check {
+	fail := func(err error) Check {
+		return Check{Name: CheckHostKey, Status: StatusFail, Detail: err.Error()}
+	}
+	trustCommand := fmt.Sprintf("devmachine machines trust %s", m.Name)
+	store, err := hostkeys.Open(m.KnownHostsFile)
+	if err != nil {
+		return fail(err)
+	}
+	pinned, err := store.Key(m.Name, m.Port)
+	if err != nil {
+		var keyErr *knownhosts.KeyError
+		if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
+			return fail(fmt.Errorf("%w for machine %q: run `%s`", remote.ErrHostKeyUnknown, m.Name, trustCommand))
+		}
+		return fail(err)
+	}
+	presented, address, err := scan(ctx, m)
+	if err != nil {
+		return fail(err)
+	}
+	if err := store.Check(m.Name, m.Port, presented); err != nil {
+		var keyErr *knownhosts.KeyError
+		if errors.As(err, &keyErr) {
+			return fail(fmt.Errorf("%w for machine %q at %s: expected %s, received %s; verify the address, then run `%s --replace` only for a deliberate rebuild",
+				remote.ErrHostKeyChanged, m.Name, address, hostkeys.Fingerprint(pinned), hostkeys.Fingerprint(presented), trustCommand))
+		}
+		return fail(err)
+	}
+	return Check{Name: CheckHostKey, Status: StatusPass,
+		Detail: fmt.Sprintf("%s at %s", hostkeys.Fingerprint(presented), address)}
 }
 
 // skipRest returns a skip for every check that comes after `done`.

@@ -52,7 +52,8 @@ func newSetupGitCmd(opts *options) *cobra.Command {
 		Short: "Make the configuration directory a git repository",
 		Long: "Writes a `.gitignore` before it ever runs `git init`, so a private " +
 			"key or a secret never has a window in which `git add -A` can pick it " +
-			"up. Only config.yml and packages.lock are committed.\n\n" +
+			"up. Only public configuration files are committed: config.yml, " +
+			"packages.lock and known_hosts when present.\n\n" +
 			"The remote this pushes to must be private: the configuration holds " +
 			"real hostnames and usernames. With `gh` on `PATH` and authenticated " +
 			"it offers to create one; otherwise it prints the two commands to run " +
@@ -106,6 +107,9 @@ func runSetupGit(ctx context.Context, dir string, in io.Reader, out io.Writer, o
 		if err := repo.Init(ctx, dir); err != nil {
 			return err
 		}
+		// The ignore file excludes private authentication material. The public
+		// known_hosts pin is deliberately committed beside config.yml so a
+		// cloned configuration retains the identity it already trusted.
 		if err := repo.Commit(ctx, dir, "chore(config): start tracking this configuration"); err != nil {
 			return err
 		}
