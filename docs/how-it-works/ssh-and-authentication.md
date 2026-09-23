@@ -54,3 +54,7 @@ Approved host keys live in `<config>/known_hosts`. Once a key is stored,
 programmatic SSH connections require that exact machine identity before they
 offer authentication. A missing or different key fails closed instead of being
 learned silently.
+
+System `ssh`, `mosh`, `login`, `tunnel` and generated aliases use the same
+store and the same strict decision. Migration, mismatch diagnosis and safe
+replacement are covered in [SSH host keys](ssh-host-keys.md).

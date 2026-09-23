@@ -10,6 +10,7 @@ directory is an ordinary set of files until you ask for this.
 | --- | --- | --- |
 | `config.yml` | machines, workspaces, packages, settings | **yes** |
 | `packages.lock` | the resolved package versions | **yes** |
+| `known_hosts` | public SSH host identities approved by the operator | **yes** |
 | `keys/` | private SSH keys | **never** |
 | `secrets.json` | the keyring fallback, in the clear | **never** |
 | `cache/` | downloaded package trees | **never** |

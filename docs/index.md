@@ -40,6 +40,8 @@ when something behaves in a way that surprises you.
 
 - [SSH and authentication](how-it-works/ssh-and-authentication.md) — why the CLI
   offers one key and never the whole agent.
+- [SSH host keys](how-it-works/ssh-host-keys.md) — how first trust, strict
+  verification and deliberate rotation protect every connection.
 - [Addresses and fallback](how-it-works/addresses-and-fallback.md) — how a
   machine with several addresses is reached, and what is dropped silently.
 - [Choosing a target](how-it-works/choosing-a-target.md) — why a command asks

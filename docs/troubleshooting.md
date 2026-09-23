@@ -293,15 +293,28 @@ Two workspaces log into the same tool with different accounts, so there is no
 one answer to "log in where". Name the workspace. The list in the error is
 every workspace that asks for it.
 
-## `devmachine login` says "Host key verification failed"
+## The SSH host key is not trusted
 
-The login runs through the system `ssh`, and that `ssh` has never seen this
-machine before. `doctor`, `run` and `sync` do not hit this: they use the CLI's
-own SSH client, which does not read `~/.ssh/known_hosts`.
+Configurations created by v0.6 and earlier have no stored server identity.
+Normal commands will not learn one silently. Run `devmachine machines trust
+<machine>`, compare the displayed fingerprint with the provider console or
+another trusted source, and approve it. The command reads the key without
+authenticating.
 
-Open a session once and accept the key — `devmachine ssh`, and answer `yes` —
-then run the login again. In a script, with nothing able to answer, `ssh` exits
-255 and nothing was run.
+## The SSH host key changed
+
+Stop and verify the address and both fingerprints. A changed key can mean a
+deliberate rebuild, a configuration mistake, or an attack; the CLI cannot tell
+which and will not authenticate. For a verified rebuild, run `devmachine
+machines trust <machine> --replace`. `--check --replace` previews without
+writing. `--yes` skips confirmation but never substitutes for `--replace`.
+
+## The SSH trust file is malformed
+
+The error names `<config>/known_hosts` and the bad line. Do not delete the
+whole file: it may hold pins for other machines. Correct that line, or remove
+only the selected machine's entry and run `devmachine machines trust <machine>`
+to approve it again. The file uses ordinary OpenSSH known-hosts syntax.
 
 ## "the login left nothing at …"
 

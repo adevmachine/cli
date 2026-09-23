@@ -31,7 +31,15 @@ The third is how a key kept in a password manager works: it never touches the
 disk, so there is no file to point at. Picking it leaves `key` out of
 `config.yml`, which is what tells the CLI to ask the agent every time.
 
-It then writes `config.yml` and starts on the machine. In order:
+Before writing configuration or authenticating, it reads the server's public
+host key, prints its type and SHA256 fingerprint, and asks whether to trust it.
+Compare the fingerprint with the provider console or another trusted channel:
+accepting without comparison is trust on first use, not independent proof of
+ownership. A refusal sends no password or client key and changes nothing
+remotely.
+
+After approval it writes the pin to `<config>/known_hosts`, writes `config.yml`
+and starts on the machine. In order:
 
 1. it tries the key. **If that already works, no password is asked for** —
    many servers arrive with a key pasted in at the provider, and their owner
@@ -77,7 +85,8 @@ devmachine setup git [--yes] [--check]
 ```
 
 Makes the configuration directory a git repository, so it can be pushed to a
-private remote. Only `config.yml` and `packages.lock` are ever committed — see
+private remote. `config.yml`, `packages.lock` and the public `known_hosts` are
+committed — see
 [versioning your configuration](../how-it-works/versioning-your-configuration.md)
 for the full table of what is kept and what never is.
 
@@ -86,7 +95,7 @@ In order:
 1. writes `<config>/.gitignore`, **before** `git init` — there is no moment
    where `git add -A` could pick up a key or a secret;
 2. `git init -b main`;
-3. commits `.gitignore`, `config.yml` and `packages.lock`;
+3. commits `.gitignore`, `config.yml`, `packages.lock` and `known_hosts` when present;
 4. checks what is tracked. A directory that became a repository by hand
    before this command existed can already be tracking a key — that is
    **refused**, with the fix (`git rm --cached <path>`) and a reminder that
@@ -113,8 +122,9 @@ the tracked-files check — it never re-writes `.gitignore` or re-runs `git init
 devmachine doctor [--machine m]
 ```
 
-Four checks, in order: the configuration, the connection, the operating system,
-and whether Ansible is installed. Then one check per credential the installed
+Five checks, in order: the configuration, the SSH host key, the authenticated
+connection, the operating system, and whether Ansible is installed. A missing,
+malformed or changed pin stops before authentication. Then one check per credential the installed
 packages declare, named `credential: <key>`, saying what is missing and the
 command that delivers it. Then one check per installed DNS provider, named
 `dns: <provider>`, asking it what it holds — a stale token is better found
@@ -277,11 +287,20 @@ Host alice-devmachine
     IdentityFile /home/you/.config/devmachine/keys/main
     IdentitiesOnly yes
     HostKeyAlias main-devmachine
+    StrictHostKeyChecking yes
+    UserKnownHostsFile "/home/you/.config/devmachine/known_hosts"
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    CheckHostIP no
+    VerifyHostKeyDNS no
+    KnownHostsCommand none
+    HostKeyAlgorithms ssh-ed25519
 # <<< devmachine
 ```
 
 `--write` puts the block in `~/.ssh/config`, or in the file `--path` names. It
-asks first. **Only the block between the two markers is replaced.** That file
+asks first. The managed block is placed first because OpenSSH keeps the first
+value it reads. **Only the block between the two markers is replaced.** That file
 holds hosts this CLI knows nothing about — a work jump host, a sandbox, a
 client's bastion — and rewriting the whole file deletes them.
 
@@ -323,6 +342,8 @@ whichever machine it lives. Without one, on the machine as its admin.
 
 Both run the system binary, so your terminal, agent and tmux behave normally.
 `mosh` survives a link that drops or roams, and needs mosh on both sides.
+Both verify `<config>/known_hosts` before starting and keep strict verification
+enabled in the system process itself.
 
 ## run
 
@@ -536,9 +557,9 @@ is what spreads it to the workspaces that declare the package.
 A `kind: secret` is refused: nobody logs into a value. Use `devmachine secrets
 set`, then `devmachine credentials push`.
 
-The system `ssh` is what opens the session, so the first login to a machine it
-has never seen asks you to accept the host key. See
-[the troubleshooting page](../troubleshooting.md).
+The system `ssh` is what opens the session, but it uses the same strict
+configuration-scoped host-key pin as every other command. It never learns a
+key interactively. See [SSH host keys](../how-it-works/ssh-host-keys.md).
 
 ## credentials
 
