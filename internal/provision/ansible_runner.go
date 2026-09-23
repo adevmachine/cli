@@ -79,7 +79,12 @@ func roleDirs(plan packages.MachinePlan) map[string]string {
 }
 
 func playbookCommand(opts Options) string {
-	command := fmt.Sprintf("cd %[1]s && ANSIBLE_CONFIG=%[1]s/ansible.cfg ansible-playbook -i inventory.ini site.yml",
+	// Ansible searches a playbook-adjacent directory named roles before the
+	// configured roles_path. Running a copied playbook from a fresh directory
+	// keeps RemoteDir/roles from silently beating RemoteDir/roles.local.
+	command := fmt.Sprintf("run=$(mktemp -d) && trap 'rm -rf \"$run\"' EXIT && "+
+		"cp %[1]s/site.yml \"$run/site.yml\" && cd \"$run\" && "+
+		"ANSIBLE_CONFIG=%[1]s/ansible.cfg ansible-playbook -i %[1]s/inventory.ini site.yml",
 		RemoteDir)
 	if opts.Check {
 		command += " --check"

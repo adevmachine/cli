@@ -76,6 +76,10 @@ coupling becomes invisible, and nobody can predict the final state by reading.
 A package in your own configuration directory replaces an official one of the
 same name. No syntax is needed: **the name is the override.**
 
+The generated playbook runs outside both recipe directories. Ansible otherwise
+searches a neighbouring directory named `roles` before its configured search
+path, which would let the published copy bypass that override.
+
 What a package may *not* do is modify what another package installed. The
 legitimate need underneath is real, though — adding a block to Caddy is the
 obvious case. The answer is a declared extension point, not a patch:

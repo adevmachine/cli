@@ -97,8 +97,10 @@ func TestApplyRunsTheGeneratedPlaybookFromTheRemoteDirectory(t *testing.T) {
 		Options{Out: io.Discard}); err != nil {
 		t.Fatal(err)
 	}
-	want := "cd /opt/devmachine && ANSIBLE_CONFIG=/opt/devmachine/ansible.cfg " +
-		"ansible-playbook -i inventory.ini site.yml"
+	want := "run=$(mktemp -d) && trap 'rm -rf \"$run\"' EXIT && " +
+		"cp /opt/devmachine/site.yml \"$run/site.yml\" && cd \"$run\" && " +
+		"ANSIBLE_CONFIG=/opt/devmachine/ansible.cfg " +
+		"ansible-playbook -i /opt/devmachine/inventory.ini site.yml"
 	if c.commands[0] != want {
 		t.Fatalf("got %q", c.commands[0])
 	}
