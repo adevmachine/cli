@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestDirPrefersTheFlagOverEverything(t *testing.T) {
@@ -103,6 +105,28 @@ func TestLoadDefaultsTheAdminUserAndPortPerMachine(t *testing.T) {
 	}
 	if c.Machines[1].Port != 52862 {
 		t.Fatalf("sandbox lost its explicit port: %d", c.Machines[1].Port)
+	}
+}
+
+func TestLoadAssociatesMachinesWithTheConfigurationTrustStore(t *testing.T) {
+	dir := writeConfig(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, KnownHostsFileName)
+	if cfg.Machines[0].KnownHostsFile != want {
+		t.Fatalf("got %q, want %q", cfg.Machines[0].KnownHostsFile, want)
+	}
+}
+
+func TestMachineTrustStorePathIsRuntimeOnly(t *testing.T) {
+	body, err := yaml.Marshal(Machine{Name: "main", KnownHostsFile: "/private/config/known_hosts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "known_hosts") || strings.Contains(string(body), "/private/config") {
+		t.Fatalf("runtime trust-store path leaked into YAML:\n%s", body)
 	}
 }
 
@@ -205,6 +229,32 @@ func TestValidateRejectsAMachineWithNoName(t *testing.T) {
 	c := Config{Machines: []Machine{{Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}}}
 	if err := c.Validate(); err == nil {
 		t.Fatal("expected an error for a machine with no name")
+	}
+}
+
+func TestValidateRejectsUnsafeMachineIdentityNames(t *testing.T) {
+	for _, name := range []string{" main", "main server", "main,backup", "[main]", "main*", "!main", "main\nbackup"} {
+		t.Run(name, func(t *testing.T) {
+			c := Config{Machines: []Machine{{
+				Name: name, Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22,
+			}}}
+			if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "safe SSH identity") {
+				t.Fatalf("Validate(%q) = %v, want safe-identity error", name, err)
+			}
+		})
+	}
+}
+
+func TestValidateAcceptsSafeMachineIdentityNames(t *testing.T) {
+	for _, name := range []string{"main", "main-2", "main_v2", "main.example"} {
+		t.Run(name, func(t *testing.T) {
+			c := Config{Machines: []Machine{{
+				Name: name, Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22,
+			}}}
+			if err := c.Validate(); err != nil {
+				t.Fatalf("Validate(%q) = %v", name, err)
+			}
+		})
 	}
 }
 

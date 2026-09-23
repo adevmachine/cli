@@ -32,6 +32,9 @@ import (
 // FileName is the configuration file inside the configuration directory.
 const FileName = "config.yml"
 
+// KnownHostsFileName is the configuration-scoped SSH host trust store.
+const KnownHostsFileName = "known_hosts"
+
 // EnvVar overrides the configuration directory.
 const EnvVar = "DEVMACHINE_CONFIG"
 
@@ -101,6 +104,9 @@ type Machine struct {
 	// Settings override the variables a package declares. A key is written
 	// `<package>.<name>`.
 	Settings map[string]any `yaml:"settings,omitempty"`
+	// KnownHostsFile is runtime metadata resolved from the configuration
+	// directory. It is never another source of user configuration.
+	KnownHostsFile string `yaml:"-"`
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -222,6 +228,7 @@ func Load(dir string) (Config, error) {
 		if c.Machines[i].Port == 0 {
 			c.Machines[i].Port = DefaultPort
 		}
+		c.Machines[i].KnownHostsFile = filepath.Join(dir, KnownHostsFileName)
 	}
 	return c, nil
 }
@@ -306,6 +313,8 @@ func (c Config) Validate() error {
 		switch {
 		case m.Name == "":
 			return fmt.Errorf("machine %d has no name: every entry under `machines` needs a `name`", i+1)
+		case !machineIdentityName.MatchString(m.Name):
+			return fmt.Errorf("machine %q does not have a safe SSH identity name: use only letters, numbers, dots, underscores and hyphens, starting with a letter or number", m.Name)
 		case seen[m.Name]:
 			return fmt.Errorf("two machines are named %q: a machine's name has to be unique", m.Name)
 		case len(m.Hosts) == 0:
@@ -432,6 +441,8 @@ func validateCredentials(kind, target string, preferences map[string]string) err
 // releaseTag is deliberately loose about the shape after the v: the packages
 // repository decides how it numbers its releases, not this package.
 var releaseTag = regexp.MustCompile(`^v[0-9][0-9A-Za-z.\-]*$`)
+
+var machineIdentityName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 func firstDuplicate(names []string) (string, bool) {
 	seen := map[string]bool{}
