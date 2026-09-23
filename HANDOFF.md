@@ -1,4 +1,4 @@
-# Handoff — where the CLI stands, 2026-09-22
+# Handoff — where the CLI stands, 2026-09-23
 
 Read this first, then `docs/superpowers/specs/2026-09-17-devmachine-cli-design.md`
 in `~/dev/devmachine` (the living spec). This file is the state; that file is the
@@ -14,6 +14,15 @@ reasoning.
 v0.5.0 shipped DNS providers as packages, `tailscale`, `git-key` and
 `base.swap`. v0.6.0 shipped `expose`, `tunnel`, `machine setup|doctor` and
 `setup git`.
+
+## Unreleased on `main`
+
+- SSH host keys are pinned in `<config>/known_hosts` before authentication and
+  verified by every Go/system-SSH path. Existing v0.6 configurations migrate
+  with `devmachine machines trust <name>`; replacement is explicit.
+- The permanent `make accept` gate now covers setup/Git, the v0.5 and v0.6
+  machine proofs, and host-key rejection plus deliberate rotation.
+- The complete local gate, disposable-VM acceptance and GitHub CI are green.
 
 ## The one ordering rule that is not written anywhere else
 
@@ -50,22 +59,6 @@ ever run.
 **Until both run, the Hostinger MCP server stays in `~/dev/devmachine/.mcp.json`
 and the `add-subdomain` skill keeps calling it.** Replacing a path that works
 with one nobody has watched is not a retirement.
-
-### The biggest open decision
-
-**The CLI has no host-key story.** `internal/remote/remote.go` uses
-`ssh.InsecureIgnoreHostKey()`, with a comment admitting that pinning needs a
-store that does not exist. Every command that execs the system `ssh` has now had
-to be talked *out* of checking, because a machine the CLI built minutes ago is in
-nobody's `known_hosts`:
-
-- `devmachine login` — fixed in v0.5
-- `devmachine tunnel` — fixed in v0.6
-- the next one will get it wrong too
-
-Three witnesses. This is one decision for the whole CLI — store the host key at
-`setup` and verify it everywhere, or decide not to and say so once — and it is
-the only open item that is a security property rather than a papercut.
 
 ### Three smaller things, in the order I would do them
 
@@ -123,11 +116,10 @@ VM, so the ACME challenge can never succeed), so it became `caddy.local_certs`, 
 setting, off by default. **An accommodation that is declared can be reviewed; one
 made by hand inside the machine cannot.**
 
-The scripts currently live inside the plan files under
-`~/dev/devmachine/docs/superpowers/plans/`, which are gitignored and deleted when
-a version ships. **They should become `make accept` in this repo**, run as part of
-the release gate. Otherwise the next version starts from nothing and relearns
-that `grep "active"` matches `inactive`.
+The scripts now live in `scripts/accept/` and run through `make accept` as part
+of the release gate. Each machine scenario owns one uniquely named disposable
+Lima VM, reuses it for all assertions in that scenario, and destroys it on exit.
+`fakevps` and the real VPS are outside that gate.
 
 ## House rules that are easy to break
 
@@ -146,7 +138,7 @@ that `grep "active"` matches `inactive`.
   `export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"`.
 - The gate before every commit:
   `make fmt && make test && make lint && make cover && make surface && make docs`
-  plus `scripts/check-no-real-data.sh`. Coverage floor is 80%; it sits at 82.8%.
+  plus `scripts/check-no-real-data.sh`. Coverage floor is 80%; it sits at 82.5%.
 
 ## Two things that bit me, so they do not bite twice
 
