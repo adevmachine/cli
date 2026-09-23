@@ -1,0 +1,21 @@
+internal/doctor/doctor.go
+  s_ad29e4893e2b5c::t_ca00684c7d9331 75-76
+internal/remote/remote.go
+  s_ad29e4893e2b5c::t_55f0c48f30f698 344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0a6d71615c537b80112ab200b45a278923acc003",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
