@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,9 +13,11 @@ import (
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/keys"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -28,6 +31,8 @@ var (
 	harden         = remote.Harden
 	installAnsible = remote.InstallAnsible
 	agentKeys      = keys.FromAgent
+	scanHostKey    = remote.ScanHostKey
+	confirmHostKey = confirm
 )
 
 // setupOptions are the flags the flow reads.
@@ -90,6 +95,10 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
+	m.KnownHostsFile = filepath.Join(dir, config.KnownHostsFileName)
+	if err := trustFirstContact(ctx, r, out, m); err != nil {
+		return err
+	}
 
 	key, err := askForKey(r, out, dir, m.Name)
 	if err != nil {
@@ -111,6 +120,52 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	}
 
 	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
+	return nil
+}
+
+// trustFirstContact records the host identity before setup offers any
+// authentication method or changes the remote machine.
+func trustFirstContact(ctx context.Context, reader io.Reader, out io.Writer, machine config.Machine) error {
+	presented, address, err := scanHostKey(ctx, machine)
+	if err != nil {
+		return err
+	}
+	fingerprint := hostkeys.Fingerprint(presented)
+	fmt.Fprintf(out, "\n%s at %s presented %s host key %s.\n", machine.Name, address, presented.Type(), fingerprint)
+
+	store, err := hostkeys.Open(machine.KnownHostsFile)
+	if err != nil {
+		return err
+	}
+	current, err := store.Key(machine.Name, machine.Port)
+	if err == nil {
+		if bytes.Equal(current.Marshal(), presented.Marshal()) {
+			fmt.Fprintf(out, "the presented host key matches the trusted key in %s\n", machine.KnownHostsFile)
+			return nil
+		}
+		return fmt.Errorf("%w for machine %q at %s: expected %s, received %s; use `devmachine machines trust %s --replace` only after verifying a deliberate rebuild",
+			remote.ErrHostKeyChanged, machine.Name, address, hostkeys.Fingerprint(current), fingerprint, machine.Name)
+	}
+	var keyErr *knownhosts.KeyError
+	if !errors.As(err, &keyErr) || len(keyErr.Want) != 0 {
+		return err
+	}
+
+	question := fmt.Sprintf("Trust this %s fingerprint for %s? This is trust on first use; compare it through the provider console or another trusted channel first.", fingerprint, machine.Name)
+	ok, err := confirmHostKey(reader, out, question)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errDeclined
+	}
+	if err := os.MkdirAll(filepath.Dir(machine.KnownHostsFile), 0o700); err != nil {
+		return fmt.Errorf("creating the configuration directory for host trust: %w", err)
+	}
+	if err := store.Put(machine.Name, machine.Port, presented); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "trusted %s in %s\n", fingerprint, machine.KnownHostsFile)
 	return nil
 }
 

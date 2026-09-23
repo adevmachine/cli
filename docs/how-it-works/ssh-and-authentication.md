@@ -41,19 +41,16 @@ logs in as. `devmachine ssh` with no workspace logs in as the machine's admin.
 
 ## Host keys
 
-The CLI does not verify the machine's host key. It reaches a server you already
-own, over a path you chose, so pinning would need a store of known keys that
-nothing here keeps.
+The operator's key proves who the operator is to the server. The server's host
+key proves which server answered the operator. They are different keys.
 
-**`devmachine login` is the exception, and the difference surprises people.** It
-execs the system `ssh` — a login has to reach a person through a real terminal —
-so it reads `~/.ssh/known_hosts` like any other `ssh`. Everything else uses the
-Go client, which does not. So the first `login` against a machine can fail with
-`Host key verification failed` seconds after `doctor`, `run` and `sync` all
-worked.
+During `setup`, the CLI reads the host public key without offering a password
+or an authentication key. It prints the SHA256 fingerprint and asks before it
+trusts the key. Compare that fingerprint with the provider console or another
+trusted channel: accepting it without comparison pins the first server reached,
+but does not independently prove that it is the intended server.
 
-Connect once with `devmachine ssh` and accept the key, and `login` works from
-then on.
-
-This is worth knowing if you are on a network you do not trust: the commands
-that do the work are the ones not checking.
+Approved host keys live in `<config>/known_hosts`. Once a key is stored,
+programmatic SSH connections require that exact machine identity before they
+offer authentication. A missing or different key fails closed instead of being
+learned silently.

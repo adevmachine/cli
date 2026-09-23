@@ -2,6 +2,10 @@ package commands
 
 import (
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -85,6 +89,41 @@ func TestMachinesAddBootstrapsAndWritesTheNewMachine(t *testing.T) {
 	}
 	if cfg.Domain != "example.com" {
 		t.Fatalf("the rest of the configuration changed: %q", cfg.Domain)
+	}
+}
+
+func TestMachinesAddHostTrustRefusalChangesNothing(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\ndomain: example.com\n")
+	before, err := os.ReadFile(filepath.Join(dir, config.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+	t.Cleanup(swap(&confirmHostKey, func(_ io.Reader, _ io.Writer, _ string) (bool, error) {
+		steps.events = append(steps.events, "ask trust")
+		return false, nil
+	}))
+
+	_, err = executeWithInput(t, "sandbox\n198.51.100.7\nroot\n2222\n",
+		"--config", dir, "machines", "add")
+	if !errors.Is(err, errDeclined) {
+		t.Fatalf("machines add error = %v, want declined", err)
+	}
+	after, err := os.ReadFile(filepath.Join(dir, config.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("config changed after refusal:\n%s", after)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, config.KnownHostsFileName)); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatal("refusal created known_hosts")
+	}
+	if !slices.Equal(steps.events, []string{"scan host key", "ask trust"}) {
+		t.Fatalf("refusal events = %#v", steps.events)
+	}
+	if steps.installedKey || steps.proved || steps.hardened || steps.ansible {
+		t.Fatalf("refusal bootstrapped: %#v", steps)
 	}
 }
 

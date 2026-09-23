@@ -156,6 +156,10 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if _, err := current.Machine(m.Name); err == nil {
 		return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
 	}
+	m.KnownHostsFile = filepath.Join(dir, config.KnownHostsFileName)
+	if err := trustFirstContact(ctx, r, out, m); err != nil {
+		return err
+	}
 
 	key, err := askForKey(r, out, dir, m.Name)
 	if err != nil {

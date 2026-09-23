@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -12,8 +14,10 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/keys"
 	"github.com/adevmachine/cli/internal/remote"
+	"golang.org/x/crypto/ssh"
 )
 
 // nopClient stands in for a machine. Every step of the bootstrap is stubbed,
@@ -43,6 +47,7 @@ type bootstrapStubs struct {
 // bootstrapSteps records the decisions the flow took, so a test reads those
 // rather than guessing from the output.
 type bootstrapSteps struct {
+	events           []string
 	askedForPassword bool
 	password         string
 	installedKey     bool
@@ -51,19 +56,43 @@ type bootstrapSteps struct {
 	provedWith       remote.Auth
 	hardened         bool
 	ansible          bool
+	hostKey          ssh.PublicKey
 }
 
 func stubBootstrap(t *testing.T, s bootstrapStubs) *bootstrapSteps {
 	t.Helper()
 	steps := &bootstrapSteps{}
+	steps.hostKey = commandHostKey(t)
+	trustRecorded := false
+
+	t.Cleanup(swap(&scanHostKey, func(_ context.Context, m config.Machine) (ssh.PublicKey, string, error) {
+		steps.events = append(steps.events, "scan host key")
+		return steps.hostKey, m.Hosts[0].Address, nil
+	}))
+	t.Cleanup(swap(&confirmHostKey, func(_ io.Reader, _ io.Writer, _ string) (bool, error) {
+		steps.events = append(steps.events, "ask trust")
+		return true, nil
+	}))
 
 	t.Cleanup(swap(&dialWith, func(_ context.Context, m config.Machine, _ string, a remote.Auth) (remote.Client, string, error) {
 		address := m.Hosts[0].Address
+		if !trustRecorded {
+			store, err := hostkeys.Open(m.KnownHostsFile)
+			if err != nil {
+				t.Errorf("opening trust before authentication: %v", err)
+			} else if err := store.Check(m.Name, m.Port, steps.hostKey); err != nil {
+				t.Errorf("host key was not written before authentication: %v", err)
+			}
+			steps.events = append(steps.events, "write trust")
+			trustRecorded = true
+		}
 		if a.Password != "" {
+			steps.events = append(steps.events, "optional password authentication")
 			steps.askedForPassword = true
 			steps.password = a.Password
 			return nopClient{}, address, nil
 		}
+		steps.events = append(steps.events, "attempt key authentication")
 		if !s.keyWorks {
 			return nil, "", fmt.Errorf("%w: the machine refused the key", remote.ErrAuthRefused)
 		}
@@ -79,20 +108,36 @@ func stubBootstrap(t *testing.T, s bootstrapStubs) *bootstrapSteps {
 			return nil, errors.New("the key is installed but does not log in: check authorized_keys and AuthorizedKeysFile")
 		}
 		steps.proved = true
+		steps.events = append(steps.events, "prove key")
 		steps.provedWith = a
 		return nopClient{}, nil
 	}))
 	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error {
 		steps.ansible = true
+		steps.events = append(steps.events, "install ansible")
 		return nil
 	}))
 	t.Cleanup(swap(&harden, func(context.Context, remote.Client) error {
 		steps.hardened = true
+		steps.events = append(steps.events, "harden")
 		return nil
 	}))
 	t.Cleanup(swap(&agentKeys, func() ([]keys.Offered, error) { return s.agent, nil }))
 
 	return steps
+}
+
+func commandHostKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	public, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := ssh.NewPublicKey(public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
 }
 
 // answers replies to setup's questions, in order: machine name, address,
@@ -143,6 +188,59 @@ func TestSetupFallsBackToThePassword(t *testing.T) {
 	}
 	if steps.password != "devmachine" {
 		t.Fatalf("password = %q", steps.password)
+	}
+}
+
+func TestSetupTrustsTheHostBeforeAnyAuthentication(t *testing.T) {
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	if _, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "", "1", "devmachine"),
+		setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"scan host key",
+		"ask trust",
+		"write trust",
+		"attempt key authentication",
+		"optional password authentication",
+		"prove key",
+		"harden",
+		"install ansible",
+	}
+	if !slices.Equal(steps.events, want) {
+		t.Fatalf("events = %#v, want %#v", steps.events, want)
+	}
+}
+
+func TestSetupHostTrustRefusalLeavesNoFilesOrAuthentication(t *testing.T) {
+	dir := t.TempDir()
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+	t.Cleanup(swap(&confirmHostKey, func(_ io.Reader, _ io.Writer, _ string) (bool, error) {
+		steps.events = append(steps.events, "ask trust")
+		return false, nil
+	}))
+
+	_, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", ""), setupOptions{})
+	if !errors.Is(err, errDeclined) {
+		t.Fatalf("runSetup error = %v, want declined", err)
+	}
+	for _, path := range []string{
+		filepath.Join(dir, config.FileName),
+		filepath.Join(dir, config.KnownHostsFileName),
+		keys.Dir(dir),
+	} {
+		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("refusal left %s", path)
+		}
+	}
+	if !slices.Equal(steps.events, []string{"scan host key", "ask trust"}) {
+		t.Fatalf("refusal events = %#v", steps.events)
+	}
+	if steps.installedKey || steps.proved || steps.hardened || steps.ansible {
+		t.Fatalf("refusal bootstrapped: %#v", steps)
 	}
 }
 
