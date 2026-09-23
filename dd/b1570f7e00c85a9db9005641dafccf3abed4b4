@@ -1,0 +1,37 @@
+internal/provision/testdata/generate/ansible.cfg
+  s_3c1e24ba9f2fdc::t_7fca4e2c235a9d 3
+internal/provision/testdata/generate/site.yml
+  s_3c1e24ba9f2fdc::t_8922471c8b5539 149
+docs/reference/dns-provider-contract.md
+  s_ad29e4893e2b5c::t_853f3464fa6d8d 104-105
+internal/provision/ansible.go
+  s_ad29e4893e2b5c::t_100fe7a5d32ef2 28-30,32
+internal/provision/ansible_runner_test.go
+  s_ad29e4893e2b5c::t_143a00cbd24c50 117,137,157,161,175
+internal/provision/ansible_test.go
+  s_ad29e4893e2b5c::t_2b0e078406c2b1 43,46-48,539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ddb1570f7e00c85a9db9005641dafccf3abed4b4",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
