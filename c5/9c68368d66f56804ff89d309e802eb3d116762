@@ -1,0 +1,39 @@
+SURFACE.txt
+  s_3c1e24ba9f2fdc::t_d8a1245c522b77 34
+docs/how-it-works/ssh-and-authentication.md
+  s_ad29e4893e2b5c::t_19a83a8d288345 57-60
+docs/how-it-works/ssh-host-keys.md
+  s_ad29e4893e2b5c::t_eb7213f157ae4e 1-65
+docs/how-it-works/versioning-your-configuration.md
+  s_ad29e4893e2b5c::t_3294bf83a59050 13
+docs/index.md
+  s_ad29e4893e2b5c::t_4d747ff41b8c68 43-44
+docs/reference/commands.md
+  s_ad29e4893e2b5c::t_27691e9895b3d3 34-42,88-89,98,125-127,290-297,302-303,345-346,560-562
+docs/troubleshooting.md
+  s_ad29e4893e2b5c::t_88b685beb6db5e 296,298-302,304-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c59c68368d66f56804ff89d309e802eb3d116762",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
