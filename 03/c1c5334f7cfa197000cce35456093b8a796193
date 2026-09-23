@@ -1,0 +1,29 @@
+scripts/accept/common_test.sh
+  s_ad29e4893e2b5c::t_104fd564feb900 76
+scripts/accept/host-key-pinning.sh
+  s_ad29e4893e2b5c::t_668934606be9c7 1-112
+scripts/accept/run.sh
+  s_ad29e4893e2b5c::t_5b99bd19db35ab 43
+scripts/accept/setup-git.sh
+  s_ad29e4893e2b5c::t_10dfb1f263995e 47-48,60,150
+scripts/accept/v05-packages-credentials-dns.sh
+  s_ad29e4893e2b5c::t_3ac06d6b915212 103
+scripts/accept/v06-expose-tunnel.sh
+  s_ad29e4893e2b5c::t_8edc6b467974ea 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "03c1c5334f7cfa197000cce35456093b8a796193",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
