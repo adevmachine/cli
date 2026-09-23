@@ -1,0 +1,19 @@
+scripts/accept/host-key-pinning.sh
+  s_ad29e4893e2b5c::t_359cbdb1fc27c1 48-59,64,85,88-105,144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "499edd8b05a3739b06df79612fcfddce4ce36e27",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
