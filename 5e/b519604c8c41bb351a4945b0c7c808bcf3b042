@@ -1,0 +1,25 @@
+internal/config/config.go
+  s_ad29e4893e2b5c::t_468b5cdcb43e71 35-37,107-109,231,316-317,445-446
+internal/config/config_test.go
+  s_ad29e4893e2b5c::t_50bcb8784da474 9-10,111-132,235-260
+internal/hostkeys/store.go
+  s_ad29e4893e2b5c::t_156b8083987ccc 1-161
+internal/hostkeys/store_test.go
+  s_ad29e4893e2b5c::t_5d80ad32f79c2b 1-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5eb519604c8c41bb351a4945b0c7c808bcf3b042",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
