@@ -45,10 +45,23 @@ printf '%s\n' "$CLOUD_INIT" > "$SCENARIO_DIR/cloud-init.log"
 
 PORT=$(limactl list --format '{{.SSHLocalPort}}' "$VM")
 [ -n "$PORT" ] || die "$VM never received an SSH port"
+
+# The fixture rotates the Ed25519 key below. Ubuntu may otherwise negotiate
+# ECDSA first, which would leave the pinned key unchanged and test nothing.
+# Remove only the other disposable host private keys before first contact.
+limactl shell "$VM" -- sudo sh -eu -c '
+  for key in /etc/ssh/ssh_host_*_key; do
+    [ "$key" = /etc/ssh/ssh_host_ed25519_key ] || mv "$key" "$key.accept-disabled"
+  done
+  systemctl restart ssh
+  systemctl is-active --quiet ssh
+' >"$SCENARIO_DIR/ed25519-only.log" 2>&1 || die "could not make the fixture negotiate Ed25519"
+
 SETUP=$(printf '%s\n' "$VM" "127.0.0.1" "root" "$PORT" "example.com" "y" "1" "devmachine" \
   | "$DEVMACHINE_ACCEPT_BIN" setup 2>&1) || die "could not set up $VM: $SETUP"
 printf '%s\n' "$SETUP" > "$SCENARIO_DIR/setup.log"
 contains "$SETUP" "SHA256:" "setup prints the presented SHA256 fingerprint" || true
+contains "$SETUP" "ssh-ed25519 host key" "the fixture pins the key it will rotate" || true
 
 KNOWN_HOSTS="$DEVMACHINE_CONFIG/known_hosts"
 [ -f "$KNOWN_HOSTS" ] || die "setup did not create $KNOWN_HOSTS"
@@ -69,7 +82,26 @@ limactl shell "$VM" -- sudo sh -eu -c '
   install -m 0644 "$tmp.pub" /etc/ssh/ssh_host_ed25519_key.pub
   rm -f "$tmp" "$tmp.pub"
   systemctl restart ssh
+  systemctl is-active --quiet ssh
 ' >"$SCENARIO_DIR/rotate-server.log" 2>&1 || die "could not rotate the disposable VM host key"
+
+# A service restart can briefly leave a connection accepted by the old sshd
+# while the replacement listener comes up. Require three consecutive scans of
+# the replacement before asserting the security behavior; every scan is
+# unauthenticated and this still uses the same VM.
+STABLE_SCANS=0
+SCAN_ATTEMPTS=0
+while [ "$STABLE_SCANS" -lt 3 ] && [ "$SCAN_ATTEMPTS" -lt 30 ]; do
+  SCAN_ATTEMPTS=$((SCAN_ATTEMPTS + 1))
+  SCAN=$("$DEVMACHINE_ACCEPT_BIN" --format json machines trust "$VM" --check --replace --yes 2>&1 || true)
+  case "$SCAN" in
+    *'"status": "changed"'*) STABLE_SCANS=$((STABLE_SCANS + 1)) ;;
+    *) STABLE_SCANS=0 ;;
+  esac
+  [ "$STABLE_SCANS" -ge 3 ] || sleep 1
+done
+printf '%s\n' "$SCAN" > "$SCENARIO_DIR/stabilize.log"
+[ "$STABLE_SCANS" -eq 3 ] || die "the rotated SSH daemon never presented the new key consistently: $SCAN"
 
 CHANGED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true 2>&1)
 CHANGED_STATUS=$?
@@ -109,4 +141,4 @@ fi
   && pass "a normal command succeeds only after explicit replacement" \
   || die "the connection did not recover after explicit replacement"
 
-scenario_done 13 "host-key pinning"
+scenario_done 14 "host-key pinning"
