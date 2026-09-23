@@ -1,0 +1,41 @@
+docs/how-it-works/ssh-host-keys.md
+  s_aa299511c5a915::t_985a9f5d8d3a7d 33-38
+internal/remote/hostkey_test.go
+  s_3c1e24ba9f2fdc::t_3a668dae4a9666 6,8,41-57,183-187,192,202-204,260-272
+internal/credentials/helpers_test.go
+  s_ad29e4893e2b5c::t_039051d1847aee 58-59,72-77
+internal/remote/remote.go
+  s_ad29e4893e2b5c::t_d0ecc6f2a3b264 321-324,332-334,337-342,344-346,356-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "05c44e844dc7b885c7e8cb76658ff76d777c4298",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_aa299511c5a915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c5c9f4e-b5ec-476a-b9a0-dd6a31086ba5",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
