@@ -89,6 +89,10 @@ resolves to `hostinger`, because `www.example.com` falls inside the zone
 which provider it picked and why, on stderr, so a surprising answer is never
 silent.
 
+The command asks immediately before it writes. For non-interactive use,
+`--publish` records that public DNS is intended; `--yes` alone never creates a
+record.
+
 ## `dns status` is not `dns list`
 
 `dns list` and `dns check` ask the **registrar**: what is actually configured,

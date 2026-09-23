@@ -175,7 +175,7 @@ contains "$KEPT" "bobs-own" "a workspace that opted out keeps its own key" || tr
 
 PROVIDERS=$("$DEVMACHINE_ACCEPT_BIN" dns providers 2>&1)
 contains "$PROVIDERS" "packages" "dns providers says where to get one" || true
-ADDED=$("$DEVMACHINE_ACCEPT_BIN" dns add www.example.com A 198.51.100.10 --yes 2>&1)
+ADDED=$("$DEVMACHINE_ACCEPT_BIN" dns add www.example.com A 198.51.100.10 --publish 2>&1)
 contains "$ADDED" "198.51.100.10" "with no provider, dns add prints the record to create" || true
 
 "$DEVMACHINE_ACCEPT_BIN" packages add hostinger --machine "$VM" --yes || die "could not add hostinger"

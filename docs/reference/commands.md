@@ -375,7 +375,7 @@ devmachine dns status [host]
 devmachine dns providers
 devmachine dns list [zone] [--dns-provider p] [--zone z]
 devmachine dns check <name> [--dns-provider p] [--zone z]
-devmachine dns add <name> <type> <value> [--dns-provider p] [--zone z] [--check] [--yes]
+devmachine dns add <name> <type> <value> [--dns-provider p] [--zone z] [--check] [--publish]
 devmachine dns rm  <name> <type> [value] [--dns-provider p] [--zone z] [--check] [--yes]
 ```
 
@@ -411,7 +411,9 @@ already there for that name and type, it does not add to it. Before writing,
 the confirmation names the zone, the provider and whatever value it is about
 to replace — writing the right record into the wrong account is the mistake
 this command can make, and that is the last chance to catch it. `--check`
-prints what would change and writes nothing; `--yes` skips the question.
+prints what would change and writes nothing. `--publish` is explicit consent
+for a script to skip the publication question; `--yes` never grants that
+consent.
 
 `rm` removes one value, or with none given, every value at that name and
 type. Removing one value out of several is not atomic on every registrar, and
@@ -427,7 +429,7 @@ refused for wildcard certificates. Anything that is not plain HTTP, or that
 only you should reach, is [`devmachine tunnel`](#tunnel), not `expose`.
 
 ```
-devmachine expose add <workspace> <port> --host <host> [--check] [--yes]
+devmachine expose add <workspace> <port> --host <host> [--check] [--publish]
 devmachine expose list
 devmachine expose rm <host> [--check] [--yes]
 ```
@@ -443,8 +445,9 @@ is the point of the command, not decoration: a database studio holding data
 restored from production, a captured-mail inbox showing mail addressed to
 real customers, a queue dashboard that can drain a queue — all three speak
 HTTP, none has its own authentication, and publishing one by habit is how it
-reaches the internet. `--yes` skips the question; `--check` prints what would
-happen and writes nothing.
+reaches the internet. `--publish` is the only non-interactive way past the
+question; `--yes` never publishes. `--check` prints what would happen and
+writes nothing.
 
 It also points the hostname at the machine, reusing the same path `dns add`
 uses: an installed provider gets the record written, and with none

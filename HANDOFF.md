@@ -22,6 +22,8 @@ v0.5.0 shipped DNS providers as packages, `tailscale`, `git-key` and
   with `devmachine machines trust <name>`; replacement is explicit.
 - The permanent `make accept` gate now covers setup/Git, the v0.5 and v0.6
   machine proofs, and host-key rejection plus deliberate rotation.
+- `dns add` and `expose add` require `--publish` for non-interactive public
+  writes; `--yes` alone never publishes.
 - The complete local gate, disposable-VM acceptance and GitHub CI are green.
 
 ## The one ordering rule that is not written anywhere else
@@ -36,41 +38,27 @@ Order: tag the CLI → wait for its release workflow → re-run `packages` CI �
 
 ## What is left to do
 
-### Blocked on the operator, and only on him
+### Blocked on registrar credentials
 
-Both need a real registrar account and a zone that can be damaged. Neither has
-ever run.
+Hostinger's current OpenAPI contract now explicitly says `overwrite: true`
+replaces the existing records with the payload. The provider's two-call path —
+`DELETE` the RRset, then `PUT` with `overwrite: false` — remains deliberate; a
+single-call replacement would erase every other RRset in the zone.
 
-1. **Does Hostinger's `overwrite: true` leave the names absent from a payload
-   alone?** Nothing Hostinger documents says it does. If it does not, one
-   `devmachine dns add` empties the zone. Until somebody watches it on a zone
-   they can afford to lose, `packages/hostinger/bin/provider` ships the
-   documented two-call path — `DELETE` the RRset, then `PUT` with
-   `overwrite: false` — which has a brief window where the name holds nothing.
-   Switching afterwards is a few lines.
+Provider discovery has been proved on `fakevps` with Hostinger and Cloudflare
+installed together: a configured Hostinger zone was selected even while the
+other provider failed authentication. Completing the external two-provider
+proof still needs a Hostinger token with DNS write permission and a valid
+Cloudflare token. The available Hostinger token reads DNS but returns 403 on
+writes, and the local Cloudflare login is expired.
 
-2. **The claim the whole DNS version rests on: the same command reaches the
-   right registrar with no flag.** Install `hostinger` and `cloudflare` on one
-   machine, then create a record in a zone at each with no `--dns-provider`. It
-   has only ever been proved with *no* provider installed, where it falls
-   through to `manual`. If a flag turns out to be needed, the discovery is
-   wrong and that is the bug this step exists to find.
-
-**Until both run, the Hostinger MCP server stays in `~/dev/devmachine/.mcp.json`
+**Until the external writes run, the Hostinger MCP server stays in `~/dev/devmachine/.mcp.json`
 and the `add-subdomain` skill keeps calling it.** Replacing a path that works
 with one nobody has watched is not a retirement.
 
 ### Three smaller things, in the order I would do them
 
-1. **`--yes` still means different things in different commands.** `setup git`
-   was fixed: it never publishes, and where there is no terminal it prints the
-   commands instead of waiting. The rule has not been applied to the rest.
-   `dns add --yes` creates a public DNS record; `expose add --yes` puts a port
-   on the internet. Audit every `--yes` call site (there are about ten) and make
-   the flag mean "do not ask me about the writes in this directory" and never
-   "publish".
-
-2. **`packages validate` cannot catch a manifest that lies.** Two defects
+1. **`packages validate` cannot catch a manifest that lies.** Two defects
    reached a real machine this week that a deeper validation would have caught
    in milliseconds: `commands:` listing a command the entrypoint refuses, and a
    `variables:` entry with a `default:` and no matching `defaults/main.yml`
@@ -78,7 +66,7 @@ with one nobody has watched is not a retirement.
    invokes `help` and compares, and that checks every declared variable has a
    default, would close both.
 
-3. **`sync` runs the workspace packages twice** whenever a machine has a shared
+2. **`sync` runs the workspace packages twice** whenever a machine has a shared
    login, which is most of them. That is correct — a package that *reads* a
    copied credential sees nothing on the run that delivered it, and a `sync`
    that ends with the machine needing another `sync` is the one thing

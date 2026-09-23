@@ -68,22 +68,27 @@ to reach that:
   false`.
 
 The provider uses the second, and it costs two calls where the first would cost
-one. The reason is what `overwrite: true` does to a value the request does not
-mention: no sentence in Hostinger's documentation says a name absent from an
-`overwrite: true` payload survives it. If it does not, the single-call path
-would mean that one `dns add` on one name silently empties the rest of the
-zone — every other RRset, gone, because `true` was never proved to apply only to
-the RRset in the request.
+one. Hostinger's current OpenAPI description says `overwrite: true` replaces
+the existing records with the records in the payload. A one-RRset payload would
+therefore empty the rest of the zone — every other RRset, gone. The single-call
+path is not an optimization waiting for a test; it has the wrong blast radius.
 
 The two-call path is verified: the `DELETE` removes only the named RRset by an
 explicit filter, and the `PUT` afterwards only ever writes what the provider
 already means to write. It has a real cost — **a name holds nothing for the
 gap between the two calls** — a resolver asking in that window gets NXDOMAIN
 for that name and type. That window was still the better trade than a write
-whose blast radius nobody has proved. The single-call path was written once and
-taken back out for exactly this reason: it may well be correct, but "may well"
-is not a property you want discovering on somebody's real zone the first time
-it is wrong.
+whose documented blast radius is the whole zone.
+
+### A DNS-only token needs its zones configured
+
+Hostinger's DNS API answers about one zone at a time and has no list-zones
+endpoint. Automatic provider selection normally gets the account's domains
+from the Domains portfolio endpoint, but a least-privilege DNS token receives
+403 there even though it can read its DNS zone. Set `hostinger.zones` on the
+machine for that case; the provider answers from the configured list and never
+asks the portfolio. An empty list preserves portfolio discovery for broader
+tokens.
 
 ### A delete filter takes the whole RRset
 

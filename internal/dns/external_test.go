@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -83,6 +86,35 @@ func TestExternalSendsTheRecordOnStdin(t *testing.T) {
 	// second call: a heredoc is what a shell has instead of stdin here.
 	if !strings.Contains(c.commands[0], "198.51.100.10") {
 		t.Fatalf("the record did not travel: %q", c.commands[0])
+	}
+}
+
+func TestExternalPipelineActuallyDeliversTheRecordToTheEntrypoint(t *testing.T) {
+	c := &recordingClient{out: `{}`}
+	e := newExternalWith(c)
+	record := Record{Name: "www", Type: "A", Value: "198.51.100.10", TTL: 3600}
+	if err := e.Upsert(context.Background(), "example.com", record); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "env")
+	provider := filepath.Join(dir, "provider")
+	if err := os.WriteFile(envFile, []byte("PROBE=value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(provider, []byte("#!/bin/sh\ncat\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	command := strings.ReplaceAll(c.commands[0], "/etc/devmachine/hostinger/env", envFile)
+	command = strings.ReplaceAll(command, "/opt/devmachine/roles/hostinger/bin/provider", provider)
+	out, err := exec.Command("sh", "-c", command).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"name":"www","type":"A","value":"198.51.100.10","ttl":3600}`
+	if string(out) != want {
+		t.Fatalf("entrypoint read %q, want %q", out, want)
 	}
 }
 

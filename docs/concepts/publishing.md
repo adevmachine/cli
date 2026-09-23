@@ -45,6 +45,11 @@ the safeguard: reading "HTTP" as "safe to publish" is exactly the habit that
 puts a database studio on the internet, and the last place to catch it is
 the question asked right before it happens.
 
+Automation must say `--publish` to cross that boundary. `--yes` only skips
+ordinary write confirmations and deliberately does not answer a publication
+question; this keeps a broad non-interactive flag from turning a local change
+into a public endpoint by accident. The same rule protects `dns add`.
+
 ## Why `expose` only speaks HTTPS
 
 Caddy terminates TLS for HTTP. Proxying raw TCP or UDP needs a plugin and a

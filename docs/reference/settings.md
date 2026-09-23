@@ -32,9 +32,11 @@ configuration says it is.
 | Setting | What it does | Default |
 | --- | --- | --- |
 | `base.hostname` | The machine's hostname. Empty leaves the one it already has. | *(empty)* |
+| `base.swap` | Size of a swapfile at /swapfile, such as 8G. Empty leaves the machine alone. | *(empty)* |
 | `base.timezone` | The machine's timezone, as tzdata spells it. Empty leaves whatever the machine came with. | *(empty)* |
 | `base.upgrade` | Upgrade every package already installed. Off, because that is the owner's decision and not a side effect of installing base tools. | `false` |
 | `caddy.email` | The address the certificate authority writes to about an expiring certificate. Empty means an anonymous account. | *(empty)* |
+| `caddy.local_certs` | Sign certificates locally instead of asking Let's Encrypt. For a machine no name resolves to — a test VM, a private network — where the ACME challenge can never succeed. Off, because a certificate nobody else trusts is not what a public site wants. | `false` |
 | `claude-code.diff_sidebar` | Open the /diff panel. Unset leaves whatever Claude Code has. It is a preference Claude Code keeps in its own state file, so it is amended only where that file, and that preference, already exist. | *(none)* |
 | `claude-code.env` | Environment variables every Claude Code session runs with, as a map. It is how a model-specific or terminal-specific workaround is turned on without this package having an opinion about it. | `map[]` |
 | `claude-code.expanded_todos` | Show the task list under the footer. Unset leaves whatever Claude Code has, and the same condition applies. | *(none)* |
@@ -60,20 +62,22 @@ configuration says it is.
 | `firewall.http` | Open 80 and 443. A machine that hosts nothing can turn this off. | `true` |
 | `firewall.mosh_interface` | The one interface mosh's UDP range is opened on. Empty means it is not opened at all, which keeps the range off a public edge. | *(empty)* |
 | `firewall.mosh_ports` | The UDP range mosh is given on that interface. | `60000:61000` |
+| `git-key.home` | Where the account's home is. | `/home/<the account>` |
 | `glab.home` | Where the account's home is. | `/home/<the account>` |
 | `glab.version` | Which GitLab CLI release to install. It is a release asset rather than a distribution package because no distribution carries glab. | `1.111.0` |
+| `hostinger.zones` | DNS zones this provider may manage. Set this when the token has DNS permission without Domains portfolio permission; an empty list asks the account portfolio instead. | `[]` |
 | `mise.home` | Where the account's home is. | `/home/<the account>` |
 | `sentry.home` | Where the account's home is. | `/home/<the account>` |
 | `ssh_hardening.service` | What systemd calls sshd. Empty means the name this distribution family uses, which is `ssh` on Debian and Ubuntu and `sshd` elsewhere. | *(empty)* |
+| `tailscale.exit_node` | Advertise this machine as an exit node. Off unless asked for. | `false` |
 | `workspace.admin_home` | The home of the account the CLI provisions with. Whatever reaches that account over SSH is what reaches this workspace. | `/root` |
-| `workspace.generate_key` | Give the account an SSH key of its own when it has none. | `true` |
 | `workspace.git_email` | The address on this workspace's commits. | *(empty)* |
 | `workspace.git_name` | The name on this workspace's commits. | *(empty)* |
 | `workspace.groups` | Extra Linux groups the account joins. The docker group is one of them and it is effectively root, so nobody joins it by accident. | `[]` |
 | `workspace.home` | Where the account's home is. Debian and Ubuntu put it under /home; a machine whose useradd is configured otherwise says so here. | `/home/<the account>` |
 | `workspace.known_hosts` | The hosts whose SSH host key is trusted in advance, so the first clone does not stop to ask a question nobody is there to answer. | `[github.com]` |
 | `workspace.shell` | The login shell. Empty means whatever useradd would pick, and the package that installs a shell is the one that sets it. | *(empty)* |
-| `workspace.sign_commits` | Sign every commit and rebase with the account's own SSH key. | `true` |
+| `workspace.sign_commits` | Sign every commit and rebase, once a package such as git-key sets up a key. | `true` |
 | `zsh.home` | Where the account's home is. | `/home/<the account>` |
 | `zsh.tmux_auto_attach` | Open a tmux session on every SSH login, so a dropped connection loses nothing. A second connection while the first is live gets a session of its own instead of a second view of the same one. | `true` |
 | `zsh.tmux_config` | Write the account's ~/.tmux.conf. Turn it off to keep a config of your own. | `true` |

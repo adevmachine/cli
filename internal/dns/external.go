@@ -164,7 +164,10 @@ func (e *External) shellFor(args []string, stdin string) string {
 	if stdin == "" {
 		return run
 	}
-	return fmt.Sprintf("printf %s | %s", shellQuote(stdin), run)
+	// Group the setup and entrypoint so the pipe reaches the provider. Without
+	// the subshell, `|` binds only to `set -a`; the provider sees an empty stdin
+	// and rejects every write as malformed JSON.
+	return fmt.Sprintf("printf %s | ( %s )", shellQuote(stdin), run)
 }
 
 // shellSafeArg matches a word that reads back identically whether or not it

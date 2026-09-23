@@ -62,7 +62,7 @@ The password is used once and never stored.
 ## Build the machine
 
 ```
-devmachine doctor      # four checks: configuration, connection, OS, Ansible
+devmachine doctor      # configuration, host key, connection, OS, Ansible
 devmachine sync        # fetch the recipes, send them, converge
 ```
 

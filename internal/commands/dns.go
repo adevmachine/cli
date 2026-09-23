@@ -350,7 +350,7 @@ func describeUpsert(ctx context.Context, choice dns.Choice, rec dns.Record) stri
 }
 
 func newDNSAddCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Command {
-	var check, yes bool
+	var check, yes, publish bool
 
 	c := &cobra.Command{
 		Use:   "add <name> <type> <value>",
@@ -381,7 +381,7 @@ func newDNSAddCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Command 
 				cmd.Printf("would %s\n", line)
 				return nil
 			}
-			if !yes {
+			if !publish {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Really "+line+"?")
 				if err != nil {
 					return err
@@ -402,7 +402,8 @@ func newDNSAddCmd(opts *options, providerFlag, zoneFlag *string) *cobra.Command 
 		},
 	}
 	c.Flags().BoolVar(&check, "check", false, "say what would change, and change nothing")
-	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
+	c.Flags().BoolVar(&yes, "yes", false, "skip local-write questions; never publish")
+	c.Flags().BoolVar(&publish, "publish", false, "publish the record without asking")
 	return c
 }
 

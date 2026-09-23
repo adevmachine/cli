@@ -62,7 +62,7 @@ func caddySitesDir(ctx context.Context, dir string, cfg config.Config, machine c
 
 func newExposeAddCmd(opts *options) *cobra.Command {
 	var host string
-	var check, yes bool
+	var check, yes, publish bool
 
 	c := &cobra.Command{
 		Use:   "add <workspace> <port>",
@@ -112,7 +112,7 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				cmd.Println("would " + question)
 				return nil
 			}
-			if !yes {
+			if !publish {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), question)
 				if err != nil {
 					return err
@@ -143,7 +143,8 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 	}
 	c.Flags().StringVar(&host, "host", "", "the public hostname this port answers to (required)")
 	c.Flags().BoolVar(&check, "check", false, "say what would happen, and change nothing")
-	c.Flags().BoolVar(&yes, "yes", false, "publish without asking")
+	c.Flags().BoolVar(&yes, "yes", false, "skip local-write questions; never publish")
+	c.Flags().BoolVar(&publish, "publish", false, "publish the site without asking")
 	return c
 }
 

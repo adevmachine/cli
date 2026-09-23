@@ -282,12 +282,46 @@ func TestDNSAddNamesTheZoneAndProviderInTheQuestion(t *testing.T) {
 	}
 }
 
+func TestDNSAddYesDoesNotPublish(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	out, err := execute(t, "--config", configDir(t),
+		"dns", "add", "www.example.com", "A", "198.51.100.10", "--yes")
+	if !errors.Is(err, errDeclined) {
+		t.Fatalf("dns add --yes returned %v, want a declined publication", err)
+	}
+	if p.upserts != 0 {
+		t.Fatalf("--yes published %d record(s)", p.upserts)
+	}
+	if !strings.Contains(out, "[y/N]") {
+		t.Fatalf("--yes skipped the publication question: %q", out)
+	}
+}
+
+func TestDNSAddPublishIsExplicitNonInteractiveConsent(t *testing.T) {
+	p := &fake{}
+	defer stubChoose("hostinger", "example.com", p)()
+
+	out, err := execute(t, "--config", configDir(t),
+		"dns", "add", "www.example.com", "A", "198.51.100.10", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.upserts != 1 {
+		t.Fatalf("--publish wrote %d record(s), want 1", p.upserts)
+	}
+	if strings.Contains(out, "[y/N]") {
+		t.Fatalf("--publish asked for confirmation: %q", out)
+	}
+}
+
 func TestDNSAddSendsTheLabelNotTheFullName(t *testing.T) {
 	p := &fake{}
 	defer stubChoose("cloudflare", "client.example.net", p)()
 
 	if _, err := execute(t, "--config", configDir(t),
-		"dns", "add", "app.client.example.net", "A", "198.51.100.10", "--yes"); err != nil {
+		"dns", "add", "app.client.example.net", "A", "198.51.100.10", "--publish"); err != nil {
 		t.Fatal(err)
 	}
 	// The provider's model is a label plus a zone. Sending the full name
@@ -305,7 +339,7 @@ func TestDNSAddWritesTheApexAsAtSign(t *testing.T) {
 	defer stubChoose("hostinger", "example.com", p)()
 
 	if _, err := execute(t, "--config", configDir(t),
-		"dns", "add", "example.com", "A", "198.51.100.10", "--yes"); err != nil {
+		"dns", "add", "example.com", "A", "198.51.100.10", "--publish"); err != nil {
 		t.Fatal(err)
 	}
 	if p.lastRecord.Name != "@" {

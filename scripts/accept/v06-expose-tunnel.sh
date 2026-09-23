@@ -164,7 +164,7 @@ NOCADDY=$(DEVMACHINE_CONFIG="$NOCADDY_DIR" "$DEVMACHINE_ACCEPT_BIN" expose add a
 printf '%s\n' "$NOCADDY" > "$SCENARIO_LOG_DIR/no-caddy.log"
 contains "$NOCADDY" "caddy is not on" "expose refuses without caddy, and names it" || true
 
-"$DEVMACHINE_ACCEPT_BIN" expose add alice 8080 --host app.example.com --yes \
+"$DEVMACHINE_ACCEPT_BIN" expose add alice 8080 --host app.example.com --publish \
   >"$SCENARIO_LOG_DIR/expose-add.log" 2>&1 || die "could not expose app.example.com"
 BLOCK=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
   'cat /etc/caddy/sites.d/app.example.com.caddy' 2>&1) \

@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -151,6 +152,42 @@ func TestExposeAddWarnsThatAnybodyCanReachIt(t *testing.T) {
 	}
 }
 
+func TestExposeAddYesDoesNotPublish(t *testing.T) {
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--yes")
+	if !errors.Is(err, errDeclined) {
+		t.Fatalf("expose add --yes returned %v, want a declined publication", err)
+	}
+	if len(client.files) != 0 {
+		t.Fatalf("--yes published files: %#v", client.files)
+	}
+	if !strings.Contains(out, "[y/N]") {
+		t.Fatalf("--yes skipped the publication question: %q", out)
+	}
+}
+
+func TestExposeAddPublishIsExplicitNonInteractiveConsent(t *testing.T) {
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := client.files["app.example.com.caddy"]; !ok {
+		t.Fatalf("--publish did not write the site: %#v", client.files)
+	}
+	if strings.Contains(out, "[y/N]") {
+		t.Fatalf("--publish asked for confirmation: %q", out)
+	}
+}
+
 func TestExposeAddRefusesWhenCaddyIsNotInstalled(t *testing.T) {
 	dialExpose(t, &exposeClient{})
 	dir := configWithoutCaddy(t)
@@ -188,7 +225,7 @@ func TestExposeAddWritesThroughTheExtensionPoint(t *testing.T) {
 	dir := configWithCaddy(t)
 
 	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--yes"); err != nil {
+		"--host", "app.example.com", "--publish"); err != nil {
 		t.Fatalf("expose add returned %v", err)
 	}
 
@@ -212,7 +249,7 @@ func TestExposeAddSaysWhatToCreateWhenNobodyHoldsTheZone(t *testing.T) {
 	dir := configWithCaddy(t)
 
 	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--yes")
+		"--host", "app.example.com", "--publish")
 	if err != nil {
 		t.Fatalf("expose add returned %v", err)
 	}
@@ -231,7 +268,7 @@ func TestExposeAddOffersToCreateTheRecord(t *testing.T) {
 	lockOnto(t, dir, "main", "hostinger")
 
 	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--yes"); err != nil {
+		"--host", "app.example.com", "--publish"); err != nil {
 		t.Fatalf("expose add returned %v", err)
 	}
 	if client.upserts != 1 {
