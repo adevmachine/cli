@@ -318,6 +318,10 @@ func ScanHostKey(ctx context.Context, m config.Machine) (ssh.PublicKey, string, 
 	if err != nil {
 		return nil, "", err
 	}
+	algorithms, err := scanHostKeyAlgorithms(m)
+	if err != nil {
+		return nil, "", err
+	}
 	user := m.User
 	if user == "" {
 		user = config.DefaultAdminUser
@@ -325,25 +329,21 @@ func ScanHostKey(ctx context.Context, m config.Machine) (ssh.PublicKey, string, 
 	var failures []string
 	for _, address := range addresses {
 		target := net.JoinHostPort(address, strconv.Itoa(m.Port))
-		conn, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "tcp", target)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%v)", address, err))
+		presented, answered, handshakeErr := scanPresentedHostKey(ctx, target, user, algorithms)
+		if !answered {
+			failures = append(failures, fmt.Sprintf("%s (%v)", address, handshakeErr))
 			continue
 		}
-		var presented ssh.PublicKey
-		cfg := &ssh.ClientConfig{
-			User: user,
-			HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
-				presented = key
-				return nil
-			},
-			Timeout: dialTimeout,
+		// A deliberate rebuild can replace one host-key algorithm with another.
+		// Prefer the pinned algorithm when the server still offers it, but fall
+		// back to ordinary negotiation so `machines trust --replace` can inspect
+		// the new identity when it does not.
+		if presented == nil && len(algorithms) > 0 {
+			presented, answered, handshakeErr = scanPresentedHostKey(ctx, target, user, nil)
 		}
-		clientConn, _, _, handshakeErr := ssh.NewClientConn(conn, target, cfg)
-		if clientConn != nil {
-			_ = clientConn.Close()
-		} else {
-			_ = conn.Close()
+		if !answered {
+			failures = append(failures, fmt.Sprintf("%s (%v)", address, handshakeErr))
+			continue
 		}
 		if presented != nil {
 			return presented, address, nil
@@ -351,6 +351,49 @@ func ScanHostKey(ctx context.Context, m config.Machine) (ssh.PublicKey, string, 
 		return nil, "", fmt.Errorf("machine %q answered on %s but did not present an SSH host key: %w", m.Name, address, handshakeErr)
 	}
 	return nil, "", fmt.Errorf("machine %q: no address answered while scanning its SSH host key: %s", m.Name, strings.Join(failures, "; "))
+}
+
+func scanHostKeyAlgorithms(m config.Machine) ([]string, error) {
+	if m.KnownHostsFile == "" {
+		return nil, nil
+	}
+	store, err := hostkeys.Open(m.KnownHostsFile)
+	if err != nil {
+		return nil, err
+	}
+	pinned, err := store.Key(m.Name, m.Port)
+	if err != nil {
+		var unknown *knownhosts.KeyError
+		if errors.As(err, &unknown) && len(unknown.Want) == 0 {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return hostkeys.Algorithms(pinned), nil
+}
+
+func scanPresentedHostKey(ctx context.Context, target, user string, algorithms []string) (ssh.PublicKey, bool, error) {
+	conn, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "tcp", target)
+	if err != nil {
+		return nil, false, err
+	}
+	var presented ssh.PublicKey
+	cfg := &ssh.ClientConfig{
+		User: user,
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			presented = key
+			return nil
+		},
+		HostKeyAlgorithms: algorithms,
+		Timeout:           dialTimeout,
+	}
+	clientConn, _, _, handshakeErr := ssh.NewClientConn(conn, target, cfg)
+	if clientConn != nil {
+		_ = clientConn.Close()
+	} else {
+		_ = conn.Close()
+	}
+	return presented, true, handshakeErr
 }
 
 // isAuthFailure reports whether the connection was made and the login was

@@ -3,7 +3,9 @@ package remote
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
 	"net"
@@ -33,6 +35,23 @@ func TestScanHostKeyDoesNotAttemptAuthentication(t *testing.T) {
 	}
 	if got := server.authAttempts.Load(); got != 0 {
 		t.Fatalf("scan attempted authentication %d times", got)
+	}
+}
+
+func TestScanHostKeyPrefersThePinnedAlgorithm(t *testing.T) {
+	ed25519Key := newHostKey(t)
+	ecdsaKey := newECDSAHostKey(t)
+	server := startHostKeyServerWithKeys(t, false, ecdsaKey, ed25519Key)
+	machine := server.machine(t)
+	trustMachine(t, machine, ed25519Key.PublicKey())
+
+	key, _, err := ScanHostKey(context.Background(), machine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(key.Marshal(), ed25519Key.PublicKey().Marshal()) {
+		t.Fatalf("ScanHostKey returned %s instead of the pinned %s key",
+			key.Type(), ed25519Key.PublicKey().Type())
 	}
 }
 
@@ -161,11 +180,16 @@ type hostKeyServer struct {
 func startHostKeyServer(t *testing.T, acceptPassword bool) *hostKeyServer {
 	t.Helper()
 	signer := newHostKey(t)
+	return startHostKeyServerWithKeys(t, acceptPassword, signer)
+}
+
+func startHostKeyServerWithKeys(t *testing.T, acceptPassword bool, signers ...ssh.Signer) *hostKeyServer {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := &hostKeyServer{listener: listener, key: signer.PublicKey()}
+	server := &hostKeyServer{listener: listener, key: signers[0].PublicKey()}
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(_ ssh.ConnMetadata, _ []byte) (*ssh.Permissions, error) {
 			server.authAttempts.Add(1)
@@ -175,7 +199,9 @@ func startHostKeyServer(t *testing.T, acceptPassword bool) *hostKeyServer {
 			return nil, errors.New("password rejected")
 		},
 	}
-	config.AddHostKey(signer)
+	for _, signer := range signers {
+		config.AddHostKey(signer)
+	}
 	go func() {
 		for {
 			conn, err := listener.Accept()
@@ -221,6 +247,19 @@ func (s *hostKeyServer) machine(t *testing.T) config.Machine {
 func newHostKey(t *testing.T) ssh.Signer {
 	t.Helper()
 	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
+
+func newECDSAHostKey(t *testing.T) ssh.Signer {
+	t.Helper()
+	private, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}

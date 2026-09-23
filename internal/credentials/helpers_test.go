@@ -55,7 +55,8 @@ func testMachine(t *testing.T) config.Machine {
 	host := os.Getenv("DEVMACHINE_TEST_HOST")
 	port := os.Getenv("DEVMACHINE_TEST_PORT")
 	key := os.Getenv("DEVMACHINE_TEST_KEY")
-	if host == "" || port == "" || key == "" {
+	knownHosts := os.Getenv("DEVMACHINE_TEST_KNOWN_HOSTS")
+	if host == "" || port == "" || key == "" || knownHosts == "" {
 		t.Skip("no test VPS: run `eval \"$(scripts/fake-vps.sh env)\"` first")
 	}
 	n, err := strconv.Atoi(port)
@@ -68,10 +69,11 @@ func testMachine(t *testing.T) config.Machine {
 		user = "root"
 	}
 	return config.Machine{
-		Name:  "sandbox",
-		Hosts: []config.Host{{Address: host}},
-		User:  user,
-		Port:  n,
-		Key:   key,
+		Name:           "sandbox",
+		Hosts:          []config.Host{{Address: host}},
+		User:           user,
+		Port:           n,
+		Key:            key,
+		KnownHostsFile: knownHosts,
 	}
 }
