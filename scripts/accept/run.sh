@@ -40,7 +40,7 @@ fi
 export DEVMACHINE_ACCEPT_BIN
 
 if [ "$#" -eq 0 ]; then
-  set -- setup-git v05-packages-credentials-dns v06-expose-tunnel
+  set -- host-key-pinning setup-git v05-packages-credentials-dns v06-expose-tunnel
 fi
 
 for scenario in "$@"; do

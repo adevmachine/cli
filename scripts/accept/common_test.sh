@@ -73,6 +73,7 @@ fi
 [ -x "$ROOT/scripts/accept/setup-git.sh" ]
 [ -x "$ROOT/scripts/accept/v05-packages-credentials-dns.sh" ]
 [ -x "$ROOT/scripts/accept/v06-expose-tunnel.sh" ]
+[ -x "$ROOT/scripts/accept/host-key-pinning.sh" ]
 grep -q '^accept:' "$ROOT/Makefile"
 grep -q 'make accept' "$ROOT/docs/development.md"
 grep -q 'KEEP_ACCEPT_VM=1' "$ROOT/docs/development.md"

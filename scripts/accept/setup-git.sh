@@ -44,6 +44,8 @@ export DEVMACHINE_CONFIG
 mkdir -p "$DEVMACHINE_CONFIG/keys" "$DEVMACHINE_CONFIG/cache/packages"
 printf 'machines:\n  - name: main\n    hosts: [203.0.113.10]\npackages: v2\n' > "$DEVMACHINE_CONFIG/config.yml"
 printf '{}\n' > "$DEVMACHINE_CONFIG/packages.lock"
+printf 'main-devmachine ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAcceptancePublicKey\n' \
+  > "$DEVMACHINE_CONFIG/known_hosts"
 printf 'PRIVATE KEY\n' > "$DEVMACHINE_CONFIG/keys/id_ed25519"
 printf 'PUBLIC KEY\n' > "$DEVMACHINE_CONFIG/keys/id_ed25519.pub"
 printf '{"t":"s3cret"}\n' > "$DEVMACHINE_CONFIG/secrets.json"
@@ -55,7 +57,7 @@ OUT=$("$DEVMACHINE_ACCEPT_BIN" setup git --yes 2>&1)
 contains "$OUT" "private" "setup git says the remote must be private" || true
 
 TRACKED=$(git -C "$DEVMACHINE_CONFIG" ls-files)
-for path in config.yml packages.lock .gitignore; do
+for path in config.yml packages.lock known_hosts .gitignore; do
   contains "$TRACKED" "$path" "tracks $path" || true
 done
 for path in keys/id_ed25519 secrets.json history.log cloudflare.env cache/; do
@@ -145,4 +147,4 @@ refutes "$STAGED" "keys/id_ed25519" "a refused commit leaves the key unstaged" |
 EXAMPLE=$("$DEVMACHINE_ACCEPT_BIN" secrets example 2>&1)
 refutes "$EXAMPLE" "s3cret" "secrets example prints no value" || true
 
-scenario_done 28 "setup git"
+scenario_done 29 "setup git"
