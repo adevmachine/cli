@@ -1,0 +1,31 @@
+internal/commands/aliases_test.go
+  s_ad29e4893e2b5c::t_ba7ea528636d1b 4,15,25-26,29-33
+internal/commands/credentials_test.go
+  s_ad29e4893e2b5c::t_b52bd1cffa9964 13-14,18,98-110,443
+internal/commands/doctor.go
+  s_ad29e4893e2b5c::t_3c49e226906977 32
+internal/commands/setup_git.go
+  s_ad29e4893e2b5c::t_f5c4663c1ed5db 55-56,110-112
+internal/commands/setup_git_test.go
+  s_ad29e4893e2b5c::t_37ca0c6b0ed963 13-14,74,163,172
+internal/doctor/doctor.go
+  s_ad29e4893e2b5c::t_a2c77b245cea52 7,14,17-18,33,75-77,85-91,115-119,151,158-190
+internal/doctor/doctor_test.go
+  s_ad29e4893e2b5c::t_edf29dc31e2e0e 4,6,13,21,24,70-86,90-99,111-194,327-328,337-343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dcb34d9cbcaed0b2a3caf2c3879e59243a4580a8",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
