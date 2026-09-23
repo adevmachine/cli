@@ -296,6 +296,19 @@ func TestSetupGitNeverCreatesARepositoryUnderYes(t *testing.T) {
 	}
 }
 
+func TestSetupGitYesHelpDoesNotPromiseToPublish(t *testing.T) {
+	out, err := execute(t, "setup", "git", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "create the private remote") || strings.Contains(out, "push without asking") {
+		t.Fatalf("--yes promises a remote the command deliberately never creates:\n%s", out)
+	}
+	if !strings.Contains(out, "local writes") || !strings.Contains(out, "never create or push a remote") {
+		t.Fatalf("--yes does not state its boundary:\n%s", out)
+	}
+}
+
 func TestSetupGitWritesTheIgnoreFileIntoADirectoryThatIsAlreadyARepository(t *testing.T) {
 	// The conversion case: the configuration directory has been a git
 	// repository for months. Skipping the ignore file there leaves the CLI

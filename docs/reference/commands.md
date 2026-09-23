@@ -110,7 +110,7 @@ hostnames and usernames.
 
 | Flag | Meaning |
 | --- | --- |
-| `--yes` | create the private remote and push without asking |
+| `--yes` | skip questions about local writes; never create or push a remote |
 | `--check` | say what would happen, and write nothing |
 
 Running it again on a directory that is already a repository skips straight to

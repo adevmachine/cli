@@ -70,7 +70,7 @@ func newSetupGitCmd(opts *options) *cobra.Command {
 			return runSetupGit(cmd.Context(), dir, cmd.InOrStdin(), cmd.OutOrStdout(), s)
 		},
 	}
-	c.Flags().BoolVar(&s.yes, "yes", false, "create the private remote and push without asking")
+	c.Flags().BoolVar(&s.yes, "yes", false, "skip questions about local writes; never create or push a remote")
 	c.Flags().BoolVar(&s.check, "check", false, "say what would happen, and write nothing")
 	return c
 }
