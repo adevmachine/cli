@@ -1,0 +1,39 @@
+internal/remote/remote_test.go
+  s_3c1e24ba9f2fdc::t_8b982986a48141 24,148-149,162-167,242-243,313-314,335-336,459,517-519,573,576,584-596,598,606,621,635-637,646,661,682-683
+internal/hostkeys/store.go
+  s_ad29e4893e2b5c::t_7211036e8337ba 69-99
+internal/hostkeys/store_test.go
+  s_ad29e4893e2b5c::t_0a806aff53ddbc 105-126
+internal/remote/bootstrap_test.go
+  s_ad29e4893e2b5c::t_2c6a7ad9514d31 118,133,315
+internal/remote/hostkey_test.go
+  s_ad29e4893e2b5c::t_595370a67565ed 1-243
+internal/remote/remote.go
+  s_ad29e4893e2b5c::t_508ace9dfc1b35 21,26,29,47-48,151-156,187-190,195,214-221,235-239,248,252-254,271-355
+scripts/fake-vps.sh
+  s_ad29e4893e2b5c::t_5332810981038a 32,77-93,102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0896f3543ba0a89c0b8374f8550a5e4a0cc178c8",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
