@@ -1,0 +1,35 @@
+internal/commands/setup.go
+  s_3c1e24ba9f2fdc::t_4939f1b9bc89a8 5,16,20,34-35,98-101,126-171
+docs/how-it-works/ssh-and-authentication.md
+  s_ad29e4893e2b5c::t_5c56e68554c368 44-56
+internal/commands/machines.go
+  s_ad29e4893e2b5c::t_564bafbcbc97c4 159-162
+internal/commands/machines_test.go
+  s_ad29e4893e2b5c::t_ac3921b6711e78 5-8,95-129
+internal/commands/setup_test.go
+  s_ad29e4893e2b5c::t_0bd1121a75e6e7 5-6,17,20,50,59,65-75,79-88,90,95,111,117,122,130-142,194-246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c4df39c9475e338cb87fa3f950526bf3113d85f5",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
