@@ -8,8 +8,16 @@ git push --tags
 gh run watch          # follow the release workflow
 ```
 
-Before tagging: `main` clean and pushed, CI green, and `make test-vps` green
-against a real machine.
+Before tagging: `main` clean and pushed, CI green, `make test-vps` green
+against a real machine, and the local CLI acceptance gate green:
+
+```
+make accept
+```
+
+After those pre-tag gates, keep the release order: release the CLI first, wait
+for packages CI, then release packages. Do not release packages ahead of the
+CLI it is intended to accompany.
 
 GoReleaser then builds the binaries, publishes them and updates the Homebrew
 formula.

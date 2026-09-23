@@ -48,6 +48,40 @@ including CI, which has no VM.
 machine and proves that root gets in with the password and no key does. That
 costs a boot, so `go test -short` leaves it out.
 
+## Release acceptance harness
+
+The release acceptance harness exercises the CLI against disposable local
+machines. It requires `bash`, `git`, `ssh`, `limactl`, `python3`, and `curl`,
+plus a local checkout of the packages repository. Run the full harness with:
+
+```
+make accept
+```
+
+By default the packages checkout is `~/dev/packages`; set `PACKAGES` when it
+lives elsewhere:
+
+```
+PACKAGES=/absolute/path/to/packages make accept
+```
+
+To run one scenario while developing it, pass its name to the harness directly:
+
+```
+scripts/accept/run.sh setup-git
+scripts/accept/run.sh v05-packages-credentials-dns
+scripts/accept/run.sh v06-expose-tunnel
+```
+
+Every run creates uniquely named `devmachine-accept-*` VMs and removes them by
+default, including when a scenario fails. For investigation only,
+`KEEP_ACCEPT_VM=1 make accept` retains its disposable acceptance VM; delete it
+when the investigation is over.
+
+The harness must never target a real machine. It may create, use, and delete
+only its own uniquely named disposable acceptance VMs; do not point it at a
+server, an existing local VM, or any shared infrastructure.
+
 ## Rules this repository holds itself to
 
 **Everything written to disk is English.** Code, comments, commit messages,

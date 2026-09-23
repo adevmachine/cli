@@ -74,3 +74,6 @@ fi
 [ -x "$ROOT/scripts/accept/v05-packages-credentials-dns.sh" ]
 [ -x "$ROOT/scripts/accept/v06-expose-tunnel.sh" ]
 grep -q '^accept:' "$ROOT/Makefile"
+grep -q 'make accept' "$ROOT/docs/development.md"
+grep -q 'KEEP_ACCEPT_VM=1' "$ROOT/docs/development.md"
+grep -q 'make accept' "$ROOT/docs/releasing.md"
