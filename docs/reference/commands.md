@@ -19,7 +19,7 @@ text.
 devmachine setup [--force] [--no-harden]
 ```
 
-Takes a machine over. It asks for a machine name, an address, the
+With no `config.yml`, takes a machine over. It asks for a machine name, an address, the
 administrative login, a port and a domain, then how the CLI should log in:
 
 1. a key of its own, kept in `<config>/keys/<machine>` and used for nothing
@@ -71,12 +71,16 @@ The password is used once, on one connection, and is written nowhere: not to
 
 | Flag | Meaning |
 | --- | --- |
-| `--force` | overwrite a configuration that already exists |
+| `--force` | discard the existing configuration and run the takeover wizard again |
 | `--no-harden` | leave password login on; the key is still installed and proved |
 
-Running it again on a machine it already owns is safe: it offers the key it
-made last time, finds that the key works, and skips straight past the
-password.
+Running it again with an existing configuration resumes preparation instead of
+starting the takeover wizard again. It selects the configured machine (or the
+one named by `--machine`), connects using its pinned host key and configured
+client key or SSH agent, and installs Ansible if needed. It does not rewrite
+configuration, install a client key, or change SSH policy. Use `--force` only
+when you deliberately want to discard the configuration and start the wizard
+again.
 
 ## setup git
 

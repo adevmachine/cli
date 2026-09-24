@@ -68,6 +68,13 @@ KNOWN_HOSTS="$DEVMACHINE_CONFIG/known_hosts"
 TRUST=$(cat "$KNOWN_HOSTS")
 contains "$TRUST" "$VM-devmachine" "setup stores the stable machine alias" || true
 
+CONFIG_BEFORE=$(cksum "$DEVMACHINE_CONFIG/config.yml" | awk '{print $1 ":" $2}')
+RESUMED=$("$DEVMACHINE_ACCEPT_BIN" setup 2>&1) || die "could not resume setup for $VM: $RESUMED"
+printf '%s\n' "$RESUMED" > "$SCENARIO_DIR/setup-resumed.log"
+contains "$RESUMED" "without rewriting configuration" "setup resumes an existing configuration" || true
+CONFIG_AFTER=$(cksum "$DEVMACHINE_CONFIG/config.yml" | awk '{print $1 ":" $2}')
+equals "$CONFIG_AFTER" "$CONFIG_BEFORE" "resumed setup leaves config.yml unchanged" || true
+
 "$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true \
   >"$SCENARIO_DIR/run-before.log" 2>&1 \
   && pass "a normal command succeeds with the stored key" \
@@ -141,4 +148,4 @@ fi
   && pass "a normal command succeeds only after explicit replacement" \
   || die "the connection did not recover after explicit replacement"
 
-scenario_done 14 "host-key pinning"
+scenario_done 16 "host-key pinning"

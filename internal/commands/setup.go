@@ -39,6 +39,7 @@ var (
 type setupOptions struct {
 	force    bool
 	noHarden bool
+	machine  string
 }
 
 func newSetupCmd(opts *options) *cobra.Command {
@@ -46,10 +47,12 @@ func newSetupCmd(opts *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "setup",
-		Short: "Take over a machine: write the configuration and get in by key",
-		Long: "Asks where the machine is and how to log in to it, then makes it " +
+		Short: "Take over a new machine or prepare the configured one",
+		Long: "With no configuration, asks where the machine is and how to log in to it, then makes it " +
 			"the CLI's own: it installs a key, proves the key on a connection of " +
-			"its own, turns password login off, and installs Ansible.\n\n" +
+			"its own, turns password login off, and installs Ansible. With an existing " +
+			"configuration, it reuses the configured trust and authentication and only " +
+			"ensures Ansible is installed; --force explicitly starts over.\n\n" +
 			"It never asks which situation you are in. A key that already works " +
 			"is found by trying it, and the root password is asked for only when " +
 			"that fails — many servers arrive with a key already pasted in, and " +
@@ -60,12 +63,13 @@ func newSetupCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			s.machine = opts.machine
 			return runSetup(cmd.Context(), dir, cmd.InOrStdin(), cmd.OutOrStdout(), s)
 		},
 	}
 	c.Flags().BoolVar(&s.force, "force", false, "overwrite a configuration that already exists")
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
-		"leave password login on (the key is still installed and proved)")
+		"during a new takeover, leave password login on (the key is still installed and proved)")
 	c.AddCommand(newSetupGitCmd(opts))
 	return c
 }
@@ -77,7 +81,9 @@ func newSetupCmd(opts *options) *cobra.Command {
 func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupOptions) error {
 	path := filepath.Join(dir, config.FileName)
 	if _, err := os.Stat(path); err == nil && !opts.force {
-		return fmt.Errorf("%s already exists: pass --force to overwrite it", path)
+		return prepareExisting(ctx, dir, out, opts.machine)
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("checking %s: %w", path, err)
 	}
 
 	r := bufio.NewReader(in)
@@ -119,6 +125,39 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		return err
 	}
 
+	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
+	return nil
+}
+
+// prepareExisting resumes setup without taking ownership a second time. The
+// configuration already says which key and host identity to trust, so this
+// path only connects with those choices and installs the last prerequisite.
+// In particular, it must not rewrite configuration, install a key, or change
+// SSH policy on a machine the CLI already owns.
+func prepareExisting(ctx context.Context, dir string, out io.Writer, name string) error {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	m, err := cfg.Machine(name)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "%s already describes %s; preparing it without rewriting configuration.\n", config.FileName, m.Name)
+	client, address, err := dial(ctx, m, m.User)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	fmt.Fprintf(out, "connected as %s@%s; installing Ansible if needed...\n", m.User, address)
+	if err := installAnsible(ctx, client, out); err != nil {
+		return err
+	}
 	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
 	return nil
 }

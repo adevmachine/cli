@@ -59,6 +59,10 @@ those steps is where it is.
 
 The password is used once and never stored.
 
+If the configuration already exists, `devmachine setup` resumes this step: it
+uses the configured host-key pin and authentication and ensures Ansible is
+installed without rewriting the configuration or changing SSH policy.
+
 ## Build the machine
 
 ```

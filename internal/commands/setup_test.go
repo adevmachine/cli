@@ -154,6 +154,56 @@ func runSetupIn(t *testing.T, dir string, in io.Reader, o setupOptions) (string,
 	return out.String(), err
 }
 
+func TestSetupWithExistingConfigurationOnlyPreparesTheSelectedMachine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, config.FileName)
+	original := []byte("machines:\n  - name: main\n    hosts: [203.0.113.10]\n  - name: sandbox\n    hosts: [198.51.100.7]\n")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var dialed string
+	t.Cleanup(swap(&dial, func(_ context.Context, m config.Machine, user string) (remote.Client, string, error) {
+		dialed = m.Name + ":" + user
+		return nopClient{}, m.Hosts[0].Address, nil
+	}))
+	ansible := false
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error {
+		ansible = true
+		return nil
+	}))
+	t.Cleanup(swap(&scanHostKey, func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		t.Fatal("setup scanned a new host key for an existing configuration")
+		return nil, "", nil
+	}))
+	t.Cleanup(swap(&installKey, func(context.Context, remote.Client, string) error {
+		t.Fatal("setup installed a key for an existing configuration")
+		return nil
+	}))
+	t.Cleanup(swap(&harden, func(context.Context, remote.Client) error {
+		t.Fatal("setup hardened an existing machine")
+		return nil
+	}))
+
+	out, err := execute(t, "--config", dir, "--machine", "sandbox", "setup")
+	if err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+	if dialed != "sandbox:root" || !ansible {
+		t.Fatalf("dialed %q, installed Ansible %v", dialed, ansible)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(after, original) {
+		t.Fatalf("setup rewrote config.yml:\n%s", after)
+	}
+	if !strings.Contains(out, "without rewriting") || !strings.Contains(out, "Ansible") {
+		t.Fatalf("setup did not explain the resume path: %q", out)
+	}
+}
+
 func TestSetupWithAWorkingKeySkipsThePassword(t *testing.T) {
 	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
 
@@ -527,24 +577,27 @@ func TestSetupRefusesAPortThatIsNotANumber(t *testing.T) {
 	}
 }
 
-func TestSetupRefusesToOverwriteWithoutForce(t *testing.T) {
+func TestSetupExistingDoesNotOverwriteWhenPreparationFails(t *testing.T) {
 	dir := t.TempDir()
 	existing := "machines:\n  - name: keep-me\n    hosts: [203.0.113.99]\n"
 	if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(existing), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("unreachable")
+	}))
 
 	_, err := runSetupIn(t, dir, answers("main", "203.0.113.10", "root", "22", ""), setupOptions{})
-	if err == nil {
-		t.Fatal("expected setup to refuse to overwrite")
-	}
-	if !strings.Contains(err.Error(), "--force") {
-		t.Fatalf("the error does not say how to proceed: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "unreachable") {
+		t.Fatalf("error = %v, want connection failure", err)
 	}
 
-	cfg, _ := config.Load(dir)
-	if cfg.Machines[0].Name != "keep-me" {
-		t.Fatal("the existing configuration was overwritten anyway")
+	after, readErr := os.ReadFile(filepath.Join(dir, config.FileName))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(after) != existing {
+		t.Fatal("the existing configuration was overwritten")
 	}
 }
 
