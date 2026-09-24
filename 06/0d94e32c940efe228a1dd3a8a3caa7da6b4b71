@@ -1,0 +1,27 @@
+docs/getting-started.md
+  s_ad29e4893e2b5c::t_c7ac5aa6601870 62-65
+docs/reference/commands.md
+  s_ad29e4893e2b5c::t_1152dc0355621c 22,74,77-83
+internal/commands/setup.go
+  s_ad29e4893e2b5c::t_d52994a5c1d243 42,50-51,53-55,66,72,84-86,132-164
+internal/commands/setup_test.go
+  s_ad29e4893e2b5c::t_5f177938b1d645 157-206,580,586-588,591-592,595-600
+scripts/accept/host-key-pinning.sh
+  s_ad29e4893e2b5c::t_3fe1d1b81f81a6 71-77,151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "060d94e32c940efe228a1dd3a8a3caa7da6b4b71",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
