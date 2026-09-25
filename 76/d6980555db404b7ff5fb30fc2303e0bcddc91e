@@ -1,0 +1,31 @@
+docs/reference/package-format.md
+  s_ad29e4893e2b5c::t_611aa41dd0ce39 178-196
+internal/packages/manifest.go
+  s_ad29e4893e2b5c::t_ab8d6829b6c26c 78-83,108
+internal/packages/skeleton.go
+  s_ad29e4893e2b5c::t_be2936d53eb03e 41
+internal/packages/validate.go
+  s_ad29e4893e2b5c::t_fb04bc3a3ab5ce 13-14,118,153-182
+internal/packages/validate_test.go
+  s_ad29e4893e2b5c::t_54f577c8f153cc 4,10-76
+internal/skills/catalog.go
+  s_ad29e4893e2b5c::t_eb265bcd3e2152 1-119
+internal/skills/catalog_test.go
+  s_ad29e4893e2b5c::t_34f70b6da7476a 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "76d6980555db404b7ff5fb30fc2303e0bcddc91e",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
