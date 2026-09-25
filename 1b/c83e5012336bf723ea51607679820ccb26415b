@@ -1,0 +1,49 @@
+SURFACE.txt
+  s_3c1e24ba9f2fdc::t_02eaf80e37f536 52-56
+internal/commands/setup.go
+  s_3c1e24ba9f2fdc::t_f65d01479b765e 19,37,86-93,136-138,173-214
+internal/commands/skills_test.go
+  s_df729d299b1e2e::t_43d7e7b81b540d 1-150
+internal/packages/store.go
+  s_df729d299b1e2e::t_ef3172489ccd66 104-124
+internal/packages/store_test.go
+  s_df729d299b1e2e::t_a0dd91faaf7a19 48-68
+internal/commands/root.go
+  s_ad29e4893e2b5c::t_3580b0a9d1828d 83
+internal/commands/setup_test.go
+  s_ad29e4893e2b5c::t_a9c473687c69ff 207-239
+internal/commands/skills.go
+  s_ad29e4893e2b5c::t_24d0fb2c592fac 1-349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1bc83e5012336bf723ea51607679820ccb26415b",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_df729d299b1e2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0d39d-6727-70e1-a0ca-c761b22dcb20",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
