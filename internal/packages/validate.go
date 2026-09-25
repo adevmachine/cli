@@ -174,6 +174,14 @@ func validateSkills(dir string, m Manifest) []Problem {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return at(fmt.Sprintf("skills.path %q must stay inside the package", raw))
 	}
+	resolvedDir, dirErr := filepath.EvalSymlinks(dir)
+	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
+	if dirErr == nil && rootErr == nil {
+		resolvedRel, relErr := filepath.Rel(resolvedDir, resolvedRoot)
+		if relErr != nil || resolvedRel == ".." || strings.HasPrefix(resolvedRel, ".."+string(filepath.Separator)) {
+			return at(fmt.Sprintf("skills.path %q must stay inside the package", raw))
+		}
+	}
 	if _, err := skills.Discover(root); err != nil {
 		return at(err.Error())
 	}

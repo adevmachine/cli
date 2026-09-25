@@ -42,6 +42,51 @@ func TestInstallIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestInstallKeepsOwnershipForASkillRemovedFromTheSource(t *testing.T) {
+	installer, source := fixtureInstaller(t)
+	writeSkill(t, source.Root, "second", "A second skill.")
+	if _, err := installer.Install(source, []Agent{AgentClaude}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(source.Root, "example")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := installer.Install(source, []Agent{AgentClaude}); err != nil {
+		t.Fatal(err)
+	}
+	records, err := installer.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 || !slices.Equal(records[0].Skills, []string{"example", "second"}) {
+		t.Fatalf("ownership lost after additive update: %#v", records)
+	}
+	if _, err := installer.Remove(source.ID, []string{"example"}); err != nil {
+		t.Fatalf("the retained skill can no longer be removed explicitly: %v", err)
+	}
+}
+
+func TestInstallDoesNotDeleteAnUnmanagedBackupNamedPath(t *testing.T) {
+	installer, source := fixtureInstaller(t)
+	if _, err := installer.Install(source, []Agent{AgentCodex}); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(installer.Home, ".agents", "skills", "example.devmachine-backup")
+	writeTestFile(t, filepath.Join(backup, "mine"), "keep")
+	writeTestFile(t, filepath.Join(source.Root, "example", "SKILL.md"), `---
+name: example
+description: Updated example.
+---
+updated
+`)
+
+	if _, err := installer.Install(source, []Agent{AgentCodex}); err != nil {
+		t.Fatal(err)
+	}
+	assertContents(t, filepath.Join(backup, "mine"), "keep")
+}
+
 func TestInstallRefusesAnUnmanagedCollision(t *testing.T) {
 	installer, source := fixtureInstaller(t)
 	writeTestFile(t, filepath.Join(installer.Home, ".agents", "skills", "example", "SKILL.md"), "mine")

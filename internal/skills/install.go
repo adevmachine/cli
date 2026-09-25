@@ -126,7 +126,16 @@ func (i Installer) Install(source Source, agents []Agent) (InstallResult, error)
 		}
 	}
 
-	if err := i.writeRecord(Installed{Source: source.ID, Root: source.Root, Skills: result.Skills, Agents: result.Agents}); err != nil {
+	recordedSkills := append([]string(nil), result.Skills...)
+	if hadPrevious {
+		for _, name := range previous.Skills {
+			if !slices.Contains(recordedSkills, name) {
+				recordedSkills = append(recordedSkills, name)
+			}
+		}
+		sort.Strings(recordedSkills)
+	}
+	if err := i.writeRecord(Installed{Source: source.ID, Root: source.Root, Skills: recordedSkills, Agents: result.Agents}); err != nil {
 		return result, err
 	}
 	return result, nil
@@ -311,8 +320,12 @@ func replaceTreeIfDifferent(source, destination string) (bool, error) {
 	if err := copyTree(source, stage); err != nil {
 		return false, err
 	}
-	backup := destination + ".devmachine-backup"
-	if err := os.RemoveAll(backup); err != nil {
+	backup, err := os.MkdirTemp(parent, ".skill-backup-")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = os.RemoveAll(backup) }()
+	if err := os.Remove(backup); err != nil {
 		return false, err
 	}
 	hadDestination := false
@@ -326,7 +339,7 @@ func replaceTreeIfDifferent(source, destination string) (bool, error) {
 	}
 	if err := os.Rename(stage, destination); err != nil {
 		if hadDestination {
-			_ = os.Rename(backup, destination)
+			return false, errors.Join(err, os.Rename(backup, destination))
 		}
 		return false, err
 	}

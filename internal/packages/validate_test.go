@@ -41,6 +41,28 @@ skills:
 	problemAbout(t, problems, "stay inside the package")
 }
 
+func TestValidateRejectsASkillPathThroughAnEscapingParentSymlink(t *testing.T) {
+	dir := writePackage(t, "global-skills", `format: 1
+name: global-skills
+scope: workspace
+summary: Shared skills.
+skills:
+  path: linked/skills
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n[]\n")
+	outside := t.TempDir()
+	writePackageSkill(t, outside, "use-devmachine", "Use Devmachine.")
+	if err := os.Symlink(outside, filepath.Join(dir, "linked")); err != nil {
+		t.Fatal(err)
+	}
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemAbout(t, problems, "stay inside the package")
+}
+
 func TestValidateReportsEveryMalformedSkill(t *testing.T) {
 	dir := writePackage(t, "global-skills", `format: 1
 name: global-skills
