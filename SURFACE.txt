@@ -49,6 +49,11 @@ devmachine secrets rm
 devmachine secrets set
 devmachine setup
 devmachine setup git
+devmachine skills
+devmachine skills add
+devmachine skills list
+devmachine skills remove
+devmachine skills update
 devmachine ssh
 devmachine stats
 devmachine sync

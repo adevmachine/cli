@@ -16,6 +16,7 @@ import (
 	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/keys"
 	"github.com/adevmachine/cli/internal/remote"
+	agentskills "github.com/adevmachine/cli/internal/skills"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
@@ -33,6 +34,7 @@ var (
 	agentKeys      = keys.FromAgent
 	scanHostKey    = remote.ScanHostKey
 	confirmHostKey = confirm
+	setupSkills    = offerSetupSkills
 )
 
 // setupOptions are the flags the flow reads.
@@ -81,7 +83,14 @@ func newSetupCmd(opts *options) *cobra.Command {
 func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupOptions) error {
 	path := filepath.Join(dir, config.FileName)
 	if _, err := os.Stat(path); err == nil && !opts.force {
-		return prepareExisting(ctx, dir, out, opts.machine)
+		if err := prepareExisting(ctx, dir, out, opts.machine); err != nil {
+			return err
+		}
+		if err := finishSetup(ctx, dir, in, out); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
+		return nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("checking %s: %w", path, err)
 	}
@@ -124,6 +133,9 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
 		return err
 	}
+	if err := finishSetup(ctx, dir, in, out); err != nil {
+		return err
+	}
 
 	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
 	return nil
@@ -158,7 +170,48 @@ func prepareExisting(ctx context.Context, dir string, out io.Writer, name string
 	if err := installAnsible(ctx, client, out); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
+	return nil
+}
+
+func finishSetup(ctx context.Context, dir string, in io.Reader, out io.Writer) error {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	if cfg.Packages == "" {
+		fmt.Fprintln(out, "\nAgent skills: no package release is pinned. Pin `packages:` in config.yml, then run `devmachine skills add`.")
+		return nil
+	}
+	return setupSkills(ctx, dir, in, out)
+}
+
+func offerSetupSkills(ctx context.Context, dir string, in io.Reader, out io.Writer) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	agents := detectAgents(home)
+	if len(agents) == 0 {
+		fmt.Fprintln(out, "\nAgent skills were not installed because no supported harness was detected. Run `devmachine skills add --agent <name>` later.")
+		return nil
+	}
+	ok, err := confirm(in, out, "Install the official Devmachine skills for "+joinAgents(agents)+"?")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		fmt.Fprintln(out, "Agent skills were not installed. Run `devmachine skills add` later.")
+		return nil
+	}
+	source, err := skillSource(ctx, dir, "")
+	if err != nil {
+		return err
+	}
+	result, err := (agentskills.Installer{Home: home}).Install(source, agents)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "installed %s from %s (%d filesystem changes)\n", strings.Join(result.Skills, ", "), result.Source, result.Changed)
 	return nil
 }
 

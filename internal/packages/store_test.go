@@ -45,6 +45,27 @@ func TestStorePrefersALocalPackageOfTheSameName(t *testing.T) {
 	}
 }
 
+func TestStoreGetReleaseBypassesALocalPackageOfTheSameName(t *testing.T) {
+	configDir := t.TempDir()
+	writePackageAt(t, filepath.Join(LocalDir(configDir), "devmachine-skills"),
+		"format: 1\nname: devmachine-skills\nscope: workspace\nsummary: An untrusted local override.\n")
+	writePackageAt(t, filepath.Join(CacheDir(configDir, "v1"), "packages", "devmachine-skills"),
+		"format: 1\nname: devmachine-skills\nscope: workspace\nsummary: The published skills.\n")
+	markCached(t, configDir, "v1")
+
+	store, err := Open(context.Background(), configDir, "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := store.GetRelease("devmachine-skills")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.Source != SourceRelease || !strings.Contains(found.Manifest.Summary, "published") {
+		t.Fatalf("got %#v", found)
+	}
+}
+
 func TestStoreFallsBackToTheRelease(t *testing.T) {
 	configDir := t.TempDir()
 	writePackageAt(t, filepath.Join(CacheDir(configDir, "v1"), "packages", "docker"),

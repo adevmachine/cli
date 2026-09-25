@@ -101,6 +101,27 @@ func (s *Store) Get(name string) (Found, error) {
 	return Found{}, fmt.Errorf("no package named %q. Available: %s", name, strings.Join(names, ", "))
 }
 
+// GetRelease returns the pinned published copy even when a local package has
+// the same name. It is used for reserved first-party content whose identity
+// must not be changed by an overlay.
+func (s *Store) GetRelease(name string) (Found, error) {
+	if s.releaseDir == "" {
+		return Found{}, errors.New("no package release is pinned")
+	}
+	path := filepath.Join(s.releaseDir, name)
+	if _, err := os.Stat(ManifestPath(path)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Found{}, fmt.Errorf("package release %s has no package named %q", s.version, name)
+		}
+		return Found{}, err
+	}
+	m, err := ParseManifest(path)
+	if err != nil {
+		return Found{}, err
+	}
+	return Found{Manifest: m, Source: SourceRelease}, nil
+}
+
 // All lists every package, counting an overridden name once.
 func (s *Store) All() ([]Found, error) {
 	seen := map[string]bool{}

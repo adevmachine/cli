@@ -204,6 +204,39 @@ func TestSetupWithExistingConfigurationOnlyPreparesTheSelectedMachine(t *testing
 	}
 }
 
+func TestSetupWithoutAPackageReleasePrintsTheSkillsFollowUp(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	out, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "", "1"), setupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "devmachine skills add") || !strings.Contains(out, "package release") {
+		t.Fatalf("missing skills follow-up: %q", out)
+	}
+}
+
+func TestSetupWithAPackageReleaseOffersLocalSkills(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\npackages: v9\n")
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nopClient{}, "203.0.113.10", nil
+	}))
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error { return nil }))
+	called := false
+	t.Cleanup(swap(&setupSkills, func(_ context.Context, gotDir string, _ io.Reader, _ io.Writer) error {
+		called = gotDir == dir
+		return nil
+	}))
+
+	if _, err := runSetupIn(t, dir, strings.NewReader(""), setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("setup did not offer local skills after preparing a pinned configuration")
+	}
+}
+
 func TestSetupWithAWorkingKeySkipsThePassword(t *testing.T) {
 	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
 
