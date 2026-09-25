@@ -529,3 +529,55 @@ func TestWorkspacesEditRefusesAMachineThatIsNotConfigured(t *testing.T) {
 		t.Fatal("it pointed a workspace at a machine that is not there")
 	}
 }
+
+func TestWorkspaceDefaultsAddAPackageWithoutTouchingAMachine(t *testing.T) {
+	dir := configWithKey(t, "defaults:\n  workspace: [workspace, dev]\n")
+	forbidDial(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "defaults", "--add", "global-skills", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(cfg.Defaults.Workspace, "global-skills") {
+		t.Fatalf("got %#v", cfg.Defaults.Workspace)
+	}
+	if !strings.Contains(out, "future workspaces") || !strings.Contains(out, "existing workspaces are unchanged") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestWorkspaceDefaultsCheckWritesNothing(t *testing.T) {
+	dir := configWithKey(t, "# keep this\ndefaults:\n  workspace: [workspace, dev]\n")
+	path := filepath.Join(dir, config.FileName)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := execute(t, "--config", dir, "workspaces", "defaults", "--add", "global-skills", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before, after) {
+		t.Fatalf("--check rewrote config.yml:\n%s", after)
+	}
+	if !strings.Contains(out, "would add the package global-skills") || !strings.Contains(out, "Nothing was written") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestWorkspaceDefaultsRefusesContradictoryFlags(t *testing.T) {
+	dir := configWithKey(t, "defaults:\n  workspace: [workspace]\n")
+	_, err := execute(t, "--config", dir, "workspaces", "defaults", "--add", "zsh", "--rm", "zsh", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "two different things") {
+		t.Fatalf("got %v", err)
+	}
+}

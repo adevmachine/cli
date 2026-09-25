@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -22,9 +23,89 @@ func newWorkspacesCmd(opts *options) *cobra.Command {
 		newWorkspacesListCmd(opts),
 		newWorkspacesNewCmd(opts),
 		newWorkspacesEditCmd(opts),
+		newWorkspacesDefaultsCmd(opts),
 		newWorkspacesRmCmd(opts),
 	)
 	return cmd
+}
+
+func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
+	var add, remove []string
+	var check, yes bool
+	c := &cobra.Command{
+		Use:   "defaults",
+		Short: "Change the packages inherited by future workspaces",
+		Long:  "Edits only defaults.workspace in the local configuration. Existing workspaces and every machine are unchanged.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _, err := config.Dir(opts.configDir)
+			if err != nil {
+				return err
+			}
+			cfg, err := loadConfig(opts)
+			if err != nil {
+				return err
+			}
+			for _, name := range remove {
+				if slices.Contains(add, name) {
+					return fmt.Errorf("--add %s and --rm %s say two different things: pass one of them", name, name)
+				}
+			}
+			wanted := slices.Clone(cfg.Defaults.Workspace)
+			var changes []string
+			for _, name := range add {
+				if !slices.Contains(wanted, name) {
+					wanted = append(wanted, name)
+					changes = append(changes, "add the package "+name)
+				}
+			}
+			for _, name := range remove {
+				if slices.Contains(wanted, name) {
+					wanted = slices.DeleteFunc(wanted, func(held string) bool { return held == name })
+					changes = append(changes, "take off the package "+name)
+				}
+			}
+			if len(changes) == 0 {
+				return errors.New("nothing to change in future workspace defaults: pass --add or --rm")
+			}
+			if check {
+				for _, line := range changes {
+					cmd.Printf("would %s for future workspaces\n", line)
+				}
+				cmd.Println("Nothing was written; existing workspaces are unchanged.")
+				return nil
+			}
+			if !yes {
+				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "For future workspaces: "+strings.Join(changes, "; ")+"?")
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errDeclined
+				}
+			}
+			if err := config.UpdateWorkspaceDefaults(dir, wanted); err != nil {
+				return err
+			}
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): update future workspace defaults")
+			if opts.format == formatJSON {
+				return writeJSON(cmd.OutOrStdout(), struct {
+					Packages []string `json:"packages"`
+					Changed  bool     `json:"changed"`
+				}{wanted, true})
+			}
+			for _, line := range changes {
+				cmd.Printf("future workspaces: %s\n", line)
+			}
+			cmd.Println("The local defaults changed; existing workspaces are unchanged, and no machine was touched.")
+			return nil
+		},
+	}
+	c.Flags().StringSliceVar(&add, "add", nil, "a package future workspaces should inherit")
+	c.Flags().StringSliceVar(&remove, "rm", nil, "a package future workspaces should stop inheriting")
+	c.Flags().BoolVar(&check, "check", false, "say what would change, and change nothing")
+	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
+	return c
 }
 
 // workspaceRow is the output contract, kept apart from the configuration

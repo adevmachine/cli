@@ -1123,3 +1123,31 @@ func TestValidateRefusesAWorkspaceCredentialPreferenceNobodyUnderstands(t *testi
 		t.Fatalf("the message has to name the workspace, got %v", err)
 	}
 }
+
+func TestUpdateWorkspaceDefaultsPreservesComments(t *testing.T) {
+	dir := writeConfig(t, `# operator note
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+defaults:
+  workspace: [workspace, dev] # future accounts
+`)
+
+	if err := UpdateWorkspaceDefaults(dir, []string{"workspace", "dev", "global-skills"}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "operator note") || !strings.Contains(string(body), "future accounts") {
+		t.Fatalf("comments were lost:\n%s", body)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Defaults.Workspace, []string{"workspace", "dev", "global-skills"}) {
+		t.Fatalf("got %#v", cfg.Defaults.Workspace)
+	}
+}

@@ -800,6 +800,23 @@ func UpdateWorkspace(dir string, w Workspace) error {
 	})
 }
 
+// UpdateWorkspaceDefaults writes the package list inherited by workspaces
+// created in the future. Existing workspace entries are deliberately untouched.
+func UpdateWorkspaceDefaults(dir string, packages []string) error {
+	return editDocument(dir, func(root *yaml.Node) error {
+		defaults := field(root, "defaults")
+		if defaults == nil || defaults.Kind != yaml.MappingNode {
+			defaults = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+			setField(root, "defaults", defaults)
+		}
+		setField(defaults, "workspace", sequenceNode(packages))
+		if len(defaults.Content) == 0 {
+			setField(root, "defaults", nil)
+		}
+		return nil
+	})
+}
+
 // RemoveWorkspace takes a workspace out of config.yml.
 //
 // It removes the entry and nothing else. The Linux account, its home and its
