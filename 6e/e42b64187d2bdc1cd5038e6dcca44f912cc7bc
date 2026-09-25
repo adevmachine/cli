@@ -1,0 +1,29 @@
+README.md
+  s_ad29e4893e2b5c::t_53ef5d209216d5 87,95-99
+docs/concepts/agent-skills.md
+  s_ad29e4893e2b5c::t_229009cb64ce0e 1-71
+docs/getting-started.md
+  s_ad29e4893e2b5c::t_7ec4986c8ff41d 66-75
+docs/index.md
+  s_ad29e4893e2b5c::t_b82743bde99adb 35-36
+docs/reference/commands.md
+  s_ad29e4893e2b5c::t_9280d09d07334d 218,276-302
+scripts/accept/v05-packages-credentials-dns.sh
+  s_ad29e4893e2b5c::t_e189603db028db 109,114-131,153-154,159-168,217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ee42b64187d2bdc1cd5038e6dcca44f912cc7bc",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
