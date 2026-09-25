@@ -106,10 +106,28 @@ printf '%s\n' "$VM" "127.0.0.1" "root" "$PORT" "example.com" "y" "1" "devmachine
   || die "$VM does not answer; downstream assertions would be meaningless"
 
 mkdir -p "$DEVMACHINE_CONFIG/packages"
-for package in base git tailscale workspace git-key hostinger; do
+for package in base git tailscale workspace git-key hostinger devmachine-skills; do
   [ -d "$PACKAGES/packages/$package" ] || die "package fixture is missing: $package"
   cp -R "$PACKAGES/packages/$package" "$DEVMACHINE_CONFIG/packages/"
 done
+
+# Selecting claude-code is what asks the generator for the Claude adapter. The
+# acceptance case needs that declaration, not a download of Claude itself.
+mkdir -p "$DEVMACHINE_CONFIG/packages/claude-code/tasks"
+python3 - <<'PY' || die "could not create the inert claude-code fixture"
+import os
+from pathlib import Path
+
+root = Path(os.environ["DEVMACHINE_CONFIG"]) / "packages" / "claude-code"
+(root / "package.yml").write_text(
+    "format: 1\n"
+    "name: claude-code\n"
+    "scope: workspace\n"
+    "summary: Acceptance-only Claude adapter marker.\n"
+    "needs: [workspace]\n"
+)
+(root / "tasks" / "main.yml").write_text("---\n[]\n")
+PY
 
 python3 - <<'PY' || die "could not configure the v0.5 fixture"
 import os
@@ -132,9 +150,21 @@ PY
 "$DEVMACHINE_ACCEPT_BIN" workspaces new bob --like alice --yes || die "could not add bob"
 "$DEVMACHINE_ACCEPT_BIN" packages add git-key --workspace alice --yes || die "could not add alice's git-key"
 "$DEVMACHINE_ACCEPT_BIN" packages add git-key --workspace bob --yes || die "could not add bob's git-key"
+"$DEVMACHINE_ACCEPT_BIN" packages add claude-code --workspace alice --yes || die "could not add alice's Claude adapter"
+"$DEVMACHINE_ACCEPT_BIN" packages add devmachine-skills --workspace alice --yes || die "could not add alice's skills"
 
 capture_sync v05-sync1
 recap_converged "$SYNC_RECAP" "sync converges"
+
+ALICE_SKILL=$("$DEVMACHINE_ACCEPT_BIN" run --workspace alice -- \
+  'test -f ~/.agents/skills/use-devmachine/SKILL.md && printf present' 2>&1)
+equals "$ALICE_SKILL" "present" "a selected workspace receives the official skill" || true
+BOB_SKILL=$("$DEVMACHINE_ACCEPT_BIN" run --workspace bob -- \
+  'test ! -e ~/.agents/skills/use-devmachine && printf absent' 2>&1)
+equals "$BOB_SKILL" "absent" "an unselected workspace receives no skill" || true
+CLAUDE_LINK=$("$DEVMACHINE_ACCEPT_BIN" run --workspace alice -- \
+  'readlink ~/.claude/skills/use-devmachine' 2>&1)
+equals "$CLAUDE_LINK" "../../.agents/skills/use-devmachine" "Claude uses the relative canonical link" || true
 
 capture_sync v05-sync2
 recap_idempotent "$SYNC_RECAP" "a second sync changes nothing"
@@ -184,4 +214,4 @@ require_converged_recap "$SYNC_RECAP" "sync after adding hostinger"
 HELP=$("$DEVMACHINE_ACCEPT_BIN" packages help hostinger 2>&1)
 contains "$HELP" "zones" "the provider says what it accepts" || true
 
-scenario_done 14 "v0.5"
+scenario_done 17 "v0.5"

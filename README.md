@@ -84,12 +84,18 @@ devmachine ssh|mosh [workspace]      an interactive session
 devmachine run --workspace w "cmd"   one command, as that workspace
 devmachine dns status [host]         DNS, TLS and one request, checked from outside
 devmachine secrets set|list|rm       provider tokens in the OS keychain
+devmachine skills add|list|update    install package-contributed skills locally
 devmachine help --json               the whole command surface, for a script or an agent
 ```
 
 Rules that hold everywhere: `--format json` is the stable contract, stdout is
 data and stderr is diagnostics, and `--help` exists on every command. A command
 that would act on a server nobody named asks instead of guessing.
+
+Agent Skills live once under `~/.agents/skills`. `devmachine skills` manages
+them on this computer without contacting a configured machine; workspace skill
+packages are applied separately by `sync`. See [Agent
+Skills](docs/concepts/agent-skills.md).
 
 ## Coming next
 

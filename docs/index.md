@@ -32,6 +32,8 @@ as a bought one arrives.
   `dns status` asks a different question from `dns list`.
 - [Publishing](concepts/publishing.md) — `expose` and `tunnel`, and why the
   question is who should reach a port rather than which protocol it speaks.
+- [Agent Skills](concepts/agent-skills.md) — one canonical skill tree, harness
+  adapters, and package selection per workspace.
 
 ## How it works
 

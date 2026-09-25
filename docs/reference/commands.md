@@ -215,6 +215,7 @@ Two limits, both from what a machine on your own computer is:
 devmachine workspaces list
 devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
 devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--check] [--yes]
+devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]
 devmachine workspaces rm <name> [--yes]
 ```
 
@@ -271,6 +272,33 @@ everything it had — its home, its files, its account. The command says so.
 **`rm` leaves the Linux account, its home and its files on the machine.**
 Deleting a home is not something a configuration edit should do, and `sync`
 could not put it back. Remove them there by hand if you really want them gone.
+
+`defaults` changes only `defaults.workspace`, which new workspaces inherit.
+Existing workspaces are unchanged. Like the other workspace configuration
+commands, it is local and touches no machine.
+
+## skills
+
+```text
+devmachine skills add [--package name] [--agent claude|codex|pi|opencode] [--yes]
+devmachine skills list
+devmachine skills update [--yes]
+devmachine skills remove <name> [--yes]
+```
+
+These commands manage Agent Skills on the current computer and never contact a
+configured machine. Bare `add` resolves `devmachine-skills` from the pinned
+package release even if a local package has the same name. `--package` accepts
+only a local package. Without `--agent`, interactive use detects installed
+harnesses and asks which ones to enable.
+
+`list` reports each managed source, its skills and harnesses. `update` resolves
+every recorded source from the current release pin or local package and
+reinstalls it. `remove` takes one exact skill name and refuses unmanaged or
+differently owned paths.
+
+The canonical copy is `~/.agents/skills/<name>`. Claude's adapter is the
+relative link `~/.claude/skills/<name> -> ../../.agents/skills/<name>`.
 
 ## aliases
 

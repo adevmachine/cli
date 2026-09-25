@@ -63,6 +63,16 @@ If the configuration already exists, `devmachine setup` resumes this step: it
 uses the configured host-key pin and authentication and ensures Ansible is
 installed without rewriting the configuration or changing SSH policy.
 
+When a package release is pinned, setup also offers the official Agent Skills.
+They can be installed later without contacting the machine:
+
+```bash
+devmachine skills add
+```
+
+This local installation is separate from adding the same knowledge to a
+workspace; see [Agent Skills](concepts/agent-skills.md).
+
 ## Build the machine
 
 ```
