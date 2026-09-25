@@ -175,6 +175,25 @@ configuration — see [Configuration](../concepts/configuration.md).
 
 Files that have to be on the machine before the package runs.
 
+### `skills.path`
+
+A package may contribute complete Agent Skill directories:
+
+```yaml
+skills:
+  path: skills
+```
+
+The path is relative to the package root and cannot contain `..`, be absolute,
+or escape through a symlink. Every direct child is one lower-case,
+dash-separated skill directory with a `SKILL.md`; its frontmatter `name` must
+match the directory and its `description` must not be empty. Scripts,
+references and assets below a valid skill directory are included as part of
+that skill.
+
+This metadata does not replace the Ansible role. A package with skills still
+has `tasks/main.yml` and may also have defaults, handlers, files and templates.
+
 ### `kind`, `entrypoint`, `commands`
 
 A package may carry an executable the CLI calls on the machine:

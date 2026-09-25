@@ -75,6 +75,12 @@ type Credential struct {
 	Path string `yaml:"path"`
 }
 
+// SkillContribution names the package-relative directory whose direct
+// children are Agent Skills.
+type SkillContribution struct {
+	Path string `yaml:"path"`
+}
+
 // Manifest is what package.yml holds.
 type Manifest struct {
 	// Format is the shape of this file, and it is required. Without it the
@@ -99,6 +105,7 @@ type Manifest struct {
 	Variables     map[string]Variable `yaml:"variables"`
 	Credentials   []Credential        `yaml:"credentials"`
 	RequiresFiles []string            `yaml:"requires_files"`
+	Skills        *SkillContribution  `yaml:"skills"`
 
 	// Kind, Entrypoint and Commands make a package callable: the contract it
 	// answers, the executable to call on the machine, and what that executable

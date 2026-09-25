@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/adevmachine/cli/internal/skills"
 )
 
 // Problem is one thing wrong with a package, and where it is.
@@ -113,6 +115,7 @@ func Validate(dir string) ([]Problem, error) {
 
 	problems = append(problems, validateEntrypoint(dir, m)...)
 	problems = append(problems, validateCredentials(m)...)
+	problems = append(problems, validateSkills(dir, m)...)
 
 	for _, point := range sortedKeys(m.Extends) {
 		source := m.Extends[point]
@@ -145,6 +148,36 @@ func Validate(dir string) ([]Problem, error) {
 		return nil, err
 	}
 	return append(problems, taskProblems...), nil
+}
+
+func validateSkills(dir string, m Manifest) []Problem {
+	if m.Skills == nil {
+		return nil
+	}
+	at := func(what string) []Problem {
+		return []Problem{{File: FileName, Line: m.Lines["skills"], What: what}}
+	}
+	raw := strings.TrimSpace(m.Skills.Path)
+	if raw == "" {
+		return at("skills.path must name a directory inside the package")
+	}
+	if filepath.IsAbs(raw) {
+		return at(fmt.Sprintf("skills.path %q must stay inside the package", raw))
+	}
+	for _, part := range strings.FieldsFunc(filepath.ToSlash(raw), func(r rune) bool { return r == '/' }) {
+		if part == ".." {
+			return at(fmt.Sprintf("skills.path %q must stay inside the package", raw))
+		}
+	}
+	root := filepath.Join(dir, raw)
+	rel, err := filepath.Rel(dir, root)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return at(fmt.Sprintf("skills.path %q must stay inside the package", raw))
+	}
+	if _, err := skills.Discover(root); err != nil {
+		return at(err.Error())
+	}
+	return nil
 }
 
 // validateEntrypoint checks a package that says it can be called.

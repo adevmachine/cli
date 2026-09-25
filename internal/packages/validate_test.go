@@ -1,10 +1,78 @@
 package packages
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestValidateAcceptsASkillContribution(t *testing.T) {
+	dir := writePackage(t, "global-skills", `format: 1
+name: global-skills
+scope: workspace
+summary: Shared skills.
+skills:
+  path: skills
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n[]\n")
+	writePackageSkill(t, dir, "use-devmachine", "Use Devmachine.")
+
+	problems, err := Validate(dir)
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("%v %#v", err, problems)
+	}
+}
+
+func TestValidateRejectsASkillPathOutsideThePackage(t *testing.T) {
+	dir := writePackage(t, "global-skills", `format: 1
+name: global-skills
+scope: workspace
+summary: Shared skills.
+skills:
+  path: ../skills
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n[]\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problemAbout(t, problems, "stay inside the package")
+}
+
+func TestValidateReportsEveryMalformedSkill(t *testing.T) {
+	dir := writePackage(t, "global-skills", `format: 1
+name: global-skills
+scope: workspace
+summary: Shared skills.
+skills:
+  path: skills
+`)
+	write(t, filepath.Join(dir, "tasks", "main.yml"), "---\n[]\n")
+	writePackageSkill(t, dir, "wrong-name", "")
+	write(t, filepath.Join(dir, "skills", "wrong-name", "SKILL.md"), "---\nname: something-else\ndescription: ''\n---\n")
+	write(t, filepath.Join(dir, "skills", "missing-description", "SKILL.md"), "---\nname: missing-description\n---\n")
+
+	problems, err := Validate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := problemAbout(t, problems, "wrong-name")
+	if !strings.Contains(p.What, "missing-description") {
+		t.Fatalf("did not report all malformed skills: %#v", problems)
+	}
+}
+
+func writePackageSkill(t *testing.T, dir, name, description string) {
+	t.Helper()
+	path := filepath.Join(dir, "skills", name)
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nname: " + name + "\ndescription: " + description + "\n---\n\n# " + name + "\n"
+	write(t, filepath.Join(path, "SKILL.md"), body)
+}
 
 func TestValidateRejectsAPackageWithNoFormat(t *testing.T) {
 	dir := writePackage(t, "git", "name: git\nscope: machine\nsummary: x\n")

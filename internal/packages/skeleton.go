@@ -38,6 +38,7 @@ var schemaFields = []SchemaField{
 	{"variables", false, "Values this package reads, each with a summary and a default."},
 	{"credentials", false, "What its tool cannot work without, and how each one is obtained."},
 	{"requires_files", false, "Files that have to be on the machine before it runs."},
+	{"skills", false, "A package-relative directory whose direct children are Agent Skills."},
 	{"kind", false, `The contract an entrypoint answers. The only one so far is "dns".`},
 	{"entrypoint", false, "An executable in the package the CLI can call on the machine."},
 	{"commands", false, `What the entrypoint accepts: a list, or ["*"] for anything.`},
