@@ -1,0 +1,35 @@
+SURFACE.txt
+  s_3c1e24ba9f2fdc::t_c20629b6b0bc90 63
+internal/commands/workspaces.go
+  s_ad29e4893e2b5c::t_5860888c19237f 4,26,32-110
+internal/commands/workspaces_test.go
+  s_ad29e4893e2b5c::t_1484dc9ca81c46 532-583
+internal/config/config.go
+  s_ad29e4893e2b5c::t_f7bb5ad7b9e43c 803-819
+internal/config/config_test.go
+  s_ad29e4893e2b5c::t_1a52393f1df932 1126-1153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e5804a77476f8282e810dc40809400b6a33686ff",
+  "prompts": {},
+  "sessions": {
+    "s_3c1e24ba9f2fdc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
