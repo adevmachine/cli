@@ -87,6 +87,13 @@ name: claude-code
 scope: workspace
 summary: Claude Code, logged in per workspace.
 `,
+	"global-skills": `format: 1
+name: global-skills
+scope: workspace
+summary: Shared Agent Skills.
+skills:
+  path: skills
+`,
 	"sharing": `format: 1
 name: sharing
 scope: workspace
@@ -108,6 +115,9 @@ commands: ["*"]
 var extraFiles = map[string]map[string]string{
 	"sharing":  {"files/sharing.caddy": "example.com {\n  respond \"ok\"\n}\n"},
 	"callable": {"bin/provider": "#!/usr/bin/env python3\n"},
+	"global-skills": {
+		"skills/workflow/SKILL.md": "---\nname: workflow\ndescription: Shared workflow.\n---\n\n# Workflow\n",
+	},
 }
 
 // writeRecipe lays a fixture package out as a role: the manifest, tasks, and

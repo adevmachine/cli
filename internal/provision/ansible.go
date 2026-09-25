@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/packages"
+	agentskills "github.com/adevmachine/cli/internal/skills"
 	"gopkg.in/yaml.v3"
 )
 
@@ -204,6 +206,10 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	contributed, err := skillTasks(plan)
+	if err != nil {
+		return "", err
+	}
 	// The copies come after the packages that declared them: the account and
 	// the tool both have to exist before a session is put where the tool
 	// looks for it.
@@ -211,7 +217,7 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tasks := machineTasks(plan) + forWorkspaces + shared
+	tasks := machineTasks(plan) + forWorkspaces + contributed + shared
 	// A package that READS a copied session sees nothing on the run that
 	// delivered it, so a single pass would leave the machine needing another
 	// `sync` — which is the one thing convergence must not do. The packages
@@ -232,6 +238,145 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	out.WriteString("  tasks:\n")
 	out.WriteString(tasks)
 	return out.String(), nil
+}
+
+type contributedSkills struct {
+	found      packages.Found
+	skills     []agentskills.Skill
+	workspaces []packages.Resolved
+	claude     []packages.Resolved
+}
+
+// skillTasks converges package skill contributions for only the workspaces
+// whose resolved package set includes the contributor.
+func skillTasks(plan packages.MachinePlan) (string, error) {
+	var contributions []contributedSkills
+	byPackage := map[string]int{}
+	for _, workspace := range plan.Workspaces {
+		for _, found := range workspace.Ordered {
+			if found.Manifest.Skills == nil {
+				continue
+			}
+			index, ok := byPackage[found.Manifest.Name]
+			if !ok {
+				discovered, err := agentskills.Discover(filepath.Join(found.Manifest.Path, found.Manifest.Skills.Path))
+				if err != nil {
+					return "", fmt.Errorf("package %s skills: %w", found.Manifest.Name, err)
+				}
+				index = len(contributions)
+				byPackage[found.Manifest.Name] = index
+				contributions = append(contributions, contributedSkills{found: found, skills: discovered})
+			}
+			contributions[index].workspaces = append(contributions[index].workspaces, workspace)
+			if has(workspace, "claude-code") {
+				contributions[index].claude = append(contributions[index].claude, workspace)
+			}
+		}
+	}
+
+	var out strings.Builder
+	for _, contribution := range contributions {
+		writeSkillDirectories(&out, contribution)
+		for _, skill := range contribution.skills {
+			writeSkillConvergence(&out, contribution, skill)
+		}
+	}
+	return out.String(), nil
+}
+
+func writeSkillDirectories(out *strings.Builder, contribution contributedSkills) {
+	name := contribution.found.Manifest.Name
+	for _, dir := range []struct {
+		title string
+		path  string
+		mode  string
+	}{
+		{"canonical skill directory", "/home/{{ devmachine_workspace.user }}/.agents/skills", "0755"},
+		{"skill ownership directory", "/home/{{ devmachine_workspace.user }}/.local/state/devmachine/skills", "0700"},
+	} {
+		fmt.Fprintf(out, "    - name: %s prepares the %s\n", name, dir.title)
+		fmt.Fprintf(out, "      file:\n        path: %q\n        state: directory\n", dir.path)
+		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n")
+		fmt.Fprintf(out, "        mode: %q\n", dir.mode)
+		writeSkillLoop(out, contribution.workspaces, false)
+		fmt.Fprintf(out, "      tags: [%s]\n\n", name)
+	}
+	if len(contribution.claude) > 0 {
+		fmt.Fprintf(out, "    - name: %s prepares the Claude skill directory\n", name)
+		out.WriteString("      file:\n        path: \"/home/{{ devmachine_workspace.user }}/.claude/skills\"\n        state: directory\n")
+		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n        mode: \"0755\"\n")
+		writeSkillLoop(out, contribution.claude, false)
+		fmt.Fprintf(out, "      tags: [%s]\n\n", name)
+	}
+}
+
+func writeSkillConvergence(out *strings.Builder, contribution contributedSkills, skill agentskills.Skill) {
+	pkg := contribution.found.Manifest.Name
+	sourceID := pkg
+	destination := "/home/{{ devmachine_workspace.user }}/.agents/skills/" + skill.Name
+	owner := "/home/{{ devmachine_workspace.user }}/.local/state/devmachine/skills/" + skill.Name + ".owner"
+	variable := strings.NewReplacer("-", "_", ".", "_").Replace(pkg + "_" + skill.Name)
+	destinationResult := "devmachine_skill_" + variable + "_destination"
+	ownerResult := "devmachine_skill_" + variable + "_owner"
+	contentResult := "devmachine_skill_" + variable + "_owner_content"
+
+	fmt.Fprintf(out, "    - name: %s checks the %s destination\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      stat:\n        path: %q\n", destination)
+	fmt.Fprintf(out, "      register: %s\n", destinationResult)
+	writeSkillLoop(out, contribution.workspaces, true)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	fmt.Fprintf(out, "    - name: %s checks the %s ownership record\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      stat:\n        path: %q\n", owner)
+	fmt.Fprintf(out, "      register: %s\n", ownerResult)
+	writeSkillLoop(out, contribution.workspaces, true)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	fmt.Fprintf(out, "    - name: %s reads the %s ownership record\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      slurp:\n        src: %q\n", owner)
+	fmt.Fprintf(out, "      register: %s\n", contentResult)
+	fmt.Fprintf(out, "      when: %s.results[devmachine_skill_index].stat.exists\n", ownerResult)
+	writeSkillLoop(out, contribution.workspaces, true)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	fmt.Fprintf(out, "    - name: %s refuses an unmanaged %s collision\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      fail:\n        msg: %q\n", "skill "+skill.Name+" already exists and is not owned by "+sourceID)
+	out.WriteString("      when:\n")
+	fmt.Fprintf(out, "        - %s.results[devmachine_skill_index].stat.exists\n", destinationResult)
+	fmt.Fprintf(out, "        - not %s.results[devmachine_skill_index].stat.exists or ((%s.results[devmachine_skill_index].content | default('') | b64decode | trim) != %q)\n", ownerResult, contentResult, sourceID)
+	writeSkillLoop(out, contribution.workspaces, true)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	fmt.Fprintf(out, "    - name: %s installs the %s skill\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      copy:\n        src: %q\n        dest: %q\n", RolePath(contribution.found.Source, pkg, contribution.found.Manifest.Skills.Path, skill.Name)+"/", destination+"/")
+	out.WriteString("        remote_src: true\n        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n        mode: preserve\n")
+	writeSkillLoop(out, contribution.workspaces, false)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	fmt.Fprintf(out, "    - name: %s records ownership of the %s skill\n", pkg, skill.Name)
+	fmt.Fprintf(out, "      copy:\n        content: %q\n        dest: %q\n", sourceID+"\n", owner)
+	out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n        mode: \"0600\"\n")
+	writeSkillLoop(out, contribution.workspaces, false)
+	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+
+	if len(contribution.claude) > 0 {
+		fmt.Fprintf(out, "    - name: %s links the %s skill for Claude\n", pkg, skill.Name)
+		fmt.Fprintf(out, "      file:\n        src: %q\n        dest: %q\n        state: link\n", "../../.agents/skills/"+skill.Name, "/home/{{ devmachine_workspace.user }}/.claude/skills/"+skill.Name)
+		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n")
+		writeSkillLoop(out, contribution.claude, false)
+		fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
+	}
+}
+
+func writeSkillLoop(out *strings.Builder, workspaces []packages.Resolved, indexed bool) {
+	out.WriteString("      loop:\n")
+	for _, workspace := range workspaces {
+		fmt.Fprintf(out, "        - {name: %q, user: %q}\n", workspace.Target.Name, workspace.Target.LinuxUser)
+	}
+	out.WriteString("      loop_control:\n        loop_var: devmachine_workspace\n")
+	if indexed {
+		out.WriteString("        index_var: devmachine_skill_index\n")
+	}
 }
 
 func machineTasks(plan packages.MachinePlan) string {

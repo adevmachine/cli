@@ -537,3 +537,110 @@ func TestRolePathFollowsTheOverlay(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestGenerateInstallsSkillsOnlyForWorkspacesSelectingThePackage(t *testing.T) {
+	plan := planWith(t, "main", nil, map[string][]string{
+		"alice": {"claude-code", "global-skills"},
+		"bob":   {"claude-code"},
+	})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playbook := string(files["site.yml"])
+	for _, want := range []string{"/home/{{ devmachine_workspace.user }}/.agents/skills/workflow", "global-skills", "remote_src: true"} {
+		if !strings.Contains(playbook, want) {
+			t.Fatalf("%q is missing:\n%s", want, playbook)
+		}
+	}
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		if !taskHasTag(task, "global-skills") {
+			continue
+		}
+		loop, ok := task["loop"].([]any)
+		if !ok {
+			continue
+		}
+		for _, raw := range loop {
+			if raw.(map[string]any)["name"] == "bob" {
+				t.Fatalf("bob received global-skills:\n%s", playbook)
+			}
+		}
+	}
+}
+
+func TestGenerateCreatesClaudeLinksOnlyWhereClaudeCodeIsSelected(t *testing.T) {
+	plan := planWith(t, "main", nil, map[string][]string{
+		"alice": {"claude-code", "global-skills"},
+		"bob":   {"global-skills"},
+	})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		file, ok := task["file"].(map[string]any)
+		if !ok || file["state"] != "link" {
+			continue
+		}
+		loop := task["loop"].([]any)
+		if len(loop) != 1 || loop[0].(map[string]any)["name"] != "alice" {
+			t.Fatalf("Claude link loop = %#v", loop)
+		}
+		if file["src"] != "../../.agents/skills/workflow" {
+			t.Fatalf("Claude link target = %#v", file["src"])
+		}
+		return
+	}
+	t.Fatal("no Claude skill link task was generated")
+}
+
+func TestGenerateSkillTasksFailOnAnUnmanagedCollision(t *testing.T) {
+	files, err := Generate(planWith(t, "main", nil, map[string][]string{"alice": {"global-skills"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		if _, ok := task["fail"]; ok && strings.Contains(task["name"].(string), "unmanaged") {
+			if task["when"] == nil {
+				t.Fatalf("collision failure is unconditional: %#v", task)
+			}
+			return
+		}
+	}
+	t.Fatalf("no unmanaged collision failure:\n%s", files["site.yml"])
+}
+
+func TestGenerateSkillTasksNeverPruneAbsentSkills(t *testing.T) {
+	files, err := Generate(planWith(t, "main", nil, map[string][]string{"alice": {"global-skills"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		file, ok := task["file"].(map[string]any)
+		if ok && file["state"] == "absent" {
+			t.Fatalf("generated a pruning task: %#v", task)
+		}
+	}
+}
+
+func TestGenerateSkillOwnershipSurvivesReleaseAndLocalOverlayChanges(t *testing.T) {
+	plan := planFor(t, storeWithCatalogue(t, "global-skills"), "main", nil,
+		map[string][]string{"alice": {"global-skills"}})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playbook := string(files["site.yml"])
+	if !strings.Contains(playbook, `content: "global-skills\n"`) {
+		t.Fatalf("ownership depends on local/release source:\n%s", playbook)
+	}
+}
+
+func taskHasTag(task map[string]any, want string) bool {
+	tags, ok := task["tags"].([]any)
+	if !ok {
+		return false
+	}
+	return slices.Contains(tags, any(want))
+}
