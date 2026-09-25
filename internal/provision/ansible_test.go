@@ -590,6 +590,9 @@ func TestGenerateCreatesClaudeLinksOnlyWhereClaudeCodeIsSelected(t *testing.T) {
 		if file["src"] != "../../.agents/skills/workflow" {
 			t.Fatalf("Claude link target = %#v", file["src"])
 		}
+		if file["force"] != "{{ ansible_check_mode }}" {
+			t.Fatalf("Claude link must tolerate check mode's not-yet-copied target: %#v", file)
+		}
 		return
 	}
 	t.Fatal("no Claude skill link task was generated")

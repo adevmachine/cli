@@ -362,6 +362,7 @@ func writeSkillConvergence(out *strings.Builder, contribution contributedSkills,
 	if len(contribution.claude) > 0 {
 		fmt.Fprintf(out, "    - name: %s links the %s skill for Claude\n", pkg, skill.Name)
 		fmt.Fprintf(out, "      file:\n        src: %q\n        dest: %q\n        state: link\n", "../../.agents/skills/"+skill.Name, "/home/{{ devmachine_workspace.user }}/.claude/skills/"+skill.Name)
+		out.WriteString("        force: \"{{ ansible_check_mode }}\"\n")
 		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n")
 		writeSkillLoop(out, contribution.claude, false)
 		fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)

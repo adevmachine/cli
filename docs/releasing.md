@@ -9,7 +9,7 @@ gh run watch          # follow the release workflow
 ```
 
 Before tagging: `main` clean and pushed, CI green, `make test-vps` green
-against a real machine, and the local CLI acceptance gate green:
+against the disposable Lima machine, and the local CLI acceptance gate green:
 
 ```
 make accept
