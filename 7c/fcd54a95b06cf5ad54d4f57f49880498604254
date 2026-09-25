@@ -1,0 +1,25 @@
+internal/packages/validate.go
+  s_ad29e4893e2b5c::t_35d928cb837300 177-184
+internal/packages/validate_test.go
+  s_ad29e4893e2b5c::t_9a6dd212a0575e 44-65
+internal/skills/install.go
+  s_ad29e4893e2b5c::t_37b5d8434e8323 129-138,323-328,342
+internal/skills/install_test.go
+  s_ad29e4893e2b5c::t_71a53232f4bea7 45-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7cfcd54a95b06cf5ad54d4f57f49880498604254",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
