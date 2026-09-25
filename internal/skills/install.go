@@ -17,9 +17,13 @@ import (
 type Agent string
 
 const (
-	AgentClaude   Agent = "claude"
-	AgentCodex    Agent = "codex"
-	AgentPi       Agent = "pi"
+	// AgentClaude identifies Claude Code's skill adapter.
+	AgentClaude Agent = "claude"
+	// AgentCodex identifies Codex's canonical skill directory.
+	AgentCodex Agent = "codex"
+	// AgentPi identifies Pi's canonical skill directory.
+	AgentPi Agent = "pi"
+	// AgentOpenCode identifies OpenCode's canonical skill directory.
 	AgentOpenCode Agent = "opencode"
 )
 
@@ -245,7 +249,7 @@ func (i Installer) checkClaudeLink(name, source, owner string, previouslyManaged
 		return err
 	}
 	if owner != source || !previouslyManaged {
-		return fmt.Errorf("Claude adapter for skill %q collides with unmanaged path %s", name, link)
+		return fmt.Errorf("claude adapter for skill %q collides with unmanaged path %s", name, link)
 	}
 	return nil
 }
@@ -282,7 +286,7 @@ func (i Installer) removeManagedClaudeLink(name string) error {
 		return nil
 	}
 	if err != nil || current != target {
-		return fmt.Errorf("Claude adapter for skill %q at %s is no longer managed", name, link)
+		return fmt.Errorf("claude adapter for skill %q at %s is no longer managed", name, link)
 	}
 	return os.Remove(link)
 }
@@ -303,7 +307,7 @@ func replaceTreeIfDifferent(source, destination string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	if err := copyTree(source, stage); err != nil {
 		return false, err
 	}
