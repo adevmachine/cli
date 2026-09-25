@@ -1,0 +1,23 @@
+internal/provision/ansible.go
+  s_ad29e4893e2b5c::t_cb812add2e747b 8,14,209-212,220,243-381
+internal/provision/ansible_test.go
+  s_ad29e4893e2b5c::t_dd83b1acd4ffd6 540-646
+internal/provision/helpers_test.go
+  s_ad29e4893e2b5c::t_4b7624c8ba2584 89-95,118-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "adc89bb287fe0fb04dc5f852b94057c159b775c2",
+  "prompts": {},
+  "sessions": {
+    "s_ad29e4893e2b5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c9d6-7e1f-7860-966a-4959d525c844",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
