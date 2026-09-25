@@ -1,0 +1,23 @@
+docs/releasing.md
+  s_df729d299b1e2e::t_9c110f95d55bc1 12
+internal/provision/ansible.go
+  s_df729d299b1e2e::t_98e35dd881ebb0 365
+internal/provision/ansible_test.go
+  s_df729d299b1e2e::t_5bad4cbed196c2 593-595
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b66ba68c657f8da284364b87ea5ea95743a4adda",
+  "prompts": {},
+  "sessions": {
+    "s_df729d299b1e2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0d39d-6727-70e1-a0ca-c761b22dcb20",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
