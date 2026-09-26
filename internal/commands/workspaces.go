@@ -460,6 +460,15 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			defer client.Close()
 
 			sitesDir, sitesErr := caddySitesDir(cmd.Context(), dir, cfg, machine)
+			if sitesErr != nil && len(w.Routes) > 0 {
+				hosts := make([]string, 0, len(w.Routes))
+				for _, r := range w.Routes {
+					hosts = append(hosts, r.Host)
+				}
+				return fmt.Errorf("%s publishes %s, and the file that serves it cannot be found (%v): "+
+					"destroying the account would leave Caddy serving it. `devmachine expose rm` each host "+
+					"and `devmachine sync` first", w.Name, strings.Join(hosts, ", "), sitesErr)
+			}
 
 			quotedUser := quoteForShell(user)
 			script := "set -e\n" +

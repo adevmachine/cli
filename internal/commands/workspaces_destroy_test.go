@@ -209,3 +209,22 @@ func TestWorkspacesDestroyRefusesTheAdminAccount(t *testing.T) {
 		t.Fatal("it dialed the machine for the admin account")
 	}
 }
+
+func TestWorkspacesDestroyRefusesWhenItCannotFindWhereItsRoutesLive(t *testing.T) {
+	client := &destroyClient{userExists: true}
+	dialDestroy(t, client)
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n"+
+		"    routes: [{host: app.example.com, port: 8080}]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err == nil || !strings.Contains(err.Error(), "app.example.com") || !strings.Contains(err.Error(), "expose rm") {
+		t.Fatalf("got %v", err)
+	}
+	if client.lastScript != "" {
+		t.Fatalf("ran on the machine: %q", client.lastScript)
+	}
+	cfg, _ := config.Load(dir)
+	if len(cfg.Workspaces) != 1 {
+		t.Fatal("config changed")
+	}
+}
