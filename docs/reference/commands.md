@@ -466,31 +466,40 @@ devmachine expose list
 devmachine expose rm <host> [--check] [--yes]
 ```
 
-`add` writes a Caddy block through the `sites.d` extension point the `caddy`
-package declares — never a path this CLI guesses itself. **If `caddy` is not
-on the machine, it refuses and names it**, rather than inventing
-`/etc/caddy/sites.d` and writing there anyway.
+`add` records the site in `config.yml`, under the workspace's `routes:`, and
+touches no machine. `devmachine sync` is what writes the Caddy block, through
+the `sites.d` extension point the `caddy` package declares — never a path
+this CLI guesses itself. **If `caddy` is not on the machine, `add` refuses
+and names it**, rather than recording a route nothing can serve.
 
-Before writing anything, it asks — and the question says whatever is behind
-the port becomes reachable by anybody who learns the hostname. That sentence
-is the point of the command, not decoration: a database studio holding data
-restored from production, a captured-mail inbox showing mail addressed to
-real customers, a queue dashboard that can drain a queue — all three speak
-HTTP, none has its own authentication, and publishing one by habit is how it
-reaches the internet. `--publish` is the only non-interactive way past the
-question; `--yes` never publishes. `--check` prints what would happen and
-writes nothing.
+The configuration is the only record of what is published. A machine rebuilt
+from it comes back with every site; a site written on the machine by hand
+does not. See [why a published site lives in the configuration](../how-it-works/published-sites.md).
+
+Before recording anything, it asks — and the question says whatever is
+behind the port becomes reachable by anybody who learns the hostname. That
+sentence is the point of the command, not decoration: a database studio
+holding data restored from production, a captured-mail inbox showing mail
+addressed to real customers, a queue dashboard that can drain a queue — all
+three speak HTTP, none has its own authentication, and publishing one by
+habit is how it reaches the internet. `--publish` is the only non-interactive
+way past the question; `--yes` never publishes. `--check` prints what would
+happen and records nothing.
 
 It also points the hostname at the machine, reusing the same path `dns add`
 uses: an installed provider gets the record written, and with none
-installed, the exact record to create by hand is printed instead of
-refusing. A name that does not resolve yet fails minutes later, in Caddy's
-certificate log, where nobody is looking — this is why the record is offered
-here rather than left for `dns add` to be remembered separately.
+installed, or with the machine unreachable, the exact record to create by
+hand is printed instead of refusing. A name that does not resolve yet fails
+minutes later, in Caddy's certificate log, where nobody is looking — this is
+why the record is offered here rather than left for `dns add` to be
+remembered separately.
 
 `list` reads `sites.d` on the machine and prints every host, its port and the
-workspace it belongs to. `rm` removes one site's file and reloads Caddy,
-leaving every other site untouched.
+workspace it belongs to. `rm` takes the site out of the configuration; the
+next `sync` removes its block and reloads Caddy. A host the configuration
+does not have is refused with the two ways out: adopt it with `add`, or
+remove the file on the machine by hand — `rm` never deletes what it does not
+own.
 
 See [Publishing](../concepts/publishing.md) for the three real cases this
 question exists to catch.

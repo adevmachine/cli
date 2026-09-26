@@ -14,6 +14,7 @@ import (
 	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
+	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -46,18 +47,12 @@ func caddySitesDir(ctx context.Context, dir string, cfg config.Config, machine c
 	if err != nil {
 		return "", err
 	}
-	for _, f := range plan.OnMachine.Ordered {
-		if f.Manifest.Name != "caddy" {
-			continue
-		}
-		p := f.Manifest.Provides["sites.d"]
-		if p == "" {
-			return "", errors.New("the caddy package on this machine does not declare a sites.d extension point")
-		}
-		return p, nil
+	if plan.SitesDir == "" {
+		return "", fmt.Errorf(
+			"caddy is not on %s: add it with `devmachine packages add caddy --machine %s` and run `devmachine sync`",
+			machine.Name, machine.Name)
 	}
-	return "", fmt.Errorf(
-		"caddy is not on %s: add it to the machine's packages and run `devmachine sync` first", machine.Name)
+	return plan.SitesDir, nil
 }
 
 func newExposeAddCmd(opts *options) *cobra.Command {
@@ -66,11 +61,12 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "add <workspace> <port>",
-		Short: "Publish a workspace's port as a public hostname",
-		Long: "Writes a Caddy block through the extension point the caddy " +
-			"package declares, and reloads Caddy. Before writing anything it " +
-			"asks — because whatever is behind the port becomes reachable by " +
-			"anybody who learns the hostname.",
+		Short: "Record a workspace's port as a public hostname; sync publishes it",
+		Long: "Records the route in the configuration. `devmachine sync` writes " +
+			"the Caddy block through the extension point the caddy package " +
+			"declares, and reloads Caddy. Before recording anything it asks — " +
+			"because whatever is behind the port becomes reachable by anybody " +
+			"who learns the hostname.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workspace := args[0]
@@ -81,15 +77,13 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			if host == "" {
 				return errors.New("--host is required: the public hostname this port answers to")
 			}
+			if !config.UsableHost(host) {
+				return fmt.Errorf("%q is not a usable hostname", host)
+			}
 
 			tgt, err := workspaceTarget(opts, workspace)
 			if err != nil {
 				return err
-			}
-			site := expose.Site{Host: host, Port: port, Workspace: workspace}
-			fileName := expose.FileName(site)
-			if fileName == "" {
-				return fmt.Errorf("%q is not a usable hostname", host)
 			}
 
 			dir, _, err := config.Dir(opts.configDir)
@@ -100,8 +94,7 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sitesDir, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine)
-			if err != nil {
+			if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
 				return err
 			}
 
@@ -122,22 +115,25 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				}
 			}
 
-			client, _, err := dial(cmd.Context(), tgt.machine, "")
-			if err != nil {
-				return err
-			}
-			defer client.Close()
-
-			if err := writeSite(cmd.Context(), client, sitesDir, fileName, expose.Render(site)); err != nil {
+			if err := config.AddRoute(dir, workspace, config.Route{Host: host, Port: port}); err != nil {
 				return err
 			}
 			record(opts, tgt, fmt.Sprintf("expose add %s %d --host %s", workspace, port, host), true)
+			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): expose %s", host))
 
+			var client remote.Client
+			if c, _, err := dial(cmd.Context(), tgt.machine, ""); err == nil {
+				client = c
+				defer client.Close()
+			} else {
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v); the DNS record is printed to create by hand\n", tgt.machine.Name, err)
+			}
 			if err := pointDNSAtMachine(cmd.Context(), dir, tgt, host, client, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 
-			cmd.Printf("published https://%s -> 127.0.0.1:%d on %s\n", host, port, tgt.machine.Name)
+			cmd.Printf("recorded https://%s -> %s:%d in the configuration. Run `devmachine sync` to publish it on %s.\n",
+				host, workspace, port, tgt.machine.Name)
 			return nil
 		},
 	}
@@ -146,17 +142,6 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&yes, "yes", false, "skip local-write questions; never publish")
 	c.Flags().BoolVar(&publish, "publish", false, "publish the site without asking")
 	return c
-}
-
-// writeSite writes the rendered block into sitesDir and reloads Caddy, so the
-// site takes effect immediately instead of waiting for Caddy's own poll.
-func writeSite(ctx context.Context, client remote.Client, sitesDir, fileName, block string) error {
-	full := path.Join(sitesDir, fileName)
-	script := fmt.Sprintf("mkdir -p %s && cat > %s && systemctl reload caddy", sitesDir, full)
-	if _, err := client.RunInput(ctx, script, strings.NewReader(block)); err != nil {
-		return fmt.Errorf("writing %s on the machine: %w", full, err)
-	}
-	return nil
 }
 
 // pointDNSAtMachine reuses the same dns.Choose and Upsert path `dns add`
@@ -291,12 +276,11 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "rm <host>",
-		Short: "Stop publishing a site",
+		Short: "Stop publishing a site at the next sync",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := args[0]
-			fileName := expose.FileName(expose.Site{Host: host})
-			if fileName == "" {
+			if !config.UsableHost(host) {
 				return fmt.Errorf("%q is not a usable hostname", host)
 			}
 
@@ -332,21 +316,18 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				}
 			}
 
-			client, _, err := dial(cmd.Context(), tgt.machine, "")
+			owner, err := config.RemoveRoute(dir, host)
 			if err != nil {
-				return err
+				return fmt.Errorf("%w; a site the old `expose` wrote is a file on the machine, not a line here: "+
+					"adopt it with `devmachine expose add <workspace> <port> --host %s`, or remove it there with "+
+					"`devmachine run 'rm %s && systemctl reload caddy'`",
+					err, host, path.Join(sitesDir, expose.FileName(expose.Site{Host: host})))
 			}
-			defer client.Close()
+			record(opts, target{machine: tgt.machine, workspace: owner}, "expose rm "+host, true)
+			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): stop exposing %s", host))
 
-			full := path.Join(sitesDir, fileName)
-			script := fmt.Sprintf("rm -f %s && systemctl reload caddy", full)
-			if _, err := client.Run(cmd.Context(), script); err != nil {
-				record(opts, tgt, "expose rm "+host, false)
-				return fmt.Errorf("removing %s on the machine: %w", full, err)
-			}
-			record(opts, tgt, "expose rm "+host, true)
-
-			cmd.Printf("%s is no longer published.\n", host)
+			cmd.Printf("%s is no longer in the configuration (it was %s's). Run `devmachine sync` to take it off %s.\n",
+				host, owner, tgt.machine.Name)
 			return nil
 		},
 	}

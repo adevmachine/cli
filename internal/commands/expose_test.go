@@ -170,24 +170,6 @@ func TestExposeAddYesDoesNotPublish(t *testing.T) {
 	}
 }
 
-func TestExposeAddPublishIsExplicitNonInteractiveConsent(t *testing.T) {
-	client := &exposeClient{}
-	dialExpose(t, client)
-	dir := configWithCaddy(t)
-
-	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--publish")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := client.files["app.example.com.caddy"]; !ok {
-		t.Fatalf("--publish did not write the site: %#v", client.files)
-	}
-	if strings.Contains(out, "[y/N]") {
-		t.Fatalf("--publish asked for confirmation: %q", out)
-	}
-}
-
 func TestExposeAddRefusesWhenCaddyIsNotInstalled(t *testing.T) {
 	dialExpose(t, &exposeClient{})
 	dir := configWithoutCaddy(t)
@@ -199,45 +181,6 @@ func TestExposeAddRefusesWhenCaddyIsNotInstalled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "caddy") {
 		t.Fatalf("the error does not name what is missing: %v", err)
-	}
-}
-
-func TestExposeAddWritesNothingUnderCheck(t *testing.T) {
-	client := &exposeClient{}
-	dialExpose(t, client)
-	dir := configWithCaddy(t)
-
-	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080", "--host", "app.example.com", "--check")
-	if err != nil {
-		t.Fatalf("expose add --check returned %v", err)
-	}
-	if !strings.Contains(out, "would") {
-		t.Fatalf("--check should say what it would do: %q", out)
-	}
-	if len(client.files) != 0 {
-		t.Fatalf("--check wrote a file: %#v", client.files)
-	}
-}
-
-func TestExposeAddWritesThroughTheExtensionPoint(t *testing.T) {
-	client := &exposeClient{}
-	dialExpose(t, client)
-	dir := configWithCaddy(t)
-
-	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--publish"); err != nil {
-		t.Fatalf("expose add returned %v", err)
-	}
-
-	block, ok := client.files["app.example.com.caddy"]
-	if !ok {
-		t.Fatalf("no file was written: %#v", client.files)
-	}
-	if !strings.Contains(block, "reverse_proxy 127.0.0.1:8080") {
-		t.Fatalf("the block does not point at the port:\n%s", block)
-	}
-	if !strings.Contains(client.lastCmd, "systemctl reload caddy") {
-		t.Fatalf("caddy was not reloaded: %q", client.lastCmd)
 	}
 }
 
@@ -302,21 +245,129 @@ func TestExposeListReadsWhatIsThere(t *testing.T) {
 	}
 }
 
-func TestExposeRmTakesOneSiteAndLeavesTheRest(t *testing.T) {
-	client := &exposeClient{files: map[string]string{
-		"app.example.com.caddy":   "app.example.com {\n\treverse_proxy 127.0.0.1:8080\n}\n",
-		"other.example.com.caddy": "other.example.com {\n\treverse_proxy 127.0.0.1:9090\n}\n",
-	}}
+func TestExposeAddRecordsTheRouteAndTouchesNoMachine(t *testing.T) {
+	client := &exposeClient{}
 	dialExpose(t, client)
 	dir := configWithCaddy(t)
 
-	if _, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes"); err != nil {
-		t.Fatalf("expose rm returned %v", err)
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := client.files["app.example.com.caddy"]; ok {
-		t.Fatal("the site was not removed")
+	if len(client.files) != 0 {
+		t.Fatalf("add wrote on the machine: %v", client.files)
 	}
-	if _, ok := client.files["other.example.com.caddy"]; !ok {
-		t.Fatal("expose rm removed the wrong site")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, r, ok := cfg.RouteOwner("app.example.com")
+	if !ok || w.Name != "alice" || r.Port != 8080 {
+		t.Fatalf("route not recorded: %v %+v", ok, r)
+	}
+	if !strings.Contains(out, "devmachine sync") {
+		t.Fatalf("the answer must say sync publishes it: %q", out)
+	}
+}
+
+func TestExposeAddStillPointsTheName(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+
+	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish"); err != nil {
+		t.Fatal(err)
+	}
+	if client.upserts != 1 {
+		t.Fatalf("the name was not pointed: %d upserts", client.upserts)
+	}
+}
+
+func TestExposeAddRecordsEvenWhenTheMachineIsDown(t *testing.T) {
+	orig := dial
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("no route to host")
+	}
+	t.Cleanup(func() { dial = orig })
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); !ok {
+		t.Fatal("an unreachable machine must not lose the route")
+	}
+	if !strings.Contains(out, "203.0.113.10") {
+		t.Fatalf("the record to create by hand is missing: %q", out)
+	}
+}
+
+func TestExposeAddRefusesWithoutCaddy(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWithoutCaddy(t)
+	_, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err == nil || !strings.Contains(err.Error(), "caddy") {
+		t.Fatalf("got %v", err)
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("a refused add must record nothing")
+	}
+}
+
+func TestExposeAddCheckWritesNothing(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWithCaddy(t)
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out, "would ") {
+		t.Fatal(out)
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("--check recorded a route")
+	}
+}
+
+func TestExposeRmForgetsTheRouteAndTouchesNoMachine(t *testing.T) {
+	client := &exposeClient{files: map[string]string{"alice-routes.caddy": "app.example.com {\n}\n"}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(client.files) != 1 {
+		t.Fatal("rm touched the machine")
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("the route is still recorded")
+	}
+	if !strings.Contains(out, "devmachine sync") {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestExposeRmOfAnUnmanagedHostSaysHowToAdoptOrRemoveIt(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWithCaddy(t)
+	_, err := execute(t, "--config", dir, "expose", "rm", "old.example.com", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "expose add") || !strings.Contains(err.Error(), "old.example.com.caddy") {
+		t.Fatalf("got %v", err)
 	}
 }
