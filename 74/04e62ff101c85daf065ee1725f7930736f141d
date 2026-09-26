@@ -1,0 +1,139 @@
+internal/commands/shell.go
+  s_a0cbf6c120c4f8::t_1d921be059f8a6 146
+  s_a0cbf6c120c4f8::t_24ff47b6b8a932 86-95,98-101
+  s_a0cbf6c120c4f8::t_1e0eb10ac141c5 251-255
+  s_a0cbf6c120c4f8::t_5af85553fd60e1 18
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_0c3a3eda356ee1 183-202
+  s_a0cbf6c120c4f8::t_a227facda0de4d 169
+  s_a0cbf6c120c4f8::t_c723ada6554b23 85-93
+docs/how-it-works/this-computer.md
+  s_a0cbf6c120c4f8::t_37db63de1e1367 1-100
+internal/remote/remote.go
+  s_a0cbf6c120c4f8::t_01d5c283b49a2c 593-653,655-694
+  s_a0cbf6c120c4f8::t_776d30c6b4f477 654
+  s_a0cbf6c120c4f8::t_369878307eb5e1 13-14,23,35-37
+  s_a0cbf6c120c4f8::t_2663bc0ef287bd 194-196
+  s_a0cbf6c120c4f8::t_98eac623164b95 38
+internal/dns/open.go
+  s_a0cbf6c120c4f8::t_191d69e1ffe6a3 21-24
+  s_a0cbf6c120c4f8::t_9eb5f7ac981eb4 39
+  s_a0cbf6c120c4f8::t_6ffb8920c48cd1 151,167,174
+  s_a0cbf6c120c4f8::t_feb8725a373d7c 126,134
+  s_a0cbf6c120c4f8::t_c597c33326c522 50,69
+  s_a0cbf6c120c4f8::t_ce18314678a2f0 110,118
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_3e5aff95f758af 698-714,716-719,722-775
+  s_a0cbf6c120c4f8::t_a9005ba9fe84e0 533,536
+  s_a0cbf6c120c4f8::t_86a63d00f34da5 715,720-721
+internal/commands/sync.go
+  s_a0cbf6c120c4f8::t_1435f0be5c6d7c 65-70
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_352f9510d2c0f9 73-76,84-86,93-95,101-102,106-138
+  s_a0cbf6c120c4f8::t_284034adb228f5 139-140
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_e27de9bbb2db69 179-183,197-202,204-215
+  s_a0cbf6c120c4f8::t_7c6e59c01de4d1 11
+  s_a0cbf6c120c4f8::t_fa6ecc3c8dafd1 39,42-54,217
+  s_a0cbf6c120c4f8::t_118c4738127309 203
+  s_a0cbf6c120c4f8::t_472abe91e2dfb8 55,216,218
+internal/provision/ansible_runner_test.go
+  s_a0cbf6c120c4f8::t_7074e0fa00a34b 8-9
+  s_a0cbf6c120c4f8::t_1b4a11639a33f1 275-296
+internal/commands/login.go
+  s_a0cbf6c120c4f8::t_81fe0f466e9349 47
+internal/dns/open_test.go
+  s_a0cbf6c120c4f8::t_0e3e3842717b53 16
+  s_a0cbf6c120c4f8::t_a84574deed6a6a 162,177,187,204,218,231,254,268,290,305,320,332,342
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_584a9013fe84ea 1303-1429
+internal/commands/machines_trust.go
+  s_a0cbf6c120c4f8::t_8c555344197cc4 77-79
+internal/provision/ansible_runner.go
+  s_a0cbf6c120c4f8::t_819e7645d20762 86,89,93
+  s_a0cbf6c120c4f8::t_7d3c4134c61a5a 31-36,45,56
+internal/commands/dns.go
+  s_a0cbf6c120c4f8::t_85bfd54a171395 137-141
+  s_a0cbf6c120c4f8::t_14442835daefde 204-208
+  s_a0cbf6c120c4f8::t_ffc2deff9c5d98 96-97
+  s_a0cbf6c120c4f8::t_013adb3e51b953 12
+internal/commands/expose.go
+  s_a0cbf6c120c4f8::t_67f104287c6ac1 15
+  s_a0cbf6c120c4f8::t_9f05d8aafd8dfe 155,159-163
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_0bd1376e14a2c6 11-38
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_23aa6be94fab92 53-67
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_e4a06ca2737fe3 7,21-22,25-38
+  s_a0cbf6c120c4f8::t_f0cba7c2c40574 412
+  s_a0cbf6c120c4f8::t_89abeebe8bc7d6 342
+  s_a0cbf6c120c4f8::t_496cccdc763af7 242,245-249,255,279-286,296-301
+  s_a0cbf6c120c4f8::t_e4c96b62e18161 555,566
+  s_a0cbf6c120c4f8::t_fd64fcf847a732 313
+  s_a0cbf6c120c4f8::t_51669d00372df6 101,107
+  s_a0cbf6c120c4f8::t_1178245c5e485b 593
+  s_a0cbf6c120c4f8::t_ab7950e5b8cc9f 622
+  s_a0cbf6c120c4f8::t_4d88f82794ff0d 659-660
+  s_a0cbf6c120c4f8::t_356ce8a5bb8839 57-58,60-70,75,80,302
+  s_a0cbf6c120c4f8::t_fe11f3979e6457 374
+  s_a0cbf6c120c4f8::t_b6702325e8d0fb 39,303
+internal/remote/local_test.go
+  s_a0cbf6c120c4f8::t_4e53e9020f9c7e 1-104
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_aacd9ed09b7b91 688-738
+internal/commands/packages.go
+  s_a0cbf6c120c4f8::t_b0b3622ae3bcc5 58-62
+  s_a0cbf6c120c4f8::t_8d66290053bc7b 10
+internal/commands/tunnel.go
+  s_a0cbf6c120c4f8::t_136fc1da23c210 40
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_3f3e20c7f99d5d 92-100
+  s_a0cbf6c120c4f8::t_533750e27e28f6 257-263
+  s_a0cbf6c120c4f8::t_aef8027b1c2806 362-363,373-395,403,421-425
+  s_a0cbf6c120c4f8::t_68364f7824ef6c 463-478,855
+  s_a0cbf6c120c4f8::t_d25385dd2fb3bc 825-831,850-854
+  s_a0cbf6c120c4f8::t_445bc6fefeb540 150-162
+  s_a0cbf6c120c4f8::t_9c59c762f53d80 856
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_003fa64dcee8ac 159,166
+  s_a0cbf6c120c4f8::t_73c8aac0126ecf 163-165
+  s_a0cbf6c120c4f8::t_19f307486dc49b 244-253
+  s_a0cbf6c120c4f8::t_ef8efcd1dd4470 115-122,150-158,160-162,167-170,172-182,184-185,187-221
+  s_a0cbf6c120c4f8::t_393bad3e8209c7 16
+  s_a0cbf6c120c4f8::t_79935c55c2d3a7 149,171,183,186
+  s_a0cbf6c120c4f8::t_7a9107e047051c 394-395
+  s_a0cbf6c120c4f8::t_815282a3fbecec 38-40
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_202f773c16f7bd 66-71
+docs/index.md
+  s_a0cbf6c120c4f8::t_c11e9de7bc0c7b 61-63
+internal/commands/self_test.go
+  s_a0cbf6c120c4f8::t_fba33924ee1433 11-12
+  s_a0cbf6c120c4f8::t_144e97ce7e8231 1-3,5,9-10,13-69,77,79,82-98,100-101,103-114
+  s_a0cbf6c120c4f8::t_e4569a77e95a46 4,6
+  s_a0cbf6c120c4f8::t_89cd6e1fc940d2 99,102
+  s_a0cbf6c120c4f8::t_94b7d4df93bcbf 7-8
+  s_a0cbf6c120c4f8::t_db125f09e34e9e 70-76,78,80-81
+  s_a0cbf6c120c4f8::t_c82ef071ddd226 115-177
+internal/commands/dns_test.go
+  s_a0cbf6c120c4f8::t_42d6ba0ce8b806 39
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_b91d6a410140f6 406-423
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7404e62ff101c85daf065ee1725f7930736f141d",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
