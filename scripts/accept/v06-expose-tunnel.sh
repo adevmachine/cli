@@ -166,22 +166,28 @@ contains "$NOCADDY" "caddy is not on" "expose refuses without caddy, and names i
 
 "$DEVMACHINE_ACCEPT_BIN" expose add alice 8080 --host app.example.com --publish \
   >"$SCENARIO_LOG_DIR/expose-add.log" 2>&1 || die "could not expose app.example.com"
+PENDING=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
+contains "$PENDING" "pending" "expose add records the route and touches no machine" || true
+"$DEVMACHINE_ACCEPT_BIN" sync --yes >"$SCENARIO_LOG_DIR/sync-routes.log" 2>&1 \
+  || die "could not sync the route"
 BLOCK=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
-  'cat /etc/caddy/sites.d/app.example.com.caddy' 2>&1) \
+  'cat /etc/caddy/sites.d/alice-routes.caddy' 2>&1) \
   || die "could not read the Caddy site block"
 contains "$BLOCK" "reverse_proxy 127.0.0.1:8080" "the block points at the port" || true
-contains "$BLOCK" "devmachine expose" "and says what wrote it" || true
+contains "$BLOCK" "devmachine sync" "and says what wrote it" || true
 
 SERVED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
   'curl -sk -o /dev/null -w "%{http_code}" --resolve app.example.com:443:127.0.0.1 https://app.example.com' 2>&1)
 equals "$SERVED" "200" "Caddy proxies the host to the container" || true
 
 LIST=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
-contains "$LIST" "app.example.com" "expose list shows it" || true
+contains "$LIST" "published" "expose list shows it published" || true
 "$DEVMACHINE_ACCEPT_BIN" expose rm app.example.com --yes \
   >"$SCENARIO_LOG_DIR/expose-rm.log" 2>&1 || die "could not remove app.example.com"
+"$DEVMACHINE_ACCEPT_BIN" sync --yes >"$SCENARIO_LOG_DIR/sync-unroute.log" 2>&1 \
+  || die "could not sync the removal"
 GONE=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- 'ls /etc/caddy/sites.d' 2>&1)
-refutes "$GONE" "app.example.com" "expose rm removed the file" || true
+refutes "$GONE" "alice-routes" "expose rm and sync removed the file" || true
 
 LOCAL_PORT=$(free_port)
 "$DEVMACHINE_ACCEPT_BIN" tunnel alice 8080 --local "$LOCAL_PORT" \
@@ -260,4 +266,4 @@ BUSY_PID=
 MD=$("$DEVMACHINE_ACCEPT_BIN" machine doctor 2>&1)
 contains "$MD" "ssh" "machine doctor checks this computer" || true
 
-scenario_done 12 "v0.6"
+scenario_done 13 "v0.6"
