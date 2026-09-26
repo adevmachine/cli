@@ -500,8 +500,9 @@ its port, its workspace and one of four words. `published` means both agree.
 `sync`. `differs` means the machine has another port or owner for it: run
 `sync`. `unmanaged` means only the machine has it — a site written before
 this CLI recorded routes, or by hand — and it is gone on a rebuild; the row
-prints the `expose add` that adopts it. With the machine unreachable, the
-configuration's rows print as `unknown` rather than being guessed.
+prints the `expose add` that adopts it. With the machine unreachable, or with `caddy` no
+longer on it, the configuration's rows print as `unknown` rather than being
+guessed; the reason is on stderr.
 
 `rm` takes the site out of the configuration; the
 next `sync` removes its block and reloads Caddy. A host the configuration
