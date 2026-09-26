@@ -1,0 +1,25 @@
+internal/commands/expose.go
+  s_a0cbf6c120c4f8::t_9a98e9183a4ecf 171-173,179,184,194-245,247-254
+  s_a0cbf6c120c4f8::t_70cdbb406c95fd 260,280-281,283-291,295,297,301-302
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_ffcef23ef4d79b 497-506
+internal/commands/expose_test.go
+  s_a0cbf6c120c4f8::t_3dfaf087ec14ba 15
+  s_a0cbf6c120c4f8::t_6fbd3ee33d7fe5 233,235-237,240-279,283-295,297-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "260096405b0be8f0712b832113d7a3a7a35f0817",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
