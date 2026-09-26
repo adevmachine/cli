@@ -1,0 +1,21 @@
+internal/commands/workspaces_destroy_test.go
+  s_a0cbf6c120c4f8::t_e851136d3578bd 212-230
+internal/commands/workspaces.go
+  s_a0cbf6c120c4f8::t_25239c7d122515 463-471
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "11a628be31c57ba69e8a544310fb369c9fd7d8a9",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
