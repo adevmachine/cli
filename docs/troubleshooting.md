@@ -383,3 +383,14 @@ files under `sites.d`: a file another package contributed, or one written by
 hand, naming a host the configuration also publishes. `devmachine run
 'caddy validate --config /etc/caddy/Caddyfile'` names the duplicate. Remove it
 from the side that should not own it.
+
+## `workspaces destroy` failed at userdel
+
+Something is still running as the account: a process started outside its
+login session, or a container. `destroy` already turned off linger for the
+account, terminated its session and killed what it could find, and `userdel`
+still refused because a process outlived that. The configuration was left
+untouched, so `destroy` can be retried.
+
+Find what is left with `devmachine run "ps -u <user>"`, stop it, then run
+`devmachine workspaces destroy <name>` again.

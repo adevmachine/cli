@@ -217,6 +217,7 @@ devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--us
 devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--check] [--yes]
 devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]
 devmachine workspaces rm <name> [--yes]
+devmachine workspaces destroy <name> [--confirm <name>] [--check]
 ```
 
 A workspace is one Linux account on one machine. These commands edit
@@ -272,6 +273,16 @@ everything it had — its home, its files, its account. The command says so.
 **`rm` leaves the Linux account, its home and its files on the machine.**
 Deleting a home is not something a configuration edit should do, and `sync`
 could not put it back. Remove them there by hand if you really want them gone.
+
+**`destroy` is the one that deletes.** It removes the Linux account, everything
+under its home, its Caddy routes file and its entry in `config.yml` — for real,
+on the machine. It asks for the workspace's name typed again before doing
+anything, because there is no undo; `--confirm <name>` answers that from a
+script, and must match exactly. DNS records for its routes are left as they
+are — take those down by hand if they should go too. If the machine step
+fails, the configuration is left untouched, so `destroy` can be retried. It
+needs the machine to be reachable; `rm` is the way to forget a workspace on a
+machine that is gone.
 
 `defaults` changes only `defaults.workspace`, which new workspaces inherit.
 Existing workspaces are unchanged. Like the other workspace configuration

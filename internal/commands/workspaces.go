@@ -1,13 +1,17 @@
 package commands
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"maps"
+	"path"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/keys"
 	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
@@ -25,6 +29,7 @@ func newWorkspacesCmd(opts *options) *cobra.Command {
 		newWorkspacesEditCmd(opts),
 		newWorkspacesDefaultsCmd(opts),
 		newWorkspacesRmCmd(opts),
+		newWorkspacesDestroyCmd(opts),
 	)
 	return cmd
 }
@@ -369,6 +374,135 @@ func newWorkspacesRmCmd(opts *options) *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&yes, "yes", false, "forget it without asking")
+	return c
+}
+
+// linuxUserName is what a Linux account name looks like: something that goes
+// into a shell command unquoted-safe as a bare word.
+var linuxUserName = regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
+
+func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
+	var confirmName string
+	var check bool
+
+	c := &cobra.Command{
+		Use:   "destroy <name>",
+		Short: "Delete a workspace's account, home and configuration",
+		Long: "This is the only command that deletes a home: its Linux account, " +
+			"everything under that account's home directory, its Caddy routes " +
+			"and its entry in the configuration. It asks for the workspace's " +
+			"name typed again, because there is no undo.\n\n" +
+			"DNS records for its routes are left as they are; take those down " +
+			"by hand if they should go too.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _, err := config.Dir(opts.configDir)
+			if err != nil {
+				return err
+			}
+			cfg, err := loadConfig(opts)
+			if err != nil {
+				return err
+			}
+			w, err := cfg.Workspace(args[0])
+			if err != nil {
+				return err
+			}
+			machine, err := cfg.Machine(machineNameOf(cfg, w))
+			if err != nil {
+				return err
+			}
+
+			user := w.LinuxUser()
+			admin := machine.User
+			if admin == "" {
+				admin = config.DefaultAdminUser
+			}
+			if user == config.DefaultAdminUser || user == admin {
+				return fmt.Errorf("refusing to destroy %q: it is the machine's administrative account", w.Name)
+			}
+			if !linuxUserName.MatchString(user) {
+				return fmt.Errorf("%q is not a Linux account name this command will pass to a shell", user)
+			}
+
+			cmd.Printf("This deletes, on %s:\n", machine.Name)
+			cmd.Printf("  the account %s and everything under /home/%s\n", user, user)
+			for _, r := range w.Routes {
+				cmd.Printf("  https://%s, which will stop answering (its DNS record is left as it is)\n", r.Host)
+			}
+			cmd.Printf("and removes %s from the configuration. None of it can be put back.\n", w.Name)
+
+			if check {
+				cmd.Printf("would destroy %s\n", w.Name)
+				return nil
+			}
+
+			if confirmName != "" {
+				if confirmName != w.Name {
+					return fmt.Errorf("--confirm %q does not match the workspace %q", confirmName, w.Name)
+				}
+			} else {
+				cmd.Print("Type the workspace name to confirm: ")
+				line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
+				if err != nil && line == "" {
+					return errDeclined
+				}
+				if strings.TrimSpace(line) != w.Name {
+					return errDeclined
+				}
+			}
+
+			client, _, err := dial(cmd.Context(), machine, "")
+			if err != nil {
+				return fmt.Errorf("destroying %s needs the machine: %w; `devmachine workspaces rm %s` "+
+					"forgets it without touching the machine", w.Name, err, w.Name)
+			}
+			defer client.Close()
+
+			sitesDir, sitesErr := caddySitesDir(cmd.Context(), dir, cfg, machine)
+
+			quotedUser := quoteForShell(user)
+			script := "set -e\n" +
+				"if id -u " + quotedUser + " >/dev/null 2>&1; then\n" +
+				// claude-remote-control enables linger for the account, keeping a
+				// user manager (and its processes) alive; userdel refuses a user
+				// with running processes, so linger goes off and everything of
+				// theirs is killed first.
+				"  loginctl disable-linger " + quotedUser + " 2>/dev/null || true\n" +
+				"  loginctl terminate-user " + quotedUser + " 2>/dev/null || true\n" +
+				"  pkill -KILL -u " + quotedUser + " 2>/dev/null || true\n" +
+				"  userdel --force --remove " + quotedUser + "\n" +
+				"  echo removed\n" +
+				"else\n" +
+				"  echo absent\n" +
+				"fi"
+			if sitesErr == nil {
+				routesFile := path.Join(sitesDir, expose.WorkspaceFileName(w.Name))
+				script += "\nrm -f " + quoteForShell(routesFile) + " && (systemctl reload caddy || true)"
+			}
+
+			out, err := client.Run(cmd.Context(), script)
+			if err != nil {
+				record(opts, target{machine: machine, workspace: w.Name}, "workspaces destroy "+w.Name, false)
+				return fmt.Errorf("destroying %s on %s: %w", w.Name, machine.Name, err)
+			}
+
+			if err := config.RemoveWorkspace(dir, w.Name); err != nil {
+				return err
+			}
+			record(opts, target{machine: machine, workspace: w.Name}, "workspaces destroy "+w.Name, true)
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): destroy workspace "+w.Name)
+
+			if strings.Contains(out, "absent") {
+				cmd.Printf("%s had no account on %s; it is out of the configuration.\n", w.Name, machine.Name)
+			} else {
+				cmd.Printf("%s is destroyed: the account, its home and its configuration are gone.\n", w.Name)
+			}
+			return nil
+		},
+	}
+	c.Flags().StringVar(&confirmName, "confirm", "", "the workspace name, to skip the interactive prompt")
+	c.Flags().BoolVar(&check, "check", false, "say what would be destroyed, and destroy nothing")
 	return c
 }
 
