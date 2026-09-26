@@ -153,3 +153,20 @@
         mode: "0644"
       tags: [sharing]
 
+    - name: files the configuration no longer owns
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop:
+        - {path: "/etc/caddy/sites.d/alice-routes.caddy"}
+        - {path: "/etc/caddy/sites.d/bob-routes.caddy"}
+      register: devmachine_routes_removed
+      tags: [routes]
+
+    - name: reload caddy for the routes
+      systemd:
+        name: caddy
+        state: reloaded
+      when: (devmachine_routes_written is defined and devmachine_routes_written is changed) or (devmachine_routes_removed is defined and devmachine_routes_removed is changed)
+      tags: [routes]
+

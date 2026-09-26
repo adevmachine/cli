@@ -640,6 +640,54 @@ func TestGenerateSkillOwnershipSurvivesReleaseAndLocalOverlayChanges(t *testing.
 	}
 }
 
+func TestGenerateWritesOneRoutesFilePerWorkspace(t *testing.T) {
+	plan := planWith(t, "main", []string{"caddy"}, map[string][]string{"alice": nil, "bob": nil})
+	plan.SitesDir = "/etc/caddy/sites.d"
+	plan.Routes = []packages.Route{
+		{Workspace: "alice", Host: "app.example.com", Port: 8080},
+		{Workspace: "alice", Host: "api.example.com", Port: 8081},
+	}
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(files["routes/alice.caddy"])
+	if !strings.Contains(body, "app.example.com {") || !strings.Contains(body, "api.example.com {") {
+		t.Fatalf("alice's file:\n%s", body)
+	}
+	if _, ok := files["routes/bob.caddy"]; ok {
+		t.Fatal("a workspace with no route gets no file")
+	}
+	site := string(files["site.yml"])
+	for _, want := range []string{
+		`dest: "/etc/caddy/sites.d/alice-routes.caddy"`,
+		`path: "/etc/caddy/sites.d/app.example.com.caddy"`,
+		`path: "/etc/caddy/sites.d/api.example.com.caddy"`,
+		`path: "/etc/caddy/sites.d/bob-routes.caddy"`,
+		"state: absent",
+		"state: reloaded",
+		"tags: [routes]",
+	} {
+		if !strings.Contains(site, want) {
+			t.Fatalf("missing %q in the play:\n%s", want, site)
+		}
+	}
+	if strings.Index(site, "name: caddy") > strings.Index(site, "alice-routes.caddy") {
+		t.Fatal("routes must be written after caddy made sites.d")
+	}
+}
+
+func TestGenerateWithoutCaddyWritesNoRouteTasks(t *testing.T) {
+	plan := planWith(t, "main", []string{"base"}, nil)
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["site.yml"]), "routes") {
+		t.Fatal("no caddy, no route tasks")
+	}
+}
+
 func taskHasTag(task map[string]any, want string) bool {
 	tags, ok := task["tags"].([]any)
 	if !ok {

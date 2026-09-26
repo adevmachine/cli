@@ -7,9 +7,11 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/packages"
 	agentskills "github.com/adevmachine/cli/internal/skills"
 	"gopkg.in/yaml.v3"
@@ -48,12 +50,26 @@ func Generate(plan packages.MachinePlan) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string][]byte{
+	files := map[string][]byte{
 		"ansible.cfg":              []byte(ansibleCfg()),
 		"inventory.ini":            []byte(inventory()),
 		"host_vars/devmachine.yml": vars,
 		"site.yml":                 []byte(site),
-	}, nil
+	}
+	for workspace, sites := range routesByWorkspace(plan) {
+		files["routes/"+workspace+".caddy"] = []byte(expose.RenderWorkspace(workspace, sites))
+	}
+	return files, nil
+}
+
+// routesByWorkspace groups a plan's routes by the workspace they belong to,
+// in the shape RenderWorkspace expects.
+func routesByWorkspace(plan packages.MachinePlan) map[string][]expose.Site {
+	out := map[string][]expose.Site{}
+	for _, r := range plan.Routes {
+		out[r.Workspace] = append(out[r.Workspace], expose.Site{Host: r.Host, Port: r.Port, Workspace: r.Workspace})
+	}
+	return out
 }
 
 func ansibleCfg() string {
@@ -231,6 +247,7 @@ func playbook(plan packages.MachinePlan) (string, error) {
 		tasks += again
 	}
 	tasks += extensionTasks(plan)
+	tasks += routeTasks(plan)
 	if tasks == "" {
 		out.WriteString("  tasks: []\n")
 		return out.String(), nil
@@ -521,6 +538,63 @@ func extensionTasks(plan packages.MachinePlan) string {
 		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n")
 		fmt.Fprintf(&out, "      tags: [%s]\n\n", extension.From)
 	}
+	return out.String()
+}
+
+// routeTasks put every workspace's routes file where caddy reads it, take
+// away the one-host files the old `expose` wrote for a host the configuration
+// now owns — Caddy refuses a reload that names one host twice — and the file
+// of a workspace with no route left. They run after every package, so caddy
+// has made sites.d, and reload Caddy only when something changed.
+func routeTasks(plan packages.MachinePlan) string {
+	if plan.SitesDir == "" {
+		return ""
+	}
+	byWorkspace := routesByWorkspace(plan)
+
+	var written, absent []string
+	for _, w := range plan.Workspaces {
+		name := w.Target.Name
+		if len(byWorkspace[name]) == 0 {
+			absent = append(absent, path.Join(plan.SitesDir, expose.WorkspaceFileName(name)))
+			continue
+		}
+		written = append(written, name)
+	}
+	sort.Strings(written)
+	for _, name := range written {
+		for _, s := range byWorkspace[name] {
+			absent = append(absent, path.Join(plan.SitesDir, expose.FileName(s)))
+		}
+	}
+
+	var out strings.Builder
+	if len(written) > 0 {
+		out.WriteString("    - name: routes from the configuration\n      copy:\n")
+		out.WriteString("        src: \"{{ item.src }}\"\n        dest: \"{{ item.dest }}\"\n")
+		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n      loop:\n")
+		for _, name := range written {
+			fmt.Fprintf(&out, "        - {src: %q, dest: %q}\n",
+				path.Join(RemoteDir, "routes", name+".caddy"),
+				path.Join(plan.SitesDir, expose.WorkspaceFileName(name)))
+		}
+		out.WriteString("      register: devmachine_routes_written\n      tags: [routes]\n\n")
+	}
+	if len(absent) > 0 {
+		out.WriteString("    - name: files the configuration no longer owns\n      file:\n")
+		out.WriteString("        path: \"{{ item.path }}\"\n        state: absent\n      loop:\n")
+		for _, p := range absent {
+			fmt.Fprintf(&out, "        - {path: %q}\n", p)
+		}
+		out.WriteString("      register: devmachine_routes_removed\n      tags: [routes]\n\n")
+	}
+	if len(written) == 0 && len(absent) == 0 {
+		return ""
+	}
+	out.WriteString("    - name: reload caddy for the routes\n      systemd:\n        name: caddy\n        state: reloaded\n")
+	out.WriteString("      when: (devmachine_routes_written is defined and devmachine_routes_written is changed) or " +
+		"(devmachine_routes_removed is defined and devmachine_routes_removed is changed)\n")
+	out.WriteString("      tags: [routes]\n\n")
 	return out.String()
 }
 
