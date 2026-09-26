@@ -46,3 +46,43 @@ func TestRenderRefusesAHostThatWouldEscapeTheFileName(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderWorkspaceHoldsEveryRouteAndNamesTheOwner(t *testing.T) {
+	out := RenderWorkspace("alice", []Site{
+		{Host: "app.example.com", Port: 8080},
+		{Host: "api.example.com", Port: 8081},
+	})
+	for _, want := range []string{
+		"# workspace: alice",
+		"app.example.com {\n\treverse_proxy 127.0.0.1:8080\n}",
+		"api.example.com {\n\treverse_proxy 127.0.0.1:8081\n}",
+		"devmachine sync",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if WorkspaceFileName("alice") != "alice-routes.caddy" {
+		t.Fatal(WorkspaceFileName("alice"))
+	}
+}
+
+func TestParseReadsEveryBlockOfAFile(t *testing.T) {
+	sites := Parse(RenderWorkspace("alice", []Site{
+		{Host: "app.example.com", Port: 8080},
+		{Host: "api.example.com", Port: 8081},
+	}))
+	if len(sites) != 2 {
+		t.Fatalf("got %d sites: %+v", len(sites), sites)
+	}
+	if sites[1].Host != "api.example.com" || sites[1].Port != 8081 || sites[1].Workspace != "alice" {
+		t.Fatalf("second block misread: %+v", sites[1])
+	}
+}
+
+func TestParseReadsTheOldPerHostFile(t *testing.T) {
+	sites := Parse(Render(Site{Host: "old.example.com", Port: 3000, Workspace: "bob"}))
+	if len(sites) != 1 || sites[0].Workspace != "bob" || sites[0].Port != 3000 {
+		t.Fatalf("%+v", sites)
+	}
+}
