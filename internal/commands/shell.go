@@ -15,6 +15,7 @@ import (
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/history"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -82,9 +83,22 @@ func record(opts *options, tgt target, command string, ok bool) {
 	history.Append(dir, history.Entry{At: time.Now(), Target: tgt.label(), Command: command, OK: ok})
 }
 
+// requiresAddress refuses on a self machine, for a command that has to reach
+// the machine over SSH: there is no address for the computer you are
+// standing on.
+func requiresAddress(m config.Machine, command string) error {
+	if !m.Self {
+		return nil
+	}
+	return fmt.Errorf("%s is this computer (self: true): `%s` needs a machine it reaches over SSH", m.Name, command)
+}
+
 // firstAddress is the address an interactive session should use. It is the
 // same order Dial tries, without opening a connection first.
-func firstAddress(m config.Machine) (string, error) {
+func firstAddress(m config.Machine, command string) (string, error) {
+	if err := requiresAddress(m, command); err != nil {
+		return "", err
+	}
 	addresses, err := remote.Resolve(m)
 	if err != nil {
 		return "", err
@@ -129,7 +143,7 @@ func interactive(ctx context.Context, opts *options, binary string, args []strin
 	if err != nil {
 		return err
 	}
-	address, err := firstAddress(tgt.machine)
+	address, err := firstAddress(tgt.machine, binary)
 	if err != nil {
 		return err
 	}
@@ -234,7 +248,11 @@ func runPackage(cmd *cobra.Command, opts *options, name string, args []string) e
 	}
 	defer client.Close()
 
-	ext, err := dns.Any(dir, tgt.machine.Name, name, client)
+	base, err := provision.Base(tgt.machine)
+	if err != nil {
+		return err
+	}
+	ext, err := dns.Any(dir, tgt.machine.Name, base, name, client)
 	if err != nil {
 		return err
 	}

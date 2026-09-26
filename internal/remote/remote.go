@@ -10,6 +10,8 @@
 package remote
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +20,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +31,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+// SelfAddress is what Dial reports for a self machine: there is no address,
+// only this computer.
+const SelfAddress = "this computer"
 
 // tailscalePrefix marks an address that something closer to the network has to
 // resolve. The CLI knows the prefix, not the product: a host entry is either a
@@ -184,6 +191,9 @@ func (a Auth) describe() string {
 // user is who to log in as. Empty means the machine's administrative login;
 // a workspace passes its own Linux account instead.
 func Dial(ctx context.Context, m config.Machine, user string) (Client, string, error) {
+	if m.Self {
+		return &localClient{}, SelfAddress, nil
+	}
 	callback, algorithms, err := hostKeyPolicy(m)
 	if err != nil {
 		return nil, "", err
@@ -580,3 +590,105 @@ func shellQuote(s string) string {
 }
 
 func (c *sshClient) Close() error { return c.conn.Close() }
+
+// localClient runs commands on this computer instead of over SSH, for a
+// machine that declares `self: true`. Every command still goes through
+// /bin/bash -c, exactly as it does on a remote machine, so a package's tasks
+// see the same shell either way.
+type localClient struct{}
+
+// Run executes one command and returns its standard output, matching
+// sshClient.Run: stderr is not collected, only what the command wrote to
+// stdout.
+func (c *localClient) Run(ctx context.Context, command string) (string, error) {
+	out, err := exec.CommandContext(ctx, "/bin/bash", "-c", command).Output()
+	if err != nil {
+		return string(out), fmt.Errorf("running %q: %w", command, err)
+	}
+	return string(out), nil
+}
+
+// RunInput executes one command with stdin fed from the reader.
+func (c *localClient) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", command)
+	cmd.Stdin = stdin
+	out, err := cmd.Output()
+	if err != nil {
+		return string(out), fmt.Errorf("running %q: %w", command, err)
+	}
+	return string(out), nil
+}
+
+// Stream executes one command with its output reaching the writers as it
+// arrives.
+func (c *localClient) Stream(ctx context.Context, command string, stdout, stderr io.Writer) error {
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", command)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running %q: %w", command, err)
+	}
+	return nil
+}
+
+// Upload extracts a gzipped tar into a directory on this computer.
+func (c *localClient) Upload(_ context.Context, dir string, tarball io.Reader) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("creating %s: %w", dir, err)
+	}
+	if err := extractTarGz(dir, tarball); err != nil {
+		return fmt.Errorf("sending a directory to %s: %w", dir, err)
+	}
+	return nil
+}
+
+func (c *localClient) Close() error { return nil }
+
+// extractTarGz writes a gzipped tar's regular files and directories under
+// dir, refusing any entry that would land outside it.
+func extractTarGz(dir string, r io.Reader) error {
+	zipped, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("reading the archive: %w", err)
+	}
+	defer func() { _ = zipped.Close() }()
+
+	archive := tar.NewReader(zipped)
+	root := filepath.Clean(dir)
+	for {
+		header, err := archive.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("reading the archive: %w", err)
+		}
+
+		target := filepath.Join(root, filepath.FromSlash(header.Name))
+		if target != root && !strings.HasPrefix(target, root+string(os.PathSeparator)) {
+			return fmt.Errorf("%s escapes %s: refusing to extract it", header.Name, dir)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			file, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, header.FileInfo().Mode())
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(file, archive); err != nil {
+				file.Close()
+				return err
+			}
+			if err := file.Close(); err != nil {
+				return err
+			}
+		}
+	}
+}

@@ -82,6 +82,15 @@ configuration, install a client key, or change SSH policy. Use `--force` only
 when you deliberately want to discard the configuration and start the wizard
 again.
 
+**On a self machine** (`self: true` in `config.yml`, see [`machines`](#machines)
+below) preparation is much shorter: there is no address, so no host key, no
+client key and no password are involved. It checks that Homebrew is on `PATH`
+— if not, it prints the official one-line install command from
+[brew.sh](https://brew.sh) and stops, because that command asks for `sudo` and
+running it is not this CLI's to do — then installs Ansible with
+`brew install ansible` if it is not already there. Already prepared, it says so
+and changes nothing.
+
 ## setup git
 
 ```
@@ -157,6 +166,7 @@ a configuration.
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden]     take over another machine and record it
+devmachine machines add --self <name>     add this computer as a machine, with no address
 devmachine machines trust [name] [--check] [--replace] [--yes]   inspect or update its SSH host key
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on this computer
@@ -169,6 +179,26 @@ devmachine machines delete-local <name> [--yes]   destroy it and everything on i
 same questions, minus the domain, and runs the same bootstrap: the key first, a
 password only if the key is refused, the proof on a connection of its own, then
 hardening and Ansible. See [setup](#setup) for what each step is for.
+
+`add --self <name>` is different: it names the computer the CLI itself runs
+on, not a server. It asks nothing about an address, a port or a key — there is
+none — writes `- name: <name>` and `self: true` into `config.yml`, and runs the
+same preparation `setup` runs on an existing self machine (Homebrew, then
+Ansible; see [setup](#setup)). It refuses when a self machine is already
+configured, or when the name is taken. This is not `machines create-local`,
+which makes a Lima VM: that VM has its own address and key, like any other
+machine; `self` has none, because it is the one you are standing on.
+
+A self machine has no `hosts`, `user`, `port` or `key`, and `sync` writes its
+bundle to a directory on this computer and runs Ansible without SSH instead of
+sending it over the network. Every command that needs an actual address to
+reach a machine over SSH — `ssh`, `mosh`, `tunnel`, `login`, `expose`, `dns`
+where it points a record at the machine, `machines trust`, and `aliases`
+(which silently leaves it out, since there is no `Host` entry to write for it)
+— refuses on a self machine with the same message: `<name> is this computer
+(self: true): <command> needs a machine it reaches over SSH`. A workspace can
+never run on a self machine: a workspace is a Linux account on a server, and a
+self machine is not one.
 
 `trust` reads the public host key without authenticating. A missing key asks
 before adding it; an existing match writes nothing; a changed key refuses

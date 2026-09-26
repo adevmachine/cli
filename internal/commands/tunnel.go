@@ -37,7 +37,7 @@ func newTunnelCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			address, err := firstAddress(tgt.machine)
+			address, err := firstAddress(tgt.machine, "tunnel")
 			if err != nil {
 				return err
 			}

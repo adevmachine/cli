@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 )
 
@@ -158,7 +159,7 @@ func TestInstalledFindsOnlyDNSPackages(t *testing.T) {
 		plainPackage("docker"),
 	)
 
-	got, err := Installed(dir, "main", &recordingClient{out: `{"zones": []}`})
+	got, err := Installed(dir, "main", provision.RemoteDir, &recordingClient{out: `{"zones": []}`})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +174,7 @@ func TestInstalledIgnoresAPackageThatIsNotOnThisMachine(t *testing.T) {
 	// way nobody can act on.
 	dir := configDirWithCachedButNotInstalled(t, providerPackage("cloudflare", "dns"))
 
-	got, err := Installed(dir, "main", &recordingClient{out: `{"zones": []}`})
+	got, err := Installed(dir, "main", provision.RemoteDir, &recordingClient{out: `{"zones": []}`})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +184,7 @@ func TestInstalledIgnoresAPackageThatIsNotOnThisMachine(t *testing.T) {
 }
 
 func TestOneSaysHowToInstallAProviderThatIsNotThere(t *testing.T) {
-	_, err := One(configDirWith(t), "main", "cloudflare", &recordingClient{})
+	_, err := One(configDirWith(t), "main", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err == nil {
 		t.Fatal("a provider that is not installed was used")
 	}
@@ -200,7 +201,7 @@ func TestOneSaysHowToInstallAProviderThatIsNotThere(t *testing.T) {
 func TestOneRefusesAPackageOfAnotherKind(t *testing.T) {
 	dir := configDirWith(t, plainPackage("docker"))
 
-	_, err := One(dir, "main", "docker", &recordingClient{})
+	_, err := One(dir, "main", provision.RemoteDir, "docker", &recordingClient{})
 	if err == nil {
 		t.Fatal("a plain machine package was used as a DNS provider")
 	}
@@ -214,7 +215,7 @@ func TestOneRefusesAProviderWithNoCredential(t *testing.T) {
 	// message that says nothing anybody can act on.
 	dir := configDirWith(t, providerPackageWithoutCredential("cloudflare"))
 
-	_, err := One(dir, "main", "cloudflare", &recordingClient{})
+	_, err := One(dir, "main", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err == nil {
 		t.Fatal("a provider with no credential was used")
 	}
@@ -227,7 +228,7 @@ func TestChooseUsesTheFlagWithoutAskingAnybody(t *testing.T) {
 	client := &recordingClient{}
 	dir := configDirWith(t, providerPackage("cloudflare", "dns"))
 
-	got, err := Choose(context.Background(), dir, "main", "www.example.com", "cloudflare", client, io.Discard)
+	got, err := Choose(context.Background(), dir, "main", provision.RemoteDir, "www.example.com", "cloudflare", client, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +251,7 @@ func TestChooseAsksAndFindsTheHolder(t *testing.T) {
 		"cloudflare": {"client.example.net"},
 	})
 
-	got, err := Choose(context.Background(), dir, "main", "app.client.example.net", "", client, io.Discard)
+	got, err := Choose(context.Background(), dir, "main", provision.RemoteDir, "app.client.example.net", "", client, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +265,7 @@ func TestChooseFallsThroughToManual(t *testing.T) {
 		"hostinger": {"example.com"},
 	})
 
-	got, err := Choose(context.Background(), dir, "main", "www.example.org", "", client, io.Discard)
+	got, err := Choose(context.Background(), dir, "main", provision.RemoteDir, "www.example.org", "", client, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +287,7 @@ func TestChooseSaysWhyOnTheWriterWhenItFellThrough(t *testing.T) {
 	}
 
 	var out strings.Builder
-	got, err := Choose(context.Background(), dir, "main", "www.example.com", "", client, &out)
+	got, err := Choose(context.Background(), dir, "main", provision.RemoteDir, "www.example.com", "", client, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +302,7 @@ func TestChooseSaysWhyOnTheWriterWhenItFellThrough(t *testing.T) {
 }
 
 func TestChooseWithNoMachineReachableIsManualAndNotAnError(t *testing.T) {
-	got, err := Choose(context.Background(), configDirWith(t), "main", "www.example.com", "", nil, io.Discard)
+	got, err := Choose(context.Background(), configDirWith(t), "main", provision.RemoteDir, "www.example.com", "", nil, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +317,7 @@ func TestChooseWithNoMachineReachableIsManualAndNotAnError(t *testing.T) {
 func TestAnyBuildsAPackageOfAnyKind(t *testing.T) {
 	dir := configDirWith(t, providerPackage("cloudflare", "dns"))
 
-	got, err := Any(dir, "main", "cloudflare", &recordingClient{})
+	got, err := Any(dir, "main", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +329,7 @@ func TestAnyBuildsAPackageOfAnyKind(t *testing.T) {
 func TestAnyRefusesAPackageWithNoEntrypoint(t *testing.T) {
 	dir := configDirWith(t, plainPackage("docker"))
 
-	_, err := Any(dir, "main", "docker", &recordingClient{})
+	_, err := Any(dir, "main", provision.RemoteDir, "docker", &recordingClient{})
 	if err == nil {
 		t.Fatal("a package with no entrypoint was called")
 	}
@@ -338,7 +339,7 @@ func TestAnyRefusesAPackageWithNoEntrypoint(t *testing.T) {
 }
 
 func TestAnySaysHowToInstallAPackageThatIsNotThere(t *testing.T) {
-	_, err := Any(configDirWith(t), "main", "cloudflare", &recordingClient{})
+	_, err := Any(configDirWith(t), "main", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err == nil {
 		t.Fatal("a package that is not installed was used")
 	}

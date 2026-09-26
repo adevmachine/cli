@@ -70,7 +70,10 @@ func newMachinesListCmd(opts *options) *cobra.Command {
 }
 
 func newMachinesAddCmd(opts *options) *cobra.Command {
-	var s setupOptions
+	var (
+		s        setupOptions
+		selfName string
+	)
 
 	c := &cobra.Command{
 		Use:   "add",
@@ -78,19 +81,61 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 		Long: "Asks the same questions as `setup`, minus the domain, and runs the " +
 			"same bootstrap: it installs a key, proves the key on a connection of " +
 			"its own, turns password login off, and installs Ansible.\n\n" +
-			"`setup` writes the first machine. This writes every one after it.",
+			"`setup` writes the first machine. This writes every one after it.\n\n" +
+			"--self <name> adds this computer instead: no address, no key, no " +
+			"password. It only makes sure Homebrew and Ansible are on PATH.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _, err := config.Dir(opts.configDir)
 			if err != nil {
 				return err
 			}
+			if selfName != "" {
+				return runMachinesAddSelf(cmd.Context(), dir, cmd.OutOrStdout(), selfName)
+			}
 			return runMachinesAdd(cmd.Context(), dir, cmd.InOrStdin(), cmd.OutOrStdout(), s)
 		},
 	}
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"leave password login on (the key is still installed and proved)")
+	c.Flags().StringVar(&selfName, "self", "",
+		"add this computer as a machine, named <name>, instead of asking for an address")
 	return c
+}
+
+// runMachinesAddSelf writes a self machine into config.yml and prepares it:
+// no address is asked for, because there is none to give.
+func runMachinesAddSelf(ctx context.Context, dir string, out io.Writer, name string) error {
+	current, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	if name == "" {
+		return errors.New("a machine needs a name: it is how every other command says which one to act on")
+	}
+	for _, m := range current.Machines {
+		if m.Self {
+			return fmt.Errorf(
+				"machine %q is already `self: true`: only one machine can be this computer", m.Name)
+		}
+	}
+	if _, err := current.Machine(name); err == nil {
+		return fmt.Errorf("a machine named %q is already configured: pick another name", name)
+	}
+
+	m := config.Machine{Name: name, Self: true}
+	if err := config.AddMachine(dir, m); err != nil {
+		return err
+	}
+	repo.AutoCommit(ctx, dir, "chore(config): add machine "+name)
+	fmt.Fprintf(out, "\nadded %s (this computer) to %s\n\n", name, filepath.Join(dir, config.FileName))
+
+	if err := prepareExistingSelf(ctx, out, m); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n", name, name)
+	return nil
 }
 
 func newMachinesRmCmd(opts *options) *cobra.Command {

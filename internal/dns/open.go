@@ -18,8 +18,10 @@ const KindDNS = "dns"
 const ProviderManual = "manual"
 
 // buildExternal wraps a found DNS package as a Provider, sourced from the
-// credential it declares.
-func buildExternal(found packages.Found, client remote.Client) (*External, error) {
+// credential it declares. base is where the bundle lives on the machine the
+// client is connected to: RemoteDir for one reached over SSH, or the self
+// bundle directory for a self machine.
+func buildExternal(found packages.Found, base string, client remote.Client) (*External, error) {
 	m := found.Manifest
 
 	var credential string
@@ -34,7 +36,7 @@ func buildExternal(found packages.Found, client remote.Client) (*External, error
 			"the %s package declares no credential, so there is nothing to source before it runs", m.Name)
 	}
 
-	entrypoint := provision.RolePath(found.Source, m.Name, m.Entrypoint)
+	entrypoint := provision.RolePath(base, found.Source, m.Name, m.Entrypoint)
 	return NewExternal(m.Name, client, entrypoint, credential, m.Commands), nil
 }
 
@@ -45,7 +47,7 @@ func buildExternal(found packages.Found, client remote.Client) (*External, error
 // the cache and not in the lock is the ordinary state for every package this
 // machine never asked for, and asking one anyway fails in a way nobody can
 // act on.
-func Installed(dir, machine string, client remote.Client) ([]*External, error) {
+func Installed(dir, machine, base string, client remote.Client) ([]*External, error) {
 	lock, err := packages.LoadLock(dir)
 	if err != nil {
 		return nil, err
@@ -64,7 +66,7 @@ func Installed(dir, machine string, client remote.Client) ([]*External, error) {
 		if found.Manifest.Kind != KindDNS {
 			continue
 		}
-		ext, err := buildExternal(found, client)
+		ext, err := buildExternal(found, base, client)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +107,7 @@ func lookupInstalled(dir, machine, name string) (packages.Found, error) {
 }
 
 // One builds a single installed DNS provider by name.
-func One(dir, machine, name string, client remote.Client) (*External, error) {
+func One(dir, machine, base, name string, client remote.Client) (*External, error) {
 	found, err := lookupInstalled(dir, machine, name)
 	if err != nil {
 		return nil, err
@@ -113,7 +115,7 @@ func One(dir, machine, name string, client remote.Client) (*External, error) {
 	if found.Manifest.Kind != KindDNS {
 		return nil, fmt.Errorf("%s is not a DNS provider (kind %q)", name, found.Manifest.Kind)
 	}
-	return buildExternal(found, client)
+	return buildExternal(found, base, client)
 }
 
 // Any builds a single installed package's entrypoint, whatever its kind.
@@ -121,7 +123,7 @@ func One(dir, machine, name string, client remote.Client) (*External, error) {
 // One refuses anything that is not a DNS provider, which is right for a
 // command that only makes sense against one. `run --package` reaches any
 // package that declares an entrypoint, and this is the door for that.
-func Any(dir, machine, name string, client remote.Client) (*External, error) {
+func Any(dir, machine, base, name string, client remote.Client) (*External, error) {
 	found, err := lookupInstalled(dir, machine, name)
 	if err != nil {
 		return nil, err
@@ -129,7 +131,7 @@ func Any(dir, machine, name string, client remote.Client) (*External, error) {
 	if found.Manifest.Entrypoint == "" {
 		return nil, fmt.Errorf("%s declares no entrypoint, so there is nothing to call", name)
 	}
-	return buildExternal(found, client)
+	return buildExternal(found, base, client)
 }
 
 // Choice is what a command decided to act on, and why.
@@ -146,7 +148,7 @@ type Choice struct {
 // when two installed providers claim the same zone: every other outcome has
 // an answer, and the answer is manual. A nil client means nothing can be
 // asked, and the answer is manual too.
-func Choose(ctx context.Context, dir, machine, name, providerFlag string,
+func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 	client remote.Client, out io.Writer) (Choice, error) {
 
 	manual := Choice{Provider: NewManual(out), Name: ProviderManual, Zone: name}
@@ -162,14 +164,14 @@ func Choose(ctx context.Context, dir, machine, name, providerFlag string,
 		return manual, nil
 	}
 	if providerFlag != "" {
-		p, err := One(dir, machine, providerFlag, client)
+		p, err := One(dir, machine, base, providerFlag, client)
 		if err != nil {
 			return Choice{}, err
 		}
 		return Choice{Provider: p, Name: p.Name(), Zone: name, Why: "the --dns-provider flag"}, nil
 	}
 
-	providers, err := Installed(dir, machine, client)
+	providers, err := Installed(dir, machine, base, client)
 	if err != nil {
 		return Choice{}, err
 	}

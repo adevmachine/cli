@@ -89,6 +89,15 @@ func (h Host) MarshalYAML() (any, error) { return h.Address, nil }
 // Machine is a server the CLI operates.
 type Machine struct {
 	Name string `yaml:"name"`
+	// Self says this machine is the computer the CLI itself runs on. It has
+	// no address, no admin login, no port and no key: `sync` writes the
+	// bundle to a directory here and runs Ansible without SSH.
+	//
+	// It is not `machines create-local`'s Lima VM. That VM has an address, a
+	// port, a root login and a key of its own — a remote machine that
+	// happens to live on this computer. Self is the computer the command
+	// runs on, and the two must never share a name.
+	Self bool `yaml:"self,omitempty"`
 	// Hosts are tried in order, so the first is the preferred path and the
 	// rest are fallbacks.
 	Hosts []Host `yaml:"hosts"`
@@ -136,6 +145,19 @@ type Workspace struct {
 	// Routes are the sites `expose` published for this workspace. sync writes
 	// them; nothing else does.
 	Routes []Route `yaml:"routes,omitempty"`
+}
+
+// resolvedMachine is the machine this workspace runs on, exactly as
+// WorkspacesOn decides it: named explicitly, or the only machine there is
+// when nothing names one.
+func (w Workspace) resolvedMachine(c Config) string {
+	if w.Machine != "" {
+		return w.Machine
+	}
+	if len(c.Machines) == 1 {
+		return c.Machines[0].Name
+	}
+	return ""
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -232,13 +254,19 @@ func Load(dir string) (Config, error) {
 	}
 
 	for i := range c.Machines {
+		c.Machines[i].KnownHostsFile = filepath.Join(dir, KnownHostsFileName)
+		if c.Machines[i].Self {
+			// A self machine has no address, so the admin-login and port
+			// defaults that only make sense for one would trip Validate's
+			// refusal of `user` and `port` on it.
+			continue
+		}
 		if c.Machines[i].User == "" {
 			c.Machines[i].User = DefaultAdminUser
 		}
 		if c.Machines[i].Port == 0 {
 			c.Machines[i].Port = DefaultPort
 		}
-		c.Machines[i].KnownHostsFile = filepath.Join(dir, KnownHostsFileName)
 	}
 	return c, nil
 }
@@ -331,6 +359,8 @@ func (c Config) Validate() error {
 	}
 
 	seen := map[string]bool{}
+	selfByName := map[string]bool{}
+	selfMachine := ""
 	for i, m := range c.Machines {
 		switch {
 		case m.Name == "":
@@ -339,23 +369,38 @@ func (c Config) Validate() error {
 			return fmt.Errorf("machine %q does not have a safe SSH identity name: use only letters, numbers, dots, underscores and hyphens, starting with a letter or number", m.Name)
 		case seen[m.Name]:
 			return fmt.Errorf("two machines are named %q: a machine's name has to be unique", m.Name)
-		case len(m.Hosts) == 0:
-			return fmt.Errorf("machine %q has no address: add at least one entry under its `hosts`", m.Name)
-		case m.Port < 1 || m.Port > 65535:
-			return fmt.Errorf("machine %q has port %d: use a port between 1 and 65535", m.Name, m.Port)
 		}
+
+		if m.Self {
+			if selfMachine != "" {
+				return fmt.Errorf("machine %q and machine %q are both `self: true`: only one machine can be this computer", selfMachine, m.Name)
+			}
+			selfMachine = m.Name
+			if err := refusesAddress(m); err != nil {
+				return err
+			}
+		} else {
+			switch {
+			case len(m.Hosts) == 0:
+				return fmt.Errorf("machine %q has no address: add at least one entry under its `hosts`", m.Name)
+			case m.Port < 1 || m.Port > 65535:
+				return fmt.Errorf("machine %q has port %d: use a port between 1 and 65535", m.Name, m.Port)
+			}
+			for j, h := range m.Hosts {
+				if h.Address == "" {
+					return fmt.Errorf("machine %q: host %d is empty", m.Name, j+1)
+				}
+			}
+		}
+
 		if name, dup := firstDuplicate(m.Packages); dup {
 			return fmt.Errorf("machine %q lists the package %q twice", m.Name, name)
 		}
 		if err := validateSettings("machine", m.Name, m.Settings, m.Packages); err != nil {
 			return err
 		}
-		for j, h := range m.Hosts {
-			if h.Address == "" {
-				return fmt.Errorf("machine %q: host %d is empty", m.Name, j+1)
-			}
-		}
 		seen[m.Name] = true
+		selfByName[m.Name] = m.Self
 	}
 
 	names := map[string]bool{}
@@ -372,6 +417,11 @@ func (c Config) Validate() error {
 				w.Name, strings.Join(c.machineNames(), ", "))
 		case w.Machine != "" && !seen[w.Machine]:
 			return fmt.Errorf("workspace %q runs on machine %q, which is not configured", w.Name, w.Machine)
+		}
+		if resolved := w.resolvedMachine(c); resolved != "" && selfByName[resolved] {
+			return fmt.Errorf(
+				"workspace %q runs on %q, which is this computer: a workspace is a Linux account on a server",
+				w.Name, resolved)
 		}
 		if name, dup := firstDuplicate(w.Packages); dup {
 			return fmt.Errorf("workspace %q lists the package %q twice", w.Name, name)
@@ -406,6 +456,22 @@ func (c Config) Validate() error {
 	if c.Packages != "" && !releaseTag.MatchString(c.Packages) {
 		return fmt.Errorf(
 			"`packages: %s` is not a release tag: use one like `v1`, never a branch name", c.Packages)
+	}
+	return nil
+}
+
+// refusesAddress reports the first address-shaped field a self machine
+// carries. There is no address for the machine you are standing on.
+func refusesAddress(m Machine) error {
+	switch {
+	case len(m.Hosts) > 0:
+		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "hosts")
+	case m.User != "":
+		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "user")
+	case m.Port != 0:
+		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "port")
+	case m.Key != "":
+		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "key")
 	}
 	return nil
 }
@@ -756,13 +822,17 @@ func plural(n int, one, many string) string {
 
 // machineNode is a machine as the file holds it.
 func machineNode(m Machine) *yaml.Node {
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	setField(node, "name", stringNode(m.Name))
+	if m.Self {
+		setField(node, "self", boolNode(m.Self))
+		return node
+	}
+
 	addresses := make([]string, 0, len(m.Hosts))
 	for _, h := range m.Hosts {
 		addresses = append(addresses, h.Address)
 	}
-
-	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-	setField(node, "name", stringNode(m.Name))
 	setField(node, "hosts", sequenceNode(addresses))
 	setField(node, "user", stringNode(m.User))
 	setField(node, "port", intNode(m.Port))
@@ -775,6 +845,13 @@ func intNode(value int) *yaml.Node {
 		return nil
 	}
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(value)}
+}
+
+func boolNode(value bool) *yaml.Node {
+	if !value {
+		return nil
+	}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}
 }
 
 // modeOf keeps a file's own permissions when it is rewritten.

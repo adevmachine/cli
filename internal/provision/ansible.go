@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -17,8 +18,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// RemoteDir is where everything a run needs is unpacked on the machine.
+// RemoteDir is where everything a run needs is unpacked on a machine reached
+// over SSH.
 const RemoteDir = "/opt/devmachine"
+
+// Base is where the bundle lives on a machine: RemoteDir for one reached over
+// SSH, or a directory under this computer's own home for one that declares
+// `self: true`. /opt is not writable without root on a Mac, so a self
+// machine's bundle lives where Homebrew, mise and Claude already do.
+func Base(m config.Machine) (string, error) {
+	if !m.Self {
+		return RemoteDir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("finding the home directory: %w", err)
+	}
+	return filepath.Join(home, ".local", "share", "devmachine", "bundle"), nil
+}
 
 // inventoryHost is the one host in the generated inventory. It is a fixed name
 // rather than the machine's own, so host_vars/<host>.yml has a path that does
@@ -37,21 +54,30 @@ const (
 )
 
 // Generate returns the files Ansible needs, keyed by their path under
-// RemoteDir.
-//
-// It is pure: the same plan gives the same bytes, so a change to what a
-// machine is asked to do shows up as a diff rather than as a surprise.
+// RemoteDir. It is GenerateAt with the remote base every machine reached
+// over SSH uses.
 func Generate(plan packages.MachinePlan) (map[string][]byte, error) {
+	return GenerateAt(plan, RemoteDir)
+}
+
+// GenerateAt is Generate with the bundle's base directory as an input, so a
+// self machine's files point at its own bundle instead of RemoteDir.
+//
+// It is pure: the same plan and the same base give the same bytes, so a
+// change to what a machine is asked to do shows up as a diff rather than as a
+// surprise. base is never read from the environment here — Apply resolves it
+// before calling in.
+func GenerateAt(plan packages.MachinePlan, base string) (map[string][]byte, error) {
 	vars, err := hostVars(plan)
 	if err != nil {
 		return nil, err
 	}
-	site, err := playbook(plan)
+	site, err := playbook(plan, base)
 	if err != nil {
 		return nil, err
 	}
 	files := map[string][]byte{
-		"ansible.cfg":              []byte(ansibleCfg()),
+		"ansible.cfg":              []byte(ansibleCfg(base)),
 		"inventory.ini":            []byte(inventory()),
 		"host_vars/devmachine.yml": vars,
 		"site.yml":                 []byte(site),
@@ -72,13 +98,13 @@ func routesByWorkspace(plan packages.MachinePlan) map[string][]expose.Site {
 	return out
 }
 
-func ansibleCfg() string {
+func ansibleCfg(base string) string {
 	return header + fmt.Sprintf(`[defaults]
 roles_path = %[1]s/%[2]s:%[1]s/%[3]s
 inventory = %[1]s/inventory.ini
 host_key_checking = False
 stdout_callback = default
-`, RemoteDir, localRoles, releaseRoles)
+`, base, localRoles, releaseRoles)
 }
 
 // inventory names the one host and no group. A group of the same name would
@@ -213,16 +239,20 @@ func ansibleVariable(key string) string {
 	return "devmachine_" + strings.NewReplacer("-", "_", ".", "_").Replace(key)
 }
 
-func playbook(plan packages.MachinePlan) (string, error) {
+func playbook(plan packages.MachinePlan, base string) (string, error) {
 	var out strings.Builder
 	out.WriteString("---\n" + header)
-	fmt.Fprintf(&out, "- hosts: %s\n  become: true\n", inventoryHost)
+	if plan.Machine.Self {
+		fmt.Fprintf(&out, "- hosts: %s\n  become: false\n", inventoryHost)
+	} else {
+		fmt.Fprintf(&out, "- hosts: %s\n  become: true\n", inventoryHost)
+	}
 
 	forWorkspaces, err := workspaceTasks(plan, false)
 	if err != nil {
 		return "", err
 	}
-	contributed, err := skillTasks(plan)
+	contributed, err := skillTasks(plan, base)
 	if err != nil {
 		return "", err
 	}
@@ -246,8 +276,14 @@ func playbook(plan packages.MachinePlan) (string, error) {
 		}
 		tasks += again
 	}
-	tasks += extensionTasks(plan)
-	tasks += routeTasks(plan)
+	tasks += extensionTasks(plan, base)
+	tasks += routeTasks(plan, base)
+	if plan.Machine.Self {
+		// A self machine converges on the operator's own Mac. Everything
+		// after this task assumes macOS — Homebrew paths, no become — so the
+		// guard runs before any of it, not as a check alongside it.
+		tasks = darwinGuardTask() + tasks
+	}
 	if tasks == "" {
 		out.WriteString("  tasks: []\n")
 		return out.String(), nil
@@ -255,6 +291,14 @@ func playbook(plan packages.MachinePlan) (string, error) {
 	out.WriteString("  tasks:\n")
 	out.WriteString(tasks)
 	return out.String(), nil
+}
+
+// darwinGuardTask refuses the run before anything else happens, on any
+// system other than macOS.
+func darwinGuardTask() string {
+	return "    - name: refuses anywhere but macOS\n" +
+		"      fail:\n        msg: \"a self machine is converged on macOS only; this is {{ ansible_facts['system'] }}\"\n" +
+		"      when: ansible_facts['system'] != 'Darwin'\n\n"
 }
 
 type contributedSkills struct {
@@ -266,7 +310,7 @@ type contributedSkills struct {
 
 // skillTasks converges package skill contributions for only the workspaces
 // whose resolved package set includes the contributor.
-func skillTasks(plan packages.MachinePlan) (string, error) {
+func skillTasks(plan packages.MachinePlan, base string) (string, error) {
 	var contributions []contributedSkills
 	byPackage := map[string]int{}
 	for _, workspace := range plan.Workspaces {
@@ -295,7 +339,7 @@ func skillTasks(plan packages.MachinePlan) (string, error) {
 	for _, contribution := range contributions {
 		writeSkillDirectories(&out, contribution)
 		for _, skill := range contribution.skills {
-			writeSkillConvergence(&out, contribution, skill)
+			writeSkillConvergence(&out, contribution, skill, base)
 		}
 	}
 	return out.String(), nil
@@ -327,7 +371,7 @@ func writeSkillDirectories(out *strings.Builder, contribution contributedSkills)
 	}
 }
 
-func writeSkillConvergence(out *strings.Builder, contribution contributedSkills, skill agentskills.Skill) {
+func writeSkillConvergence(out *strings.Builder, contribution contributedSkills, skill agentskills.Skill, base string) {
 	pkg := contribution.found.Manifest.Name
 	sourceID := pkg
 	destination := "/home/{{ devmachine_workspace.user }}/.agents/skills/" + skill.Name
@@ -365,7 +409,7 @@ func writeSkillConvergence(out *strings.Builder, contribution contributedSkills,
 	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
 
 	fmt.Fprintf(out, "    - name: %s installs the %s skill\n", pkg, skill.Name)
-	fmt.Fprintf(out, "      copy:\n        src: %q\n        dest: %q\n", RolePath(contribution.found.Source, pkg, contribution.found.Manifest.Skills.Path, skill.Name)+"/", destination+"/")
+	fmt.Fprintf(out, "      copy:\n        src: %q\n        dest: %q\n", RolePath(base, contribution.found.Source, pkg, contribution.found.Manifest.Skills.Path, skill.Name)+"/", destination+"/")
 	out.WriteString("        remote_src: true\n        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n        mode: preserve\n")
 	writeSkillLoop(out, contribution.workspaces, false)
 	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
@@ -508,7 +552,7 @@ func groupBySettings(plan packages.MachinePlan, pkg string) ([]group, error) {
 
 // extensionTasks copy each contribution into the directory its provider
 // opened. They run last, after the package that creates the directory.
-func extensionTasks(plan packages.MachinePlan) string {
+func extensionTasks(plan packages.MachinePlan, base string) string {
 	found := map[string]packages.Found{}
 	for _, resolved := range append([]packages.Resolved{plan.OnMachine}, plan.Workspaces...) {
 		for _, f := range resolved.Ordered {
@@ -519,7 +563,7 @@ func extensionTasks(plan packages.MachinePlan) string {
 	var out strings.Builder
 	for _, extension := range plan.Extensions {
 		from := found[extension.From]
-		source := path.Join(RemoteDir, rolesDir(from.Source), extension.From, extension.Source)
+		source := path.Join(base, rolesDir(from.Source), extension.From, extension.Source)
 
 		// The destination is named after what contributed it, so two packages
 		// shipping the same file name cannot collide. The workspace is in the
@@ -546,7 +590,7 @@ func extensionTasks(plan packages.MachinePlan) string {
 // now owns — Caddy refuses a reload that names one host twice — and the file
 // of a workspace with no route left. They run after every package, so caddy
 // has made sites.d, and reload Caddy only when something changed.
-func routeTasks(plan packages.MachinePlan) string {
+func routeTasks(plan packages.MachinePlan, base string) string {
 	if plan.SitesDir == "" {
 		return ""
 	}
@@ -575,7 +619,7 @@ func routeTasks(plan packages.MachinePlan) string {
 		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n      loop:\n")
 		for _, name := range written {
 			fmt.Fprintf(&out, "        - {src: %q, dest: %q}\n",
-				path.Join(RemoteDir, "routes", name+".caddy"),
+				path.Join(base, "routes", name+".caddy"),
 				path.Join(plan.SitesDir, expose.WorkspaceFileName(name)))
 		}
 		out.WriteString("      register: devmachine_routes_written\n      tags: [routes]\n\n")
@@ -612,8 +656,8 @@ func includeRole(name string) string {
 // package — a DNS provider's entrypoint, a credential's helper — and the
 // overlay rule that picks roles.local over roles must have exactly one
 // implementation. Two would be one rule nobody remembers to change twice.
-func RolePath(source, name string, rest ...string) string {
-	return path.Join(append([]string{RemoteDir, rolesDir(source), name}, rest...)...)
+func RolePath(base, source, name string, rest ...string) string {
+	return path.Join(append([]string{base, rolesDir(source), name}, rest...)...)
 }
 
 // rolesDir is where a package is unpacked, which is what decides whether the

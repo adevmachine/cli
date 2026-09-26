@@ -36,7 +36,7 @@ func (f fakeZoner) Zones(context.Context) ([]string, error) { return f.zones, f.
 // providers, and dial with one that never really connects.
 func stubInstalled(providers []fakeZoner) func() {
 	origInstalled, origDial := dnsInstalled, dial
-	dnsInstalled = func(string, string, remote.Client) ([]dnsZoner, error) {
+	dnsInstalled = func(string, string, string, remote.Client) ([]dnsZoner, error) {
 		out := make([]dnsZoner, len(providers))
 		for i, p := range providers {
 			out[i] = p

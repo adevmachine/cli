@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,7 +36,22 @@ var (
 	scanHostKey    = remote.ScanHostKey
 	confirmHostKey = confirm
 	setupSkills    = offerSetupSkills
+	streamLocal    = streamLocalCommand
 )
+
+// brewInstallCommand is the official one-line Homebrew install. `setup`
+// prints it and runs nothing: that command asks for sudo, and asking for
+// sudo on the operator's own computer is not this CLI's to do.
+const brewInstallCommand = `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+
+// streamLocalCommand runs a command on this computer with its output
+// streamed to out as it arrives, the same way installing Ansible on a remote
+// machine streams over SSH.
+func streamLocalCommand(ctx context.Context, out io.Writer, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdout, cmd.Stderr = out, out
+	return cmd.Run()
+}
 
 // setupOptions are the flags the flow reads.
 type setupOptions struct {
@@ -160,6 +176,11 @@ func prepareExisting(ctx context.Context, dir string, out io.Writer, name string
 	}
 
 	fmt.Fprintf(out, "%s already describes %s; preparing it without rewriting configuration.\n", config.FileName, m.Name)
+
+	if m.Self {
+		return prepareExistingSelf(ctx, out, m)
+	}
+
 	client, address, err := dial(ctx, m, m.User)
 	if err != nil {
 		return err
@@ -170,6 +191,28 @@ func prepareExisting(ctx context.Context, dir string, out io.Writer, name string
 	if err := installAnsible(ctx, client, out); err != nil {
 		return err
 	}
+	return nil
+}
+
+// prepareExistingSelf is `setup`'s whole job for a self machine: no host key
+// to trust, no key to install, no password, no hardening. It only makes sure
+// Homebrew and Ansible are on this computer.
+func prepareExistingSelf(ctx context.Context, out io.Writer, m config.Machine) error {
+	if _, err := lookPath("brew"); err != nil {
+		return fmt.Errorf(
+			"homebrew is not installed on this computer: run this, then `devmachine setup --machine %s` again:\n%s",
+			m.Name, brewInstallCommand)
+	}
+	if _, err := lookPath("ansible-playbook"); err == nil {
+		fmt.Fprintf(out, "%s is already prepared: Homebrew and ansible-playbook are both on PATH.\n", m.Name)
+		return nil
+	}
+
+	fmt.Fprintf(out, "installing Ansible with Homebrew...\n")
+	if err := streamLocal(ctx, out, "brew", "install", "ansible"); err != nil {
+		return fmt.Errorf("installing Ansible with Homebrew: %w", err)
+	}
+	fmt.Fprintf(out, "Ansible is installed.\n")
 	return nil
 }
 

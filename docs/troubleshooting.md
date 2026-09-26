@@ -50,6 +50,21 @@ once — `apt install ansible`, or whatever that distribution calls it — and
 everything after that is `sync`'s job. Everything else in `doctor` still tells
 you the truth without it.
 
+## "ansible-playbook is not on this computer"
+
+The self-machine version of the check above. `sync` and `doctor` both refuse
+before touching anything when Ansible is not on `PATH` on this computer. Run
+`devmachine setup --machine <name>` — on a self machine that only checks
+Homebrew is there and then runs `brew install ansible`, with no key, no
+password and no hardening involved.
+
+## "machine X is this computer (self: true), so it has no hosts"
+
+A machine with `self: true` in `config.yml` also carries `hosts`, `user`,
+`port` or `key` — whichever the message names. There is no address for the
+computer the CLI is running on, so remove the field it names. This also
+appears for `user`, `port` and `key`, one at a time, for the same reason.
+
 ## A `tailscale:` address is being ignored
 
 It is dropped when `tailscale` is not installed or does not know that name, and

@@ -9,6 +9,7 @@ import (
 
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/dns"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -92,8 +93,8 @@ type dnsZoner interface {
 // dnsInstalled is the seam a test replaces so `dns providers` never dials a
 // machine for real. It wraps dns.Installed behind an interface so a test can
 // hand it a stub provider instead of a real dns.External.
-var dnsInstalled = func(dir, machine string, client remote.Client) ([]dnsZoner, error) {
-	providers, err := dns.Installed(dir, machine, client)
+var dnsInstalled = func(dir, machine, base string, client remote.Client) ([]dnsZoner, error) {
+	providers, err := dns.Installed(dir, machine, base, client)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +134,11 @@ func newDNSProvidersCmd(opts *options) *cobra.Command {
 			}
 			defer client.Close()
 
-			providers, err := dnsInstalled(dir, tgt.machine.Name, client)
+			base, err := provision.Base(tgt.machine)
+			if err != nil {
+				return err
+			}
+			providers, err := dnsInstalled(dir, tgt.machine.Name, base, client)
 			if err != nil {
 				return err
 			}
@@ -196,7 +201,11 @@ func defaultChooseDNS(ctx context.Context, opts *options, name, providerFlag, zo
 		client = nil
 	}
 
-	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, name, providerFlag, client, out)
+	base, err := provision.Base(tgt.machine)
+	if err != nil {
+		return dns.Choice{}, target{}, err
+	}
+	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, base, name, providerFlag, client, out)
 	if err != nil {
 		return dns.Choice{}, target{}, err
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/adevmachine/cli/internal/config"
 	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +55,11 @@ func newPackagesHelpCmd(opts *options) *cobra.Command {
 			}
 			defer client.Close()
 
-			ext, err := dns.Any(dir, tgt.machine.Name, name, client)
+			base, err := provision.Base(tgt.machine)
+			if err != nil {
+				return err
+			}
+			ext, err := dns.Any(dir, tgt.machine.Name, base, name, client)
 			if err != nil {
 				return err
 			}

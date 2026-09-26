@@ -74,6 +74,9 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 	if err != nil {
 		return err
 	}
+	if err := requiresAddress(machine, "machines trust"); err != nil {
+		return err
+	}
 	presented, address, err := scanHostKey(ctx, machine)
 	if err != nil {
 		return err

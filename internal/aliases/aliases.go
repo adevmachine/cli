@@ -63,6 +63,12 @@ func List(cfg config.Config) ([]Alias, error) {
 		if err != nil {
 			return nil, err
 		}
+		if machine.Self {
+			// A self machine has no address, so there is no Host entry to
+			// write. Validate already refuses a workspace on one; this is
+			// the defensive skip for whatever reaches here anyway.
+			continue
+		}
 		addresses, err := resolve(machine)
 		if err != nil || len(addresses) == 0 {
 			return nil, errNoAddress(machine.Name)

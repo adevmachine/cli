@@ -8,6 +8,34 @@ own addresses, administrative login, port and key.
 A **workspace** is an environment: normally one Linux user on one machine. It is
 what a person works in and what they name in a command.
 
+## This computer
+
+A machine can also be `self: true` — the computer the CLI itself runs on:
+
+```yaml
+machines:
+  - name: mac
+    self: true
+```
+
+It has no `hosts`, `user`, `port` or `key`: there is no address for the
+computer you are standing on. `sync` writes the bundle to a directory here and
+runs Ansible directly, with no SSH in between. Everything else about planning
+stays the same.
+
+This is not `machines create-local`'s Lima VM. That VM has its own address, its
+own key, its own `setup` — a machine that happens to live on this computer, but
+reached exactly like any other. `self` is the one command runs on, and the two
+names are kept apart on purpose: see
+[This computer](../how-it-works/this-computer.md) for why.
+
+**A workspace can never run on a self machine.** A workspace is a Linux account
+on a server, reached over SSH by a key the CLI installed; a self machine has
+neither an account model like that nor an SSH server of its own to reach. Add
+it with `devmachine machines add --self <name>`, prepare it with `devmachine
+setup`, and use it for what runs on the operator's own Mac — see
+[commands](../reference/commands.md#machines) for what refuses on it and why.
+
 ## Why a workspace, and not just a user
 
 Where a workspace runs is a property of the workspace, not something you repeat

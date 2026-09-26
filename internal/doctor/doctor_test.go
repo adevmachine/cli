@@ -685,3 +685,54 @@ func TestDoctorSaysNothingAboutDNSWhenNoProviderIsInstalled(t *testing.T) {
 		}
 	}
 }
+
+const selfMachineConfig = "machines:\n  - name: mac\n    self: true\n"
+
+func selfDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(selfMachineConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func selfClient(system string) fakeClient {
+	return fakeClient{out: map[string]string{
+		"uname -s":     system + "\n",
+		ansibleCommand: "/opt/homebrew/bin/ansible-playbook\n",
+	}}
+}
+
+func TestDoctorOnASelfMachineRunsNoSSHChecks(t *testing.T) {
+	checks := Run(context.Background(), selfDir(t), "", dialling(selfClient("Darwin")), nil)
+
+	for _, name := range []string{CheckHostKey, CheckConnection} {
+		for _, c := range checks {
+			if c.Name == name {
+				t.Fatalf("a self machine ran an SSH check %q: %#v", name, c)
+			}
+		}
+	}
+	if got := find(t, checks, CheckOperatingSystem); got.Status != StatusPass || got.Detail != "darwin" {
+		t.Fatalf("got %#v", got)
+	}
+	if got := find(t, checks, CheckAnsible); got.Status != StatusPass {
+		t.Fatalf("got %#v", got)
+	}
+	if got := find(t, checks, CheckBundle); got.Status != StatusPass {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestDoctorOnASelfMachineFailsOutsideMacOS(t *testing.T) {
+	checks := Run(context.Background(), selfDir(t), "", dialling(selfClient("Linux")), nil)
+
+	got := find(t, checks, CheckOperatingSystem)
+	if got.Status != StatusFail || !strings.Contains(got.Detail, "macOS only") {
+		t.Fatalf("got %#v", got)
+	}
+	if find(t, checks, CheckAnsible).Status != StatusSkip {
+		t.Fatal("ansible was checked on an unsupported system")
+	}
+}

@@ -28,7 +28,12 @@ type Ansible struct {
 // so the recap is read from what the person already watched rather than from a
 // second run.
 func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Options) (Result, error) {
-	files, err := Generate(plan)
+	base, err := Base(plan.Machine)
+	if err != nil {
+		return Result{}, err
+	}
+
+	files, err := GenerateAt(plan, base)
 	if err != nil {
 		return Result{}, err
 	}
@@ -37,7 +42,7 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	if err != nil {
 		return Result{}, err
 	}
-	if err := a.Client.Upload(ctx, RemoteDir, tarball); err != nil {
+	if err := a.Client.Upload(ctx, base, tarball); err != nil {
 		return Result{}, err
 	}
 
@@ -48,7 +53,7 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	var seen bytes.Buffer
 	watched := io.MultiWriter(&seen, out)
 
-	command := playbookCommand(opts)
+	command := playbookCommand(opts, base)
 	runErr := a.Client.Stream(ctx, command, watched, watched)
 	result := readRecap(seen.String())
 
@@ -78,14 +83,14 @@ func roleDirs(plan packages.MachinePlan) map[string]string {
 	return dirs
 }
 
-func playbookCommand(opts Options) string {
+func playbookCommand(opts Options, base string) string {
 	// Ansible searches a playbook-adjacent directory named roles before the
 	// configured roles_path. Running a copied playbook from a fresh directory
-	// keeps RemoteDir/roles from silently beating RemoteDir/roles.local.
+	// keeps base/roles from silently beating base/roles.local.
 	command := fmt.Sprintf("run=$(mktemp -d) && trap 'rm -rf \"$run\"' EXIT && "+
 		"cp %[1]s/site.yml \"$run/site.yml\" && cd \"$run\" && "+
 		"ANSIBLE_CONFIG=%[1]s/ansible.cfg ansible-playbook -i %[1]s/inventory.ini site.yml",
-		RemoteDir)
+		base)
 	if opts.Check {
 		command += " --check"
 	}

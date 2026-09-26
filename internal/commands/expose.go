@@ -12,6 +12,7 @@ import (
 	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 	"github.com/adevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
@@ -151,11 +152,15 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out interface {
 	Write([]byte) (int, error)
 }) error {
-	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, host, "", client, out)
+	base, err := provision.Base(tgt.machine)
 	if err != nil {
 		return err
 	}
-	address, err := firstAddress(tgt.machine)
+	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, base, host, "", client, out)
+	if err != nil {
+		return err
+	}
+	address, err := firstAddress(tgt.machine, "expose")
 	if err != nil {
 		return err
 	}

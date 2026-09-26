@@ -403,3 +403,21 @@ func TestWriteKeepsABlankLineBeforeWhatFollowsTheBlock(t *testing.T) {
 		t.Fatalf("the host after the block was glued to it:\n%s", read(t, path))
 	}
 }
+
+func TestListSkipsAWorkspaceOnASelfMachine(t *testing.T) {
+	cfg := config.Config{
+		Machines: []config.Machine{
+			{Name: "mac", Self: true},
+		},
+		Workspaces: []config.Workspace{
+			{Name: "alice", Machine: "mac"},
+		},
+	}
+	found, err := List(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("a self machine's workspace produced an alias: %#v", found)
+	}
+}

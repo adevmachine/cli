@@ -1300,3 +1300,130 @@ workspaces:
 		t.Fatal("editing a workspace dropped its routes")
 	}
 }
+
+func TestValidateRefusesAHostsOnASelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true, Hosts: []Host{{Address: "203.0.113.10"}}}}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "hosts") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAUserOnASelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true, User: "root"}}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "user") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAPortOnASelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true, Port: 22}}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "port") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAKeyOnASelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true, Key: "/keys/mac"}}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "key") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesTwoSelfMachines(t *testing.T) {
+	cfg := Config{Machines: []Machine{
+		{Name: "mac1", Self: true},
+		{Name: "mac2", Self: true},
+	}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "mac1") || !strings.Contains(err.Error(), "mac2") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAWorkspaceOnASelfMachineNamedExplicitly(t *testing.T) {
+	cfg := Config{
+		Machines: []Machine{
+			{Name: "mac", Self: true},
+			{Name: "server", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22},
+		},
+		Workspaces: []Workspace{{Name: "alice", Machine: "mac"}},
+	}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "alice") || !strings.Contains(err.Error(), "this computer") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAWorkspaceOnASelfMachineImplicitly(t *testing.T) {
+	cfg := Config{
+		Machines:   []Machine{{Name: "mac", Self: true}},
+		Workspaces: []Workspace{{Name: "alice"}},
+	}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateAcceptsAValidSelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true}}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadDoesNotApplyAddressDefaultsToASelfMachine(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: mac\n    self: true\n")
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Load applied a default that Validate then refuses: %v", err)
+	}
+	m := cfg.Machines[0]
+	if m.User != "" || m.Port != 0 {
+		t.Fatalf("Load applied address defaults to a self machine: %#v", m)
+	}
+}
+
+func TestAddMachineWritesSelfTrueAndNoAddressFields(t *testing.T) {
+	dir := configDirWith(t, `# the machine I bought first
+machines:
+  - name: server
+    hosts: [203.0.113.10]
+`)
+	if err := AddMachine(dir, Machine{Name: "mac", Self: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# the machine I bought first") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+	if strings.Contains(string(body), "hosts:\n    - null") {
+		t.Fatalf("wrote a null hosts entry:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := cfg.Machine("mac")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !added.Self || len(added.Hosts) != 0 || added.User != "" || added.Port != 0 || added.Key != "" {
+		t.Fatalf("got %#v", added)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

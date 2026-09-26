@@ -44,7 +44,7 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 	}
 
 	tgt := target{machine: found.machine, user: d.LinuxUser, workspace: d.Workspace}
-	address, err := firstAddress(found.machine)
+	address, err := firstAddress(found.machine, "login")
 	if err != nil {
 		return err
 	}

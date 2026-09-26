@@ -530,10 +530,10 @@ func TestRolePathFollowsTheOverlay(t *testing.T) {
 	// Anything that needs to name a file inside a package on the machine has
 	// to agree with roles_path. A second copy of this rule, in another
 	// package, is a rule that has to be changed in two places and will not be.
-	if got := RolePath(packages.SourceLocal, "hostinger", "bin/provider"); got != "/opt/devmachine/roles.local/hostinger/bin/provider" {
+	if got := RolePath(RemoteDir, packages.SourceLocal, "hostinger", "bin/provider"); got != "/opt/devmachine/roles.local/hostinger/bin/provider" {
 		t.Fatalf("got %q", got)
 	}
-	if got := RolePath(packages.SourceRelease, "hostinger", "bin/provider"); got != "/opt/devmachine/roles/hostinger/bin/provider" {
+	if got := RolePath(RemoteDir, packages.SourceRelease, "hostinger", "bin/provider"); got != "/opt/devmachine/roles/hostinger/bin/provider" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -694,4 +694,82 @@ func taskHasTag(task map[string]any, want string) bool {
 		return false
 	}
 	return slices.Contains(tags, any(want))
+}
+
+// planSelf resolves a plan for a self machine, so tests can prove the base
+// directory and the macOS guard without touching a real machine.
+func planSelf(t *testing.T, machinePackages []string) packages.MachinePlan {
+	t.Helper()
+	store := storeWithCatalogue(t)
+	machine := config.Machine{Name: "mac", Self: true, Packages: machinePackages}
+	cfg := config.Config{Machines: []config.Machine{machine}, Packages: pin}
+	plan, err := packages.ResolveMachine(store, cfg, machine, "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+func TestGenerateAtWritesTheBaseIntoAnsibleCfgAndThePlaybookCommand(t *testing.T) {
+	plan := planSelf(t, []string{"base"})
+	files, err := GenerateAt(plan, "/Users/alice/.local/share/devmachine/bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := string(files["ansible.cfg"])
+	want := "roles_path = /Users/alice/.local/share/devmachine/bundle/roles.local" +
+		":/Users/alice/.local/share/devmachine/bundle/roles"
+	if !strings.Contains(cfg, want) {
+		t.Fatalf("got:\n%s", cfg)
+	}
+}
+
+func TestGenerateAtSelfSetsBecomeFalse(t *testing.T) {
+	plan := planSelf(t, []string{"base"})
+	files, err := GenerateAt(plan, RemoteDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var plays []struct {
+		Hosts  string `yaml:"hosts"`
+		Become bool   `yaml:"become"`
+	}
+	if err := yaml.Unmarshal(files["site.yml"], &plays); err != nil {
+		t.Fatalf("the playbook is not YAML: %v\n%s", err, files["site.yml"])
+	}
+	if len(plays) != 1 {
+		t.Fatalf("got %d plays", len(plays))
+	}
+	if plays[0].Become {
+		t.Fatalf("a self machine's play still escalates: %v", plays[0])
+	}
+}
+
+func TestGenerateAtSelfRefusesAnywhereButMacOS(t *testing.T) {
+	plan := planSelf(t, []string{"base"})
+	files, err := GenerateAt(plan, RemoteDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	site := string(files["site.yml"])
+	for _, want := range []string{
+		"ansible_facts['system'] != 'Darwin'",
+		"a self machine is converged on macOS only",
+	} {
+		if !strings.Contains(site, want) {
+			t.Fatalf("missing %q in:\n%s", want, site)
+		}
+	}
+}
+
+func TestGenerateAtRemoteMachineHasNoDarwinGuard(t *testing.T) {
+	files, err := GenerateAt(planWith(t, "main", []string{"base"}, nil), RemoteDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["site.yml"]), "Darwin") {
+		t.Fatalf("a remote machine's playbook mentions Darwin:\n%s", files["site.yml"])
+	}
 }

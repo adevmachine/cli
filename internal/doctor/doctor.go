@@ -13,6 +13,7 @@ import (
 	"github.com/adevmachine/cli/internal/dns"
 	"github.com/adevmachine/cli/internal/hostkeys"
 	"github.com/adevmachine/cli/internal/packages"
+	"github.com/adevmachine/cli/internal/provision"
 	"github.com/adevmachine/cli/internal/remote"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -34,6 +35,9 @@ const (
 	CheckConnection      = "connection"
 	CheckOperatingSystem = "operating system"
 	CheckAnsible         = "ansible"
+	// CheckBundle is only reported for a self machine: whether the directory
+	// the bundle is written to exists and can be written.
+	CheckBundle = "bundle"
 	// CheckDNS prefixes one check per installed DNS provider, named
 	// "dns: <provider>".
 	CheckDNS = "dns"
@@ -108,6 +112,14 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 		)
 	}
 
+	if m.Self {
+		return append([]Check{{
+			Name:   CheckConfiguration,
+			Status: StatusPass,
+			Detail: fmt.Sprintf("machine %q, this computer, %d workspace(s)", m.Name, len(cfg.WorkspacesOn(m.Name))),
+		}}, selfChecks(ctx, dir, m, dial, wanted)...)
+	}
+
 	checks := []Check{{
 		Name:   CheckConfiguration,
 		Status: StatusPass,
@@ -134,7 +146,79 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 	})
 	checks = append(checks, remoteChecks(ctx, client)...)
 	checks = append(checks, credentialChecks(ctx, client, wanted)...)
-	return append(checks, dnsChecks(ctx, dir, m.Name, client)...)
+	return append(checks, dnsChecks(ctx, dir, m.Name, baseOf(m), client)...)
+}
+
+// selfChecks is doctor's whole surface for a self machine: no SSH checks —
+// there is no address to check one against — only whether this computer is
+// what a self machine is allowed to be.
+func selfChecks(ctx context.Context, dir string, m config.Machine, dial Dialer, wanted []credentials.Declared) []Check {
+	client, _, err := dial(ctx, m, "")
+	if err != nil {
+		checks := []Check{{Name: CheckOperatingSystem, Status: StatusFail, Detail: err.Error()}}
+		return append(checks, skipRest(selfOrder(wanted), CheckOperatingSystem, "this computer could not be reached")...)
+	}
+	defer client.Close()
+
+	osCheck := selfOSCheck(ctx, client)
+	checks := []Check{osCheck}
+	if osCheck.Status != StatusPass {
+		return append(checks, skipRest(selfOrder(wanted), CheckOperatingSystem, "a self machine is converged on macOS only")...)
+	}
+
+	checks = append(checks, selfAnsibleCheck(ctx, client))
+
+	base := baseOf(m)
+	if base == "" {
+		checks = append(checks, Check{Name: CheckBundle, Status: StatusFail,
+			Detail: "could not find the home directory to write the bundle into"})
+	} else {
+		checks = append(checks, selfBundleCheck(ctx, client, base))
+	}
+
+	checks = append(checks, credentialChecks(ctx, client, wanted)...)
+	return append(checks, dnsChecks(ctx, dir, m.Name, base, client)...)
+}
+
+// baseOf is where the bundle lives on m, empty when it could not be
+// resolved. Doctor reports that rather than failing outright: every other
+// check still has something to say.
+func baseOf(m config.Machine) string {
+	base, err := provision.Base(m)
+	if err != nil {
+		return ""
+	}
+	return base
+}
+
+func selfOSCheck(ctx context.Context, client remote.Client) Check {
+	out, err := client.Run(ctx, "uname -s")
+	if err != nil {
+		return Check{Name: CheckOperatingSystem, Status: StatusFail, Detail: err.Error()}
+	}
+	system := strings.TrimSpace(out)
+	if system != "Darwin" {
+		return Check{Name: CheckOperatingSystem, Status: StatusFail,
+			Detail: fmt.Sprintf("a self machine is converged on macOS only; this is %s", system)}
+	}
+	return Check{Name: CheckOperatingSystem, Status: StatusPass, Detail: "darwin"}
+}
+
+func selfAnsibleCheck(ctx context.Context, client remote.Client) Check {
+	path, err := client.Run(ctx, ansibleCommand)
+	if err != nil {
+		return Check{Name: CheckAnsible, Status: StatusFail,
+			Detail: "ansible-playbook is not on this computer: run `devmachine setup --machine <name>`"}
+	}
+	return Check{Name: CheckAnsible, Status: StatusPass, Detail: strings.TrimSpace(path)}
+}
+
+func selfBundleCheck(ctx context.Context, client remote.Client, base string) Check {
+	probe := fmt.Sprintf(`mkdir -p "%s" && test -w "%s"`, base, base)
+	if _, err := client.Run(ctx, probe); err != nil {
+		return Check{Name: CheckBundle, Status: StatusFail, Detail: err.Error()}
+	}
+	return Check{Name: CheckBundle, Status: StatusPass, Detail: base}
 }
 
 func loadAndValidate(dir string) (config.Config, error) {
@@ -151,6 +235,16 @@ func loadAndValidate(dir string) (config.Config, error) {
 // name of.
 func order(wanted []credentials.Declared) []string {
 	out := []string{CheckConfiguration, CheckHostKey, CheckConnection, CheckOperatingSystem, CheckAnsible}
+	for _, d := range wanted {
+		out = append(out, CredentialCheck(d))
+	}
+	return out
+}
+
+// selfOrder is order for a self machine: no SSH checks, and CheckBundle
+// instead of nothing.
+func selfOrder(wanted []credentials.Declared) []string {
+	out := []string{CheckOperatingSystem, CheckAnsible, CheckBundle}
 	for _, d := range wanted {
 		out = append(out, CredentialCheck(d))
 	}
@@ -297,8 +391,8 @@ func dnsCheckName(provider string) string { return CheckDNS + ": " + provider }
 //
 // A machine with no DNS provider installed reports nothing here — not
 // installing one is a choice, not a fault.
-func dnsChecks(ctx context.Context, dir, machine string, client remote.Client) []Check {
-	providers, err := dns.Installed(dir, machine, client)
+func dnsChecks(ctx context.Context, dir, machine, base string, client remote.Client) []Check {
+	providers, err := dns.Installed(dir, machine, base, client)
 	if err != nil {
 		return []Check{{Name: CheckDNS, Status: StatusFail, Detail: err.Error()}}
 	}

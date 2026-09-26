@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -270,3 +272,25 @@ func TestApplyWithNoWriterStillRuns(t *testing.T) {
 
 // An Ansible is a Provisioner. The interface exists so a caller can hold one.
 var _ Provisioner = (*Ansible)(nil)
+
+func TestApplyUsesTheSelfBaseForASelfMachine(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(home, ".local", "share", "devmachine", "bundle")
+
+	c := &fakeClient{output: okRecap}
+	a := &Ansible{Client: c}
+
+	if _, err := a.Apply(context.Background(), planSelf(t, []string{"base"}), Options{Out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := c.uploaded[want]; !ok {
+		t.Fatalf("nothing was sent to %s: %v", want, c.uploaded)
+	}
+	if !strings.Contains(c.commands[0], want) {
+		t.Fatalf("the playbook command does not use %s: %q", want, c.commands[0])
+	}
+}

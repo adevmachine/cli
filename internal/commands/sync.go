@@ -62,6 +62,12 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 	if err != nil {
 		return err
 	}
+	if machine.Self {
+		if _, err := lookPath("ansible-playbook"); err != nil {
+			return fmt.Errorf(
+				"ansible-playbook is not on this computer: run `devmachine setup --machine %s`", machine.Name)
+		}
+	}
 
 	store, err := openStore(cmd.Context(), dir, cfg.Packages)
 	if err != nil {
