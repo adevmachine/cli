@@ -1,0 +1,26 @@
+docs/concepts/publishing.md
+  s_a0cbf6c120c4f8::t_3c3039316af3ed 40-46
+docs/how-it-works/published-sites.md
+  s_a0cbf6c120c4f8::t_5c0d4277ba1799 1-43
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_9ac6107bc25f0e 353-385
+  s_a0cbf6c120c4f8::t_901434d28f84f5 135-137
+docs/index.md
+  s_a0cbf6c120c4f8::t_1f8238b9658468 64-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "404993cd373d070b0f5c9e807cd4e2174ca118c1",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
