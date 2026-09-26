@@ -1,0 +1,27 @@
+internal/provision/testdata/generate/site.yml
+  s_a0cbf6c120c4f8::t_3a2a504d3434cc 156-172
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_d34ee4eaa1e352 544-584,586,588-600
+  s_a0cbf6c120c4f8::t_df1a88e79e15da 10,14
+  s_a0cbf6c120c4f8::t_40b5131ce9f7b7 53,58-72
+  s_a0cbf6c120c4f8::t_071254fcc6e0e9 585,587
+  s_a0cbf6c120c4f8::t_db6bc54207c486 250
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_c35ecf885cf69d 643-690
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dde2789b5739105daa3341c20dfd3b32b1aff5be",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
