@@ -1,0 +1,22 @@
+internal/expose/expose_test.go
+  s_a0cbf6c120c4f8::t_9715231bc35181 49-88
+internal/expose/expose.go
+  s_a0cbf6c120c4f8::t_8d241aa56df55c 6-7
+  s_a0cbf6c120c4f8::t_cbfcbf0d0a5607 44-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e95dc50d8d2ee712919bb408bb3351c0b427bea2",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
