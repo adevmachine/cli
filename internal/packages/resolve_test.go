@@ -270,3 +270,43 @@ func TestResolveCarriesTheCredentialAnswersTheWorkspaceEndsUpWith(t *testing.T) 
 		t.Fatalf("bob asked for his own: %q", got)
 	}
 }
+
+func TestResolveMachineGathersRoutesAndTheirDirectory(t *testing.T) {
+	store := storeWith(t, map[string]string{
+		"caddy":     "format: 1\nname: caddy\nscope: machine\nsummary: x\nprovides:\n  sites.d: /etc/caddy/sites.d\n",
+		"workspace": "format: 1\nname: workspace\nscope: workspace\nsummary: x\n",
+	})
+	cfg := config.Config{
+		Machines: []config.Machine{{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}, Packages: []string{"caddy"}}},
+		Workspaces: []config.Workspace{
+			{Name: "alice", Machine: "main", Packages: []string{"workspace"},
+				Routes: []config.Route{{Host: "app.example.com", Port: 8080}}},
+			{Name: "bob", Machine: "main", Packages: []string{"workspace"}},
+		},
+	}
+	plan, err := ResolveMachine(store, cfg, cfg.Machines[0], "9.9.9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.SitesDir != "/etc/caddy/sites.d" {
+		t.Fatalf("sites dir %q", plan.SitesDir)
+	}
+	if len(plan.Routes) != 1 || plan.Routes[0].Workspace != "alice" || plan.Routes[0].Port != 8080 {
+		t.Fatalf("%+v", plan.Routes)
+	}
+}
+
+func TestResolveMachineRefusesRoutesWithoutCaddy(t *testing.T) {
+	store := storeWith(t, map[string]string{
+		"workspace": "format: 1\nname: workspace\nscope: workspace\nsummary: x\n",
+	})
+	cfg := config.Config{
+		Machines: []config.Machine{{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}}},
+		Workspaces: []config.Workspace{{Name: "alice", Machine: "main", Packages: []string{"workspace"},
+			Routes: []config.Route{{Host: "app.example.com", Port: 8080}}}},
+	}
+	_, err := ResolveMachine(store, cfg, cfg.Machines[0], "9.9.9")
+	if err == nil || !strings.Contains(err.Error(), "caddy") || !strings.Contains(err.Error(), "app.example.com") {
+		t.Fatalf("routes without caddy must be refused and name both, got %v", err)
+	}
+}

@@ -52,6 +52,19 @@ type MachinePlan struct {
 	OnMachine  Resolved
 	Workspaces []Resolved
 	Extensions []Extension
+	// Routes is every route of every workspace on this machine, in workspace
+	// order, and SitesDir is where caddy takes them. SitesDir is empty when
+	// caddy is not on the machine, and then Routes is empty too, because
+	// ResolveMachine refuses a route with nowhere to go.
+	Routes   []Route
+	SitesDir string
+}
+
+// Route is a workspace's port answering to a public host.
+type Route struct {
+	Workspace string `json:"workspace"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
 }
 
 // ResolveMachine works out the machine's own packages, each of its
@@ -85,7 +98,31 @@ func ResolveMachine(store *Store, cfg config.Config, machine config.Machine, cli
 		return plan, err
 	}
 	plan.Extensions = extensions
+
+	plan.SitesDir = sitesDirOf(plan)
+	for _, w := range cfg.WorkspacesOn(machine.Name) {
+		for _, r := range w.Routes {
+			if plan.SitesDir == "" {
+				return MachinePlan{}, fmt.Errorf(
+					"workspace %q publishes %s, but caddy is not on machine %q: "+
+						"add it with `devmachine packages add caddy --machine %s`",
+					w.Name, r.Host, machine.Name, machine.Name)
+			}
+			plan.Routes = append(plan.Routes, Route{Workspace: w.Name, Host: r.Host, Port: r.Port})
+		}
+	}
 	return plan, nil
+}
+
+// sitesDirOf finds the absolute path caddy provides for sites, empty when
+// caddy is not on the machine.
+func sitesDirOf(plan MachinePlan) string {
+	for _, f := range plan.OnMachine.Ordered {
+		if f.Manifest.Name == "caddy" {
+			return f.Manifest.Provides["sites.d"]
+		}
+	}
+	return ""
 }
 
 // resolveTarget expands one target's list through `needs` and orders it.
