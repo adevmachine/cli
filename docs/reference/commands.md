@@ -494,8 +494,16 @@ minutes later, in Caddy's certificate log, where nobody is looking — this is
 why the record is offered here rather than left for `dns add` to be
 remembered separately.
 
-`list` reads `sites.d` on the machine and prints every host, its port and the
-workspace it belongs to. `rm` takes the site out of the configuration; the
+`list` reads the configuration and the machine and prints every host with
+its port, its workspace and one of four words. `published` means both agree.
+`pending` means the configuration has it and the machine does not: run
+`sync`. `differs` means the machine has another port or owner for it: run
+`sync`. `unmanaged` means only the machine has it — a site written before
+this CLI recorded routes, or by hand — and it is gone on a rebuild; the row
+prints the `expose add` that adopts it. With the machine unreachable, the
+configuration's rows print as `unknown` rather than being guessed.
+
+`rm` takes the site out of the configuration; the
 next `sync` removes its block and reloads Caddy. A host the configuration
 does not have is refused with the two ways out: adopt it with `add`, or
 remove the file on the machine by hand — `rm` never deletes what it does not

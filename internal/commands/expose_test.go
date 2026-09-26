@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/adevmachine/cli/internal/config"
+	"github.com/adevmachine/cli/internal/expose"
 	"github.com/adevmachine/cli/internal/packages"
 	"github.com/adevmachine/cli/internal/remote"
 )
@@ -229,19 +230,72 @@ func TestExposeAddRefusesAHostThatWouldEscapeTheFileName(t *testing.T) {
 	}
 }
 
-func TestExposeListReadsWhatIsThere(t *testing.T) {
+func TestExposeListReportsEveryDisagreement(t *testing.T) {
 	client := &exposeClient{files: map[string]string{
-		"app.example.com.caddy": "app.example.com {\n\treverse_proxy 127.0.0.1:8080\n}\n# workspace: alice\n",
+		"alice-routes.caddy":    expose.RenderWorkspace("alice", []expose.Site{{Host: "app.example.com", Port: 8080}}),
+		"old.example.com.caddy": expose.Render(expose.Site{Host: "old.example.com", Port: 3000, Workspace: "bob"}),
+		"bob-routes.caddy":      expose.RenderWorkspace("bob", []expose.Site{{Host: "moved.example.com", Port: 1}}),
 	}}
 	dialExpose(t, client)
-	dir := configWithCaddy(t)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}, {host: new.example.com, port: 8082}]\n"+
+		"  - name: bob\n    routes: [{host: moved.example.com, port: 2}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "expose", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []site
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatal(err, out)
+	}
+	got := map[string]site{}
+	for _, r := range rows {
+		got[r.Host] = r
+	}
+	if got["app.example.com"].Status != "published" {
+		t.Fatalf("%+v", got["app.example.com"])
+	}
+	if r := got["new.example.com"]; r.Status != "pending" || !strings.Contains(r.Note, "devmachine sync") {
+		t.Fatalf("%+v", r)
+	}
+	if r := got["old.example.com"]; r.Status != "unmanaged" || !strings.Contains(r.Note, "expose add bob 3000 --host old.example.com") {
+		t.Fatalf("%+v", r)
+	}
+	if r := got["moved.example.com"]; r.Status != "differs" || !strings.Contains(r.Note, "machine has port 1") {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestExposeListWithTheMachineDownStillListsTheConfiguration(t *testing.T) {
+	orig := dial
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("no route to host")
+	}
+	t.Cleanup(func() { dial = orig })
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
 
 	out, err := execute(t, "--config", dir, "expose", "list")
 	if err != nil {
-		t.Fatalf("expose list returned %v", err)
+		t.Fatal(err)
 	}
-	if !strings.Contains(out, "app.example.com") || !strings.Contains(out, "8080") {
-		t.Fatalf("got %q", out)
+	if !strings.Contains(out, "app.example.com") || !strings.Contains(out, "unknown") {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestExposeListSaysNothingWhenBothSidesAreEmpty(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWithCaddy(t)
+	out, err := execute(t, "--config", dir, "expose", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Nothing is published") {
+		t.Fatalf("%q", out)
 	}
 }
 

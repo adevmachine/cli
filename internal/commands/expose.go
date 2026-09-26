@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -169,42 +168,20 @@ type site struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
 	Workspace string `json:"workspace,omitempty"`
-}
-
-var reHost = regexp.MustCompile(`(?m)^([^\s{#]+)\s*\{`)
-var rePort = regexp.MustCompile(`reverse_proxy 127\.0\.0\.1:(\d+)`)
-var reWorkspace = regexp.MustCompile(`(?m)^#\s*workspace:\s*(\S+)`)
-
-// parseSites reads every *.caddy file `expose` wrote out of sites.d's
-// concatenated content — one file per site, so a block's own braces mark
-// where the next one starts.
-func parseSites(blocks []string) []site {
-	var out []site
-	for _, block := range blocks {
-		hm := reHost.FindStringSubmatch(block)
-		pm := rePort.FindStringSubmatch(block)
-		if hm == nil || pm == nil {
-			continue
-		}
-		s := site{Host: hm[1]}
-		s.Port, _ = strconv.Atoi(pm[1])
-		if wm := reWorkspace.FindStringSubmatch(block); wm != nil {
-			s.Workspace = wm[1]
-		}
-		out = append(out, s)
-	}
-	return out
+	// Status is one of: published, pending, unmanaged, differs, unknown.
+	Status string `json:"status"`
+	Note   string `json:"note,omitempty"`
 }
 
 // listSites reads sites.d and returns every site written there. A machine
 // with no caddy, or with an empty sites.d, reports zero sites rather than an
 // error: an empty list is a fine answer to "what is published".
-func listSites(ctx context.Context, client remote.Client, sitesDir string) ([]site, error) {
+func listSites(ctx context.Context, client remote.Client, sitesDir string) ([]expose.Site, error) {
 	listing, err := client.Run(ctx, fmt.Sprintf("ls -1 %s 2>/dev/null", sitesDir))
 	if err != nil {
 		return nil, fmt.Errorf("listing %s: %w", sitesDir, err)
 	}
-	var blocks []string
+	var sites []expose.Site
 	for _, name := range strings.Split(strings.TrimSpace(listing), "\n") {
 		name = strings.TrimSpace(name)
 		if name == "" || !strings.HasSuffix(name, ".caddy") {
@@ -214,15 +191,73 @@ func listSites(ctx context.Context, client remote.Client, sitesDir string) ([]si
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", name, err)
 		}
-		blocks = append(blocks, content)
+		sites = append(sites, expose.Parse(content)...)
 	}
-	return parseSites(blocks), nil
+	return sites, nil
+}
+
+// reconcile lines the configuration up against the machine, by host.
+//
+// Reachable and empty are different answers: the machine side is nil when it
+// could not be asked, and then nothing is "pending", it is "unknown".
+func reconcile(cfg config.Config, machine string, onMachine []expose.Site, reachable bool) []site {
+	seen := map[string]bool{}
+	var rows []site
+	for _, w := range cfg.WorkspacesOn(machine) {
+		for _, r := range w.Routes {
+			seen[r.Host] = true
+			row := site{Host: r.Host, Port: r.Port, Workspace: w.Name}
+			switch {
+			case !reachable:
+				row.Status = "unknown"
+				row.Note = "the machine could not be asked"
+			default:
+				found, ok := find(onMachine, r.Host)
+				switch {
+				case !ok:
+					row.Status = "pending"
+					row.Note = "not on the machine yet: run `devmachine sync`"
+				case found.Port != r.Port || found.Workspace != w.Name:
+					row.Status = "differs"
+					row.Note = fmt.Sprintf("the machine has port %d for %s: run `devmachine sync`", found.Port, orDash(found.Workspace))
+				default:
+					row.Status = "published"
+				}
+			}
+			rows = append(rows, row)
+		}
+	}
+	for _, s := range onMachine {
+		if seen[s.Host] {
+			continue
+		}
+		rows = append(rows, site{Host: s.Host, Port: s.Port, Workspace: s.Workspace, Status: "unmanaged",
+			Note: fmt.Sprintf("only on the machine, and gone on a rebuild: adopt it with `devmachine expose add %s %d --host %s`",
+				orDash(s.Workspace), s.Port, s.Host)})
+	}
+	return rows
+}
+
+func find(sites []expose.Site, host string) (expose.Site, bool) {
+	for _, s := range sites {
+		if s.Host == host {
+			return s, true
+		}
+	}
+	return expose.Site{}, false
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 func newExposeListCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "Every site currently published through Caddy",
+		Short: "Every site the configuration and the machine agree, or disagree, about",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tgt, err := machineTarget(opts)
@@ -241,30 +276,30 @@ func newExposeListCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			var rows []site
 			client, _, err := dial(cmd.Context(), tgt.machine, "")
 			if err != nil {
-				return err
-			}
-			defer client.Close()
-
-			sites, err := listSites(cmd.Context(), client, sitesDir)
-			if err != nil {
-				return err
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v)\n", tgt.machine.Name, err)
+				rows = reconcile(cfg, tgt.machine.Name, nil, false)
+			} else {
+				defer client.Close()
+				sites, err := listSites(cmd.Context(), client, sitesDir)
+				if err != nil {
+					return err
+				}
+				rows = reconcile(cfg, tgt.machine.Name, sites, true)
 			}
 
 			if opts.format == formatJSON {
-				return writeJSON(cmd.OutOrStdout(), sites)
+				return writeJSON(cmd.OutOrStdout(), rows)
 			}
-			if len(sites) == 0 {
+			if len(rows) == 0 {
 				cmd.Println("Nothing is published.")
 				return nil
 			}
-			for _, s := range sites {
-				workspace := s.Workspace
-				if workspace == "" {
-					workspace = "-"
-				}
-				cmd.Printf("%-28s %-6d %s\n", s.Host, s.Port, workspace)
+			for _, r := range rows {
+				cmd.Printf("%-28s %-6d %-10s %-10s %s\n", r.Host, r.Port, orDash(r.Workspace), r.Status, r.Note)
 			}
 			return nil
 		},
