@@ -175,6 +175,10 @@ devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
 ```
 
+`list --format json` prints each machine with `name`, `hosts`, `admin_user`,
+`port`, `key` and `workspaces`, and `self: true` on the one that is this
+computer — how a program finds the machine to run something locally.
+
 `setup` writes the first machine; `add` writes every one after it. It asks the
 same questions, minus the domain, and runs the same bootstrap: the key first, a
 password only if the key is refused, the proof on a connection of its own, then
@@ -422,7 +426,7 @@ enabled in the system process itself.
 
 ```
 devmachine run "<command>" [--workspace w]
-devmachine run --package <name> -- <command> [args...]
+devmachine run --package <name> [--workspace w] -- <command> [args...]
 ```
 
 Runs one command and prints its output. Without `--workspace` it runs as the
@@ -437,9 +441,11 @@ the generic door onto a machine: it removes the need to know an address, an
 account, a port or a key, and it does not limit what a shell can do.
 `commands:` in the package's manifest is what limits, and only for a package
 that asked to be limited — `run --package` refuses anything the manifest does
-not list, and says what it does accept. `--package` and `--workspace` name
-two different targets and cannot be combined. See [how a package declares an
-entrypoint](../concepts/packages.md).
+not list, and says what it does accept. With `--workspace`, the entrypoint
+runs as that workspace's own account on the machine it lives on, instead of
+the machine's admin — how a package offers a command that has to read that
+account's own files or use its own logins, such as a per-workspace GitHub
+login. See [how a package declares an entrypoint](../concepts/packages.md).
 
 ## dns
 

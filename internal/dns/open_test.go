@@ -97,6 +97,28 @@ func configDirWith(t *testing.T, specs ...pkgSpec) string {
 	return dir
 }
 
+// configDirWithForWorkspace is configDirWith, but the lock says the package
+// is installed for a workspace rather than for the machine.
+func configDirWithForWorkspace(t *testing.T, workspace string, specs ...pkgSpec) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	entries := make([]packages.LockEntry, 0, len(specs))
+	for _, spec := range specs {
+		writeManifest(t, dir, spec)
+		entries = append(entries, packages.LockEntry{Name: spec.name, Source: packages.SourceLocal})
+	}
+
+	lock := packages.Lock{
+		AppliedAt:  time.Now().UTC().Format(time.RFC3339),
+		Workspaces: map[string][]packages.LockEntry{workspace: entries},
+	}
+	if err := packages.SaveLock(dir, lock); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // configDirWithCachedButNotInstalled writes a package's manifest into the
 // store without locking it onto any machine: the cache holds every recipe in
 // the release, and only the lock says what was actually applied.
@@ -317,7 +339,7 @@ func TestChooseWithNoMachineReachableIsManualAndNotAnError(t *testing.T) {
 func TestAnyBuildsAPackageOfAnyKind(t *testing.T) {
 	dir := configDirWith(t, providerPackage("cloudflare", "dns"))
 
-	got, err := Any(dir, "main", provision.RemoteDir, "cloudflare", &recordingClient{})
+	got, err := Any(dir, "main", "", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +351,7 @@ func TestAnyBuildsAPackageOfAnyKind(t *testing.T) {
 func TestAnyRefusesAPackageWithNoEntrypoint(t *testing.T) {
 	dir := configDirWith(t, plainPackage("docker"))
 
-	_, err := Any(dir, "main", provision.RemoteDir, "docker", &recordingClient{})
+	_, err := Any(dir, "main", "", provision.RemoteDir, "docker", &recordingClient{})
 	if err == nil {
 		t.Fatal("a package with no entrypoint was called")
 	}
@@ -338,8 +360,20 @@ func TestAnyRefusesAPackageWithNoEntrypoint(t *testing.T) {
 	}
 }
 
+func TestAnyFindsAPackageInstalledForAWorkspace(t *testing.T) {
+	dir := configDirWithForWorkspace(t, "alice", providerPackage("cloudflare", "dns"))
+
+	got, err := Any(dir, "main", "alice", provision.RemoteDir, "cloudflare", &recordingClient{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name() != "cloudflare" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
 func TestAnySaysHowToInstallAPackageThatIsNotThere(t *testing.T) {
-	_, err := Any(configDirWith(t), "main", provision.RemoteDir, "cloudflare", &recordingClient{})
+	_, err := Any(configDirWith(t), "main", "", provision.RemoteDir, "cloudflare", &recordingClient{})
 	if err == nil {
 		t.Fatal("a package that is not installed was used")
 	}

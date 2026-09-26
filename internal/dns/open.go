@@ -75,28 +75,30 @@ func Installed(dir, machine, base string, client remote.Client) ([]*External, er
 	return out, nil
 }
 
-// lookupInstalled finds a single package this machine's lock says is
-// installed, whatever its kind.
+// lookupInstalled finds a single package the lock says is installed on this
+// machine, or for this workspace, whatever the package's kind.
 //
 // Unlike Installed, it reports rather than skips: somebody who named a
-// package wants to know why it did not work, not silence.
-func lookupInstalled(dir, machine, name string) (packages.Found, error) {
+// package wants to know why it did not work, not silence. workspace is
+// empty for a lookup that only ever means the machine.
+func lookupInstalled(dir, machine, workspace, name string) (packages.Found, error) {
 	lock, err := packages.LoadLock(dir)
 	if err != nil {
 		return packages.Found{}, err
 	}
 
-	installed := false
-	for _, entry := range lock.Machines[machine] {
-		if entry.Name == name {
-			installed = true
-			break
-		}
+	installed := lockHas(lock.Machines[machine], name)
+	if !installed && workspace != "" {
+		installed = lockHas(lock.Workspaces[workspace], name)
 	}
 	if !installed {
+		where := machine
+		if workspace != "" {
+			where = fmt.Sprintf("%s or workspace %s", machine, workspace)
+		}
 		return packages.Found{}, fmt.Errorf(
 			"%s is not installed on %s. Add it with `devmachine packages add %s` and apply with `devmachine sync`",
-			name, machine, name)
+			name, where, name)
 	}
 
 	store, err := packages.Open(context.Background(), dir, lock.Release)
@@ -106,9 +108,19 @@ func lookupInstalled(dir, machine, name string) (packages.Found, error) {
 	return store.Get(name)
 }
 
+// lockHas is whether the lock names this package among these entries.
+func lockHas(entries []packages.LockEntry, name string) bool {
+	for _, entry := range entries {
+		if entry.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // One builds a single installed DNS provider by name.
 func One(dir, machine, base, name string, client remote.Client) (*External, error) {
-	found, err := lookupInstalled(dir, machine, name)
+	found, err := lookupInstalled(dir, machine, "", name)
 	if err != nil {
 		return nil, err
 	}
@@ -123,8 +135,10 @@ func One(dir, machine, base, name string, client remote.Client) (*External, erro
 // One refuses anything that is not a DNS provider, which is right for a
 // command that only makes sense against one. `run --package` reaches any
 // package that declares an entrypoint, and this is the door for that.
-func Any(dir, machine, base, name string, client remote.Client) (*External, error) {
-	found, err := lookupInstalled(dir, machine, name)
+// workspace is empty for a machine-only lookup, or a workspace name so a
+// package installed for that workspace alone is also found.
+func Any(dir, machine, workspace, base, name string, client remote.Client) (*External, error) {
+	found, err := lookupInstalled(dir, machine, workspace, name)
 	if err != nil {
 		return nil, err
 	}

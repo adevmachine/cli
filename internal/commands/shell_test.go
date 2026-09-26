@@ -343,13 +343,79 @@ func TestRunPackageReachesTheEntrypoint(t *testing.T) {
 	}
 }
 
-func TestRunRefusesTwoTargets(t *testing.T) {
-	dialing(t, fakeRemote{})
-	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nworkspaces:\n  - name: alice\n")
+func TestRunPackageWithWorkspaceDialsAsTheWorkspacesAccount(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\n    machine: main\n")
+	writeDNSPackage(t, dir, "cloudflare", nil, `import sys; print("saw " + " ".join(sys.argv[1:]))`)
+	lockOnto(t, dir, "main", "cloudflare")
+	calls := dialLocalCapturing(t, dir)
 
-	_, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--workspace", "alice", "--", "ls")
+	out, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--workspace", "alice", "--", "zones", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "saw zones list") {
+		t.Fatalf("the entrypoint did not get the args after --: %q", out)
+	}
+
+	if len(*calls) != 1 {
+		t.Fatalf("expected one dial, got %#v", *calls)
+	}
+	if got := (*calls)[0]; got.machine != "main" || got.user != "alice" {
+		t.Fatalf("dialed %#v, want main as alice", got)
+	}
+}
+
+func TestRunPackageFindsOnePackageInstalledForTheWorkspace(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\n    machine: main\n")
+	writeDNSPackage(t, dir, "cloudflare", nil, `print("hello from the workspace package")`)
+	lockOntoWorkspace(t, dir, "alice", "cloudflare")
+	dialLocal(t, dir)
+
+	out, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--workspace", "alice", "--", "zones")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "hello from the workspace package") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestRunPackageWithoutWorkspaceDialsAsTheMachinesAdmin(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `print("hello from the package")`)
+	calls := dialLocalCapturing(t, dir)
+
+	if _, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--", "zones"); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(*calls) != 1 {
+		t.Fatalf("expected one dial, got %#v", *calls)
+	}
+	if got := (*calls)[0]; got.machine != "main" || got.user != "" {
+		t.Fatalf("dialed %#v, want main as the admin (empty user)", got)
+	}
+}
+
+func TestRunPackageWithAnUnknownWorkspaceErrorsWithoutDialing(t *testing.T) {
+	dialed := false
+	orig := dial
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		dialed = true
+		return nil, "", nil
+	}
+	t.Cleanup(func() { dial = orig })
+
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\n    machine: main\n")
+
+	_, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--workspace", "carol", "--", "zones")
 	if err == nil {
-		t.Fatal("two targets were accepted")
+		t.Fatal("expected an error for an unknown workspace")
+	}
+	if dialed {
+		t.Fatal("it dialed before resolving the workspace")
 	}
 }
 

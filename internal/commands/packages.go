@@ -59,7 +59,7 @@ func newPackagesHelpCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ext, err := dns.Any(dir, tgt.machine.Name, base, name, client)
+			ext, err := dns.Any(dir, tgt.machine.Name, "", base, name, client)
 			if err != nil {
 				return err
 			}

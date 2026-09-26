@@ -75,6 +75,27 @@ func dialLocal(t *testing.T, configDir string) {
 	t.Cleanup(func() { dial = orig })
 }
 
+// dialCall is what one dial invocation was asked to reach.
+type dialCall struct {
+	machine string
+	user    string
+}
+
+// dialLocalCapturing is dialLocal, but it also records the machine and user
+// each call was made with, so a test can prove who a package's entrypoint
+// ran as.
+func dialLocalCapturing(t *testing.T, configDir string) *[]dialCall {
+	t.Helper()
+	var calls []dialCall
+	orig := dial
+	dial = func(_ context.Context, m config.Machine, user string) (remote.Client, string, error) {
+		calls = append(calls, dialCall{machine: m.Name, user: user})
+		return localClient{root: packages.LocalDir(configDir)}, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { dial = orig })
+	return &calls
+}
+
 // lockOnto writes a lock that says these packages are installed on machine,
 // the same state `devmachine sync` leaves behind.
 func lockOnto(t *testing.T, configDir, machine string, names ...string) {
@@ -86,6 +107,23 @@ func lockOnto(t *testing.T, configDir, machine string, names ...string) {
 	lock := packages.Lock{
 		AppliedAt: time.Now().UTC().Format(time.RFC3339),
 		Machines:  map[string][]packages.LockEntry{machine: entries},
+	}
+	if err := packages.SaveLock(configDir, lock); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// lockOntoWorkspace writes a lock that says these packages are installed for
+// a workspace specifically, rather than for the whole machine.
+func lockOntoWorkspace(t *testing.T, configDir, workspace string, names ...string) {
+	t.Helper()
+	entries := make([]packages.LockEntry, len(names))
+	for i, n := range names {
+		entries[i] = packages.LockEntry{Name: n, Source: packages.SourceLocal}
+	}
+	lock := packages.Lock{
+		AppliedAt:  time.Now().UTC().Format(time.RFC3339),
+		Workspaces: map[string][]packages.LockEntry{workspace: entries},
 	}
 	if err := packages.SaveLock(configDir, lock); err != nil {
 		t.Fatal(err)

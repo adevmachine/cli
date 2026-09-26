@@ -3,7 +3,6 @@ package commands
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -182,7 +181,10 @@ func newRunCmd(opts *options) *cobra.Command {
 			"This is the generic door onto a machine — it removes the need to " +
 			"know an address, an account, a port or a key, and it does not " +
 			"limit what a shell can do. `commands:` in the package's manifest " +
-			"is what limits, and only for a package that asked to be limited.",
+			"is what limits, and only for a package that asked to be limited. " +
+			"Add --workspace and the entrypoint runs as that workspace's own " +
+			"account instead of the machine's admin — for a command that has " +
+			"to read that account's own files or use its own logins.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if pkg != "" {
 				return nil
@@ -191,11 +193,7 @@ func newRunCmd(opts *options) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if pkg != "" {
-				if workspace != "" {
-					return errors.New(
-						"--package and --workspace name two different targets: pass one of them, not both")
-				}
-				return runPackage(cmd, opts, pkg, args)
+				return runPackage(cmd, opts, pkg, workspace, args)
 			}
 
 			tgt, err := workspaceTarget(opts, workspace)
@@ -227,14 +225,19 @@ func newRunCmd(opts *options) *cobra.Command {
 // runPackage reaches an installed package's entrypoint directly: the generic
 // door for whatever `dns`, `packages` and the rest have not grown a verb for
 // yet.
-func runPackage(cmd *cobra.Command, opts *options, name string, args []string) error {
+//
+// With no workspace it runs as the machine's admin. With one, it runs as
+// that workspace's own Linux account on the machine the workspace lives on —
+// what a package needs to read that account's own files or use its own
+// logins, such as a per-workspace GitHub login.
+func runPackage(cmd *cobra.Command, opts *options, name, workspace string, args []string) error {
 	dashAt := cmd.ArgsLenAtDash()
 	if dashAt < 0 {
 		return fmt.Errorf("say what to run after `--`, for example: devmachine run --package %s -- <command>", name)
 	}
 	pkgArgs := args[dashAt:]
 
-	tgt, err := machineTarget(opts)
+	tgt, err := workspaceTarget(opts, workspace)
 	if err != nil {
 		return err
 	}
@@ -242,7 +245,7 @@ func runPackage(cmd *cobra.Command, opts *options, name string, args []string) e
 	if err != nil {
 		return err
 	}
-	client, _, err := dial(cmd.Context(), tgt.machine, "")
+	client, _, err := dial(cmd.Context(), tgt.machine, tgt.user)
 	if err != nil {
 		return err
 	}
@@ -252,7 +255,7 @@ func runPackage(cmd *cobra.Command, opts *options, name string, args []string) e
 	if err != nil {
 		return err
 	}
-	ext, err := dns.Any(dir, tgt.machine.Name, base, name, client)
+	ext, err := dns.Any(dir, tgt.machine.Name, tgt.workspace, base, name, client)
 	if err != nil {
 		return err
 	}
