@@ -109,6 +109,13 @@ type Machine struct {
 	KnownHostsFile string `yaml:"-"`
 }
 
+// Route is one public hostname a workspace's port answers to. Caddy holds the
+// block; DNS holds the name; this holds the fact that both should exist.
+type Route struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
 // Workspace is an environment: one Linux user on one machine.
 type Workspace struct {
 	Name string `yaml:"name"`
@@ -126,6 +133,9 @@ type Workspace struct {
 	// Credentials is this workspace's own answer, and it overrides the
 	// configuration's.
 	Credentials map[string]string `yaml:"credentials,omitempty"`
+	// Routes are the sites `expose` published for this workspace. sync writes
+	// them; nothing else does.
+	Routes []Route `yaml:"routes,omitempty"`
 }
 
 // LinuxUser is the account this workspace owns on its machine.
@@ -301,6 +311,18 @@ func (c Config) WorkspacesOn(machine string) []Workspace {
 	return out
 }
 
+// RouteOwner finds the workspace and route that publish a host.
+func (c Config) RouteOwner(host string) (Workspace, Route, bool) {
+	for _, w := range c.Workspaces {
+		for _, r := range w.Routes {
+			if r.Host == host {
+				return w, r, true
+			}
+		}
+	}
+	return Workspace{}, Route{}, false
+}
+
 // Validate reports the first thing that makes the configuration unusable, in
 // words that say what to change.
 func (c Config) Validate() error {
@@ -337,6 +359,7 @@ func (c Config) Validate() error {
 	}
 
 	names := map[string]bool{}
+	hosts := map[string]string{}
 	for i, w := range c.Workspaces {
 		switch {
 		case w.Name == "":
@@ -358,6 +381,17 @@ func (c Config) Validate() error {
 		}
 		if err := validateCredentials("workspace", w.Name, w.Credentials); err != nil {
 			return err
+		}
+		for _, r := range w.Routes {
+			switch {
+			case !UsableHost(r.Host):
+				return fmt.Errorf("workspace %q publishes %q, which is not a usable hostname", w.Name, r.Host)
+			case r.Port < 1 || r.Port > 65535:
+				return fmt.Errorf("workspace %q publishes %s on port %d: use a port between 1 and 65535", w.Name, r.Host, r.Port)
+			case hosts[r.Host] != "":
+				return fmt.Errorf("%s is published twice, by %q and %q: one hostname reaches one port", r.Host, hosts[r.Host], w.Name)
+			}
+			hosts[r.Host] = w.Name
 		}
 		names[w.Name] = true
 	}
@@ -443,6 +477,13 @@ func validateCredentials(kind, target string, preferences map[string]string) err
 var releaseTag = regexp.MustCompile(`^v[0-9][0-9A-Za-z.\-]*$`)
 
 var machineIdentityName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// UsableHost is the one rule for a hostname that becomes a file name on a
+// machine: nothing in it may walk the file system.
+func UsableHost(host string) bool {
+	return host != "" && !strings.Contains(host, "/") && !strings.Contains(host, "..") &&
+		!strings.ContainsAny(host, " \t\n")
+}
 
 func firstDuplicate(names []string) (string, bool) {
 	seen := map[string]bool{}
@@ -890,7 +931,90 @@ func workspaceNode(w Workspace) (*yaml.Node, error) {
 	setField(node, "user", stringNode(w.User))
 	setField(node, "packages", sequenceNode(w.Packages))
 	setField(node, "settings", settings)
+	setField(node, "routes", routesNode(w.Routes))
 	return node, nil
+}
+
+func routesNode(routes []Route) *yaml.Node {
+	if len(routes) == 0 {
+		return nil
+	}
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, r := range routes {
+		item := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle}
+		setField(item, "host", stringNode(r.Host))
+		setField(item, "port", intNode(r.Port))
+		node.Content = append(node.Content, item)
+	}
+	return node
+}
+
+// AddRoute records that a workspace's port answers to a host. The host must
+// be free across the whole configuration, because one name reaches one port.
+func AddRoute(dir, workspace string, r Route) error {
+	cfg, err := Load(dir)
+	if err != nil {
+		return err
+	}
+	if _, err := cfg.Workspace(workspace); err != nil {
+		return err
+	}
+	if owner, _, ok := cfg.RouteOwner(r.Host); ok {
+		return fmt.Errorf("%s is already published by workspace %q: `devmachine expose rm %s` first", r.Host, owner.Name, r.Host)
+	}
+	return editDocument(dir, func(root *yaml.Node) error {
+		entry := workspaceEntry(root, workspace)
+		if entry == nil {
+			return fmt.Errorf("`workspaces` has no entry named %q", workspace)
+		}
+		var routes []Route
+		if node := field(entry, "routes"); node != nil {
+			if err := node.Decode(&routes); err != nil {
+				return fmt.Errorf("reading the routes of %q: %w", workspace, err)
+			}
+		}
+		setField(entry, "routes", routesNode(append(routes, r)))
+		return nil
+	})
+}
+
+// RemoveRoute forgets a host and says which workspace had it.
+func RemoveRoute(dir, host string) (string, error) {
+	cfg, err := Load(dir)
+	if err != nil {
+		return "", err
+	}
+	owner, _, ok := cfg.RouteOwner(host)
+	if !ok {
+		return "", fmt.Errorf("%s is not published by any workspace in the configuration", host)
+	}
+	var kept []Route
+	for _, r := range owner.Routes {
+		if r.Host != host {
+			kept = append(kept, r)
+		}
+	}
+	return owner.Name, editDocument(dir, func(root *yaml.Node) error {
+		entry := workspaceEntry(root, owner.Name)
+		if entry == nil {
+			return fmt.Errorf("`workspaces` has no entry named %q", owner.Name)
+		}
+		setField(entry, "routes", routesNode(kept))
+		return nil
+	})
+}
+
+func workspaceEntry(root *yaml.Node, name string) *yaml.Node {
+	entries := field(root, "workspaces")
+	if entries == nil || entries.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, entry := range entries.Content {
+		if entry.Kind == yaml.MappingNode && scalar(field(entry, "name")) == name {
+			return entry
+		}
+	}
+	return nil
 }
 
 // settingsNode renders a settings map with its keys in order, so two runs that

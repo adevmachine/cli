@@ -1151,3 +1151,152 @@ defaults:
 		t.Fatalf("got %#v", cfg.Defaults.Workspace)
 	}
 }
+
+func TestRoutesAreReadFromAWorkspace(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+    routes:
+      - host: app.example.com
+        port: 8080
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, r, ok := cfg.RouteOwner("app.example.com")
+	if !ok || w.Name != "alice" || r.Port != 8080 {
+		t.Fatalf("route not read: %v %+v %v", ok, r, w.Name)
+	}
+}
+
+func TestValidateRefusesTheSameHostTwice(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+    routes: [{host: app.example.com, port: 8080}]
+  - name: bob
+    routes: [{host: app.example.com, port: 9090}]
+`)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "app.example.com") || !strings.Contains(err.Error(), "twice") {
+		t.Fatalf("a host on two workspaces must be refused, got %v", err)
+	}
+}
+
+func TestValidateRefusesABadRoute(t *testing.T) {
+	for _, body := range []string{
+		"routes: [{host: 'a/b', port: 8080}]",
+		"routes: [{host: 'app.example.com', port: 0}]",
+		"routes: [{host: '', port: 8080}]",
+	} {
+		dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nworkspaces:\n  - name: alice\n    "+body+"\n")
+		cfg, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cfg.Validate(); err == nil {
+			t.Fatalf("%s must be refused", body)
+		}
+	}
+}
+
+func TestAddRouteKeepsCommentsAndRefusesDuplicates(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice  # the one I work in
+    packages: [workspace]
+`)
+	if err := AddRoute(dir, "alice", Route{Host: "app.example.com", Port: 8080}); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(filepath.Join(dir, FileName))
+	if !strings.Contains(string(body), "the one I work in") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, r, ok := cfg.RouteOwner("app.example.com"); !ok || r.Port != 8080 {
+		t.Fatalf("route not written:\n%s", body)
+	}
+	err = AddRoute(dir, "bob", Route{Host: "app.example.com", Port: 1})
+	if err == nil || !strings.Contains(err.Error(), "alice") {
+		t.Fatalf("adding a host another workspace owns must name the owner, got %v", err)
+	}
+	if err := AddRoute(dir, "nobody", Route{Host: "x.example.com", Port: 1}); err == nil {
+		t.Fatal("an unknown workspace must be refused")
+	}
+}
+
+func TestRemoveRouteSaysWhoseItWas(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+    routes:
+      - host: app.example.com
+        port: 8080
+      - host: api.example.com
+        port: 8081
+`)
+	owner, err := RemoveRoute(dir, "app.example.com")
+	if err != nil || owner != "alice" {
+		t.Fatalf("got %q, %v", owner, err)
+	}
+	cfg, _ := Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("the route is still there")
+	}
+	if _, r, ok := cfg.RouteOwner("api.example.com"); !ok || r.Port != 8081 {
+		t.Fatal("the other route was lost")
+	}
+	if _, err := RemoveRoute(dir, "gone.example.com"); err == nil {
+		t.Fatal("removing a host nobody has must be refused")
+	}
+	owner, err = RemoveRoute(dir, "api.example.com")
+	if err != nil || owner != "alice" {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(filepath.Join(dir, FileName))
+	if strings.Contains(string(body), "routes") {
+		t.Fatalf("an emptied routes list must be removed, not left as []:\n%s", body)
+	}
+}
+
+func TestUpdateWorkspaceKeepsRoutes(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+workspaces:
+  - name: alice
+    routes: [{host: app.example.com, port: 8080}]
+`)
+	cfg, _ := Load(dir)
+	w, _ := cfg.Workspace("alice")
+	w.Packages = []string{"zsh"}
+	if err := UpdateWorkspace(dir, w); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ = Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); !ok {
+		t.Fatal("editing a workspace dropped its routes")
+	}
+}
