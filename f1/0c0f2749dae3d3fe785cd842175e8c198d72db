@@ -1,0 +1,41 @@
+internal/dns/open.go
+  s_a0cbf6c120c4f8::t_9891c3c692d145 138-141
+  s_a0cbf6c120c4f8::t_d030a9367dc8c5 123
+  s_a0cbf6c120c4f8::t_ccd1a70e14e615 78-79,82-84,90-92,95-98,101,111-118
+  s_a0cbf6c120c4f8::t_62b07fbbdbdc48 119-120
+internal/commands/packages_helpers_test.go
+  s_a0cbf6c120c4f8::t_f55f8e826cdd44 78-98,116-127,130-131
+  s_a0cbf6c120c4f8::t_c7bdeb8d7c603b 128-129
+  s_a0cbf6c120c4f8::t_d50ab71f25da9b 132
+internal/commands/shell.go
+  s_a0cbf6c120c4f8::t_4b62abfb26e25d 228-233,240,248,258
+  s_a0cbf6c120c4f8::t_7132734e805cf6 184-187,196
+internal/commands/packages.go
+  s_a0cbf6c120c4f8::t_9614ac8ac59b6c 62
+internal/dns/open_test.go
+  s_a0cbf6c120c4f8::t_8875f3e02d2af1 363-372
+  s_a0cbf6c120c4f8::t_1f7a5b12e0716f 100-121,373
+  s_a0cbf6c120c4f8::t_d1e0e877b6cf08 342,354,376
+  s_a0cbf6c120c4f8::t_fd797abf585531 374
+internal/commands/shell_test.go
+  s_a0cbf6c120c4f8::t_1cf3ad2cc2a4d3 346-367,369-413,415-418
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_be4b1f7c78de6b 429,444-448
+  s_a0cbf6c120c4f8::t_c17e5565957d0e 178-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f10c0f2749dae3d3fe785cd842175e8c198d72db",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
