@@ -272,14 +272,12 @@ func newExposeListCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var rows []site
 			sitesDir, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine)
 			if err != nil {
-				return err
-			}
-
-			var rows []site
-			client, _, err := dial(cmd.Context(), tgt.machine, "")
-			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s cannot be asked: %v\n", tgt.machine.Name, err)
+				rows = reconcile(cfg, tgt.machine.Name, nil, false)
+			} else if client, _, err := dial(cmd.Context(), tgt.machine, ""); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v)\n", tgt.machine.Name, err)
 				rows = reconcile(cfg, tgt.machine.Name, nil, false)
 			} else {
@@ -331,11 +329,6 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sitesDir, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine)
-			if err != nil {
-				return err
-			}
-
 			question := fmt.Sprintf("Stop publishing https://%s ?", host)
 			if check {
 				cmd.Println("would " + question)
@@ -353,10 +346,14 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 
 			owner, err := config.RemoveRoute(dir, host)
 			if err != nil {
+				where := "<caddy's sites.d>/" + expose.FileName(expose.Site{Host: host})
+				if sitesDir, derr := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); derr == nil {
+					where = path.Join(sitesDir, expose.FileName(expose.Site{Host: host}))
+				}
 				return fmt.Errorf("%w; a site the old `expose` wrote is a file on the machine, not a line here: "+
 					"adopt it with `devmachine expose add <workspace> <port> --host %s`, or remove it there with "+
 					"`devmachine run 'rm %s && systemctl reload caddy'`",
-					err, host, path.Join(sitesDir, expose.FileName(expose.Site{Host: host})))
+					err, host, where)
 			}
 			record(opts, target{machine: tgt.machine, workspace: owner}, "expose rm "+host, true)
 			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): stop exposing %s", host))

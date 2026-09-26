@@ -425,3 +425,34 @@ func TestExposeRmOfAnUnmanagedHostSaysHowToAdoptOrRemoveIt(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// A machine that lost caddy while a route still points at it is the one state
+// where removing the route matters most, so it is the state these two must
+// not refuse.
+func TestExposeRmWorksWhenCaddyLeftTheMachine(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+
+	if _, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes"); err != nil {
+		t.Fatalf("rm must not need caddy on the machine: %v", err)
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("the route is still recorded")
+	}
+}
+
+func TestExposeListWorksWhenCaddyLeftTheMachine(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+
+	out, err := execute(t, "--config", dir, "expose", "list")
+	if err != nil {
+		t.Fatalf("list must not refuse: %v", err)
+	}
+	if !strings.Contains(out, "app.example.com") || !strings.Contains(out, "unknown") {
+		t.Fatalf("the configuration's row must still print, as unknown: %q", out)
+	}
+}
