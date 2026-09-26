@@ -1,0 +1,32 @@
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_b638e1b7337632 1154-1186,1192-1203,1209-1302
+  s_a0cbf6c120c4f8::t_32c1dcfb38269e 1187-1191
+  s_a0cbf6c120c4f8::t_1bfeb3fe79af94 1204-1208
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_1fee07cc4b16a0 112-118
+  s_a0cbf6c120c4f8::t_14ba0a7563ee9c 385-395
+  s_a0cbf6c120c4f8::t_56a33e0e21aef5 481-486
+  s_a0cbf6c120c4f8::t_d61fc8beb264b7 362
+  s_a0cbf6c120c4f8::t_35aadde60166b1 136-138
+  s_a0cbf6c120c4f8::t_d17f94a8642038 934
+  s_a0cbf6c120c4f8::t_cf2e0c25b3345f 324,938-1019
+  s_a0cbf6c120c4f8::t_8151e45897a24a 314-323
+  s_a0cbf6c120c4f8::t_f6372fbca5a098 325
+  s_a0cbf6c120c4f8::t_f59d201ec2c3e6 487
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bc49dd3afcb04ac6415b5324f6a6dff4c5d95ee9",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
