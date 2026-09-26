@@ -132,8 +132,9 @@ Two more that are not errors, but change what a command does:
 
 ## A certificate never arrives after `expose add`
 
-Caddy only gets a certificate for a name that already resolves to the
-machine. Two ordinary causes:
+The block reaches the machine on `sync`, so a certificate cannot arrive
+before `sync` ran. Once it has, Caddy only gets a certificate for a name that
+already resolves to the machine. Two ordinary causes:
 
 - **The name does not resolve yet.** DNS can take a few minutes to
   propagate, even when `expose add` wrote the record (or printed it for you
@@ -349,3 +350,36 @@ or the history itself if the remote is ever made public, still has it.
 `devmachine setup git` refuses to run against a directory that already tracks
 one of these paths, and its error says exactly this — see
 [versioning your configuration](how-it-works/versioning-your-configuration.md).
+
+## `expose add` said "recorded", and the site does not answer
+
+`add` writes the configuration and nothing else. The block reaches Caddy on
+the next `devmachine sync`. Run it, then `devmachine expose list` says
+`published`.
+
+## `expose list` says `unmanaged`
+
+The machine has a site the configuration does not: written by the old
+`expose`, which wrote straight to the machine, or by hand. It works today and
+is gone the day the machine is rebuilt. The row prints the `expose add` that
+adopts it; after that, `sync` writes the workspace's file and removes the old
+one-host file, so Caddy sees the host once.
+
+## `expose list` says `differs`
+
+The configuration and the machine disagree on the port or the owner of a
+host. The configuration is the truth: `devmachine sync` makes the machine
+match it.
+
+## "workspace X publishes Y, but caddy is not on machine Z"
+
+A route has nowhere to go. Add caddy to the machine
+(`devmachine packages add caddy --machine Z`) and run `sync`.
+
+## `sync` failed at "reload caddy for the routes"
+
+Caddy refused the new set of files. The most common cause is one host in two
+files under `sites.d`: a file another package contributed, or one written by
+hand, naming a host the configuration also publishes. `devmachine run
+'caddy validate --config /etc/caddy/Caddyfile'` names the duplicate. Remove it
+from the side that should not own it.

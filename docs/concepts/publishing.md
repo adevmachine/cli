@@ -37,6 +37,13 @@ None of them should: none has its own login, so whoever reaches the
 hostname reaches the data. `tunnel` answers the same need — looking at the
 thing from this computer — without ever putting a hostname in DNS.
 
+## Where a published site is recorded
+
+In `config.yml`, on the workspace, under `routes:`. `sync` writes it to the
+machine; nothing reads the machine to learn what should be published. A
+machine rebuilt from the configuration serves every site. The reasons are in
+[why a published site lives in the configuration](../how-it-works/published-sites.md).
+
 ## Why `expose` asks, and says who can reach it
 
 `expose add` prints, in the question itself, that whatever is behind the

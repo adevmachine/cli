@@ -61,6 +61,9 @@ when something behaves in a way that surprises you.
 - [Versioning your configuration](how-it-works/versioning-your-configuration.md)
   — what `devmachine setup git` commits, why the remote must be private, and
   why the `.gitignore` comes first.
+- [Why a published site lives in the configuration](how-it-works/published-sites.md)
+  — why `expose` writes to the configuration instead of the machine, and what
+  `sync` removes on its way to matching it.
 
 ## Reference
 
