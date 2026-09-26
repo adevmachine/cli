@@ -61,6 +61,7 @@ devmachine tunnel
 devmachine version
 devmachine workspaces
 devmachine workspaces defaults
+devmachine workspaces destroy
 devmachine workspaces edit
 devmachine workspaces list
 devmachine workspaces new
