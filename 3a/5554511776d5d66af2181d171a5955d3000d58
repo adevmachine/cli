@@ -1,0 +1,21 @@
+internal/commands/expose_test.go
+  s_a0cbf6c120c4f8::t_6c9333e26bb5fe 428-458
+internal/commands/expose.go
+  s_a0cbf6c120c4f8::t_4897fce06a3bff 276,278-280,349-352,356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3a5554511776d5d66af2181d171a5955d3000d58",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
