@@ -90,6 +90,7 @@ type machineJSON struct {
 	Port       int      `json:"port"`
 	Key        string   `json:"key,omitempty"`
 	Workspaces []string `json:"workspaces"`
+	Self       bool     `json:"self,omitempty"`
 }
 
 type configJSON struct {
@@ -119,7 +120,7 @@ func asJSON(cfg config.Config) configJSON {
 		}
 		out.Machines = append(out.Machines, machineJSON{
 			Name: m.Name, Hosts: addresses, AdminUser: m.User,
-			Port: m.Port, Key: m.Key, Workspaces: names,
+			Port: m.Port, Key: m.Key, Workspaces: names, Self: m.Self,
 		})
 	}
 

@@ -431,3 +431,26 @@ func TestTheSurfaceListsEveryCommandPath(t *testing.T) {
 		}
 	}
 }
+
+func TestMachinesListInJSONSaysWhichMachineIsThisComputer(t *testing.T) {
+	dir := configWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+  - name: mac
+    self: true
+`)
+	out, err := execute(t, "--config", dir, "--format", "json", "machines", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []machineJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err, out)
+	}
+	for _, m := range got {
+		if m.Self != (m.Name == "mac") {
+			t.Fatalf("%s: self=%v", m.Name, m.Self)
+		}
+	}
+}
