@@ -42,6 +42,14 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	if err != nil {
 		return Result{}, err
 	}
+	if base == "" || base == "/" {
+		return Result{}, fmt.Errorf("refusing to empty %q as the bundle directory", base)
+	}
+	// Unpacking never deletes, and Ansible searches roles.local before roles:
+	// a copy an earlier sync left would keep running instead of this one.
+	if _, err := a.Client.Run(ctx, "rm -rf "+base); err != nil {
+		return Result{}, fmt.Errorf("emptying %s: %w", base, err)
+	}
 	if err := a.Client.Upload(ctx, base, tarball); err != nil {
 		return Result{}, err
 	}

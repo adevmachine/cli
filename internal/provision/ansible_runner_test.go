@@ -23,11 +23,12 @@ type fakeClient struct {
 	commands []string
 	output   string
 	err      error
+	runErr   error
 }
 
 func (c *fakeClient) Run(_ context.Context, command string) (string, error) {
 	c.commands = append(c.commands, command)
-	return c.output, c.err
+	return "", c.runErr
 }
 
 func (c *fakeClient) Stream(_ context.Context, command string, stdout, _ io.Writer) error {
@@ -51,6 +52,7 @@ func (c *fakeClient) Upload(_ context.Context, dir string, tarball io.Reader) er
 		return err
 	}
 	c.uploaded[dir] = namesIn(body)
+	c.commands = append(c.commands, "upload "+dir)
 	return nil
 }
 
@@ -86,8 +88,29 @@ func TestApplyUploadsBeforeItRuns(t *testing.T) {
 	if len(c.uploaded) == 0 {
 		t.Fatal("it ran without sending anything")
 	}
-	if !strings.Contains(c.commands[0], "ansible-playbook") {
-		t.Fatalf("first command was %q", c.commands[0])
+	if !strings.Contains(c.commands[len(c.commands)-1], "ansible-playbook") {
+		t.Fatalf("last command was %q", c.commands[len(c.commands)-1])
+	}
+}
+
+// A package that moved from roles.local to the release, or left the machine,
+// would otherwise keep running from the copy an earlier sync unpacked: Ansible
+// searches roles.local first, and unpacking never deletes.
+func TestApplyStartsFromAnEmptyBundle(t *testing.T) {
+	c := &fakeClient{output: okRecap}
+	a := &Ansible{Client: c}
+
+	if _, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil), Options{Out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.commands) < 3 {
+		t.Fatalf("commands: %q", c.commands)
+	}
+	if c.commands[0] != "rm -rf "+RemoteDir {
+		t.Fatalf("first it must empty the bundle, it ran %q", c.commands[0])
+	}
+	if c.commands[1] != "upload "+RemoteDir {
+		t.Fatalf("then send the new one, it ran %q", c.commands[1])
 	}
 }
 
@@ -103,8 +126,8 @@ func TestApplyRunsTheGeneratedPlaybookFromTheRemoteDirectory(t *testing.T) {
 		"cp /opt/devmachine/site.yml \"$run/site.yml\" && cd \"$run\" && " +
 		"ANSIBLE_CONFIG=/opt/devmachine/ansible.cfg " +
 		"ansible-playbook -i /opt/devmachine/inventory.ini site.yml"
-	if c.commands[0] != want {
-		t.Fatalf("got %q", c.commands[0])
+	if c.commands[len(c.commands)-1] != want {
+		t.Fatalf("got %q", c.commands[len(c.commands)-1])
 	}
 }
 
@@ -190,7 +213,7 @@ func TestApplyPassesCheckAndTagsThrough(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := c.commands[0]
+	command := c.commands[len(c.commands)-1]
 	if !strings.Contains(command, "--check") {
 		t.Fatalf("--check was dropped: %q", command)
 	}
@@ -290,7 +313,20 @@ func TestApplyUsesTheSelfBaseForASelfMachine(t *testing.T) {
 	if _, ok := c.uploaded[want]; !ok {
 		t.Fatalf("nothing was sent to %s: %v", want, c.uploaded)
 	}
-	if !strings.Contains(c.commands[0], want) {
-		t.Fatalf("the playbook command does not use %s: %q", want, c.commands[0])
+	if !strings.Contains(c.commands[len(c.commands)-1], want) {
+		t.Fatalf("the playbook command does not use %s: %q", want, c.commands[len(c.commands)-1])
+	}
+}
+
+func TestApplyStopsWhenTheBundleCannotBeEmptied(t *testing.T) {
+	c := &fakeClient{output: okRecap, runErr: errors.New("permission denied")}
+	a := &Ansible{Client: c}
+
+	_, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil), Options{Out: io.Discard})
+	if err == nil || !strings.Contains(err.Error(), "emptying") {
+		t.Fatalf("got %v", err)
+	}
+	if len(c.uploaded) != 0 {
+		t.Fatal("it sent a bundle on top of one it could not empty")
 	}
 }
