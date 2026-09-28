@@ -53,6 +53,9 @@ func NewRootCmd() *cobra.Command {
 			return cmd.Help()
 		},
 	}
+	// cobra's Print writes to stderr unless told otherwise, and a program
+	// reading an answer reads stdout.
+	root.SetOut(os.Stdout)
 
 	root.PersistentFlags().StringVar(&opts.configDir, "config", "",
 		"configuration directory (default: $DEVMACHINE_CONFIG, then $XDG_CONFIG_HOME/devmachine, then ~/.config/devmachine)")

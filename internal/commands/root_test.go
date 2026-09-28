@@ -454,3 +454,15 @@ machines:
 		}
 	}
 }
+
+// A program reading the CLI's answer reads stdout: cobra's Print writes to
+// stderr unless the command is told otherwise.
+func TestAnswersGoToStdoutByDefault(t *testing.T) {
+	root := NewRootCmd()
+	if root.OutOrStderr() != os.Stdout {
+		t.Fatal("cmd.Print would write the answer to stderr")
+	}
+	if root.ErrOrStderr() != os.Stderr {
+		t.Fatal("diagnostics must stay on stderr")
+	}
+}
