@@ -1,0 +1,44 @@
+docs/concepts/configuration.md
+  s_a0cbf6c120c4f8::t_c8d7f20dc6bb8c 68,76,80,131,150,156,158,164-165,178
+  s_a0cbf6c120c4f8::t_d0def945b8df84 3-5,9,24,49,81-83,87-88,106-107,109,116-118,132-133,135,141,143,145-146,151,159,166-172,177,186-189
+  s_a0cbf6c120c4f8::t_7471687588d8d4 23,30
+  s_a0cbf6c120c4f8::t_af57d16968ae1a 110-112
+  s_a0cbf6c120c4f8::t_ddf6d55dbd16c0 144
+docs/concepts/credentials.md
+  s_a0cbf6c120c4f8::t_be253be1c25b8f 4-6,23-25,39-40,42,45-47,50-53,64-65,69-72,74-76,81-82,87-89
+  s_a0cbf6c120c4f8::t_e75be131415044 8,16-19,86
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_8246927037ecf6 20,32,111,138-139
+  s_a0cbf6c120c4f8::t_57a561c2592fcc 170-173
+  s_a0cbf6c120c4f8::t_f514c27aeff82d 27-28,33-37
+  s_a0cbf6c120c4f8::t_7dcbc14e2c80f2 3-6,10-12,21-23,25-26,41-42,65-67,71-72,84-86,90-94,99-100,112-113,115-116,123-126,128-130,140-142,151-153,155,166-167,169,175-176
+docs/concepts/publishing.md
+  s_a0cbf6c120c4f8::t_8ba1081f5c5b3a 20-25,39-41,44-46
+  s_a0cbf6c120c4f8::t_7ea034311a219f 3-4,17,31-32,38,43,50,52-53
+docs/concepts/agent-skills.md
+  s_a0cbf6c120c4f8::t_4798e29c367dc5 7,9,36,43,58,60
+  s_a0cbf6c120c4f8::t_4a1573d22073d5 23-24
+  s_a0cbf6c120c4f8::t_9ce43747edc002 3-5,15-16,22,37-39,51-56,67-71
+docs/concepts/packages.md
+  s_a0cbf6c120c4f8::t_b1417fff8e4cc5 3-5,7-10,14-17,20-21,30-32,37-41,65-68,73,75-77,90-91,95-99,101,103-107,111-114,121-125,127-129,131,133-136,141-142,144,150-154,156-159
+  s_a0cbf6c120c4f8::t_63c4fd93494027 18,54-55,72,89,109,120,130,140,143
+docs/concepts/dns.md
+  s_a0cbf6c120c4f8::t_ae6d79b135edd9 3-4,8-9,11-17,21-23,31-32,36-40,44-46,51-53,55-59,63-64,66-73,75-76,82-83,85-86,90-94,96-99
+  s_a0cbf6c120c4f8::t_2c6a68ceafcd56 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f7ba9d58b2a16e43578808af1ab28d47c7f339e3",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
