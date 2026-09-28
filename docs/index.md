@@ -2,11 +2,11 @@
 
 Set up and operate a personal development VPS.
 
-Three commands take a server nobody has logged into and make it yours:
+Three commands turn a server nobody has logged into into one that is yours:
 
 ```
-devmachine setup      get in, install a key, prove it, harden, install Ansible
-devmachine sync       fetch the recipes and converge the machine
+devmachine setup      connect, install a key, prove it works, lock it down, install Ansible
+devmachine sync       fetch the recipes and apply them to the machine
 devmachine workspaces new alice && devmachine sync
 ```
 

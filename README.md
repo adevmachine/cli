@@ -13,9 +13,9 @@ devmachine workspaces new alice && devmachine sync
 devmachine ssh alice
 ```
 
-`setup` takes the machine over: it checks the host key with you, installs a
-key, and turns password login off. `workspaces new` adds a workspace to your
-configuration, and `sync` builds it on the machine.
+`setup` connects to the machine and locks it down: it checks the host key
+with you, installs a key, and turns password login off. `workspaces new` adds
+a workspace to your configuration, and `sync` builds it on the machine.
 
 **Documentation: https://adevmachine.github.io/docs/** — getting started,
 concepts, the command reference and troubleshooting. The same pages are in

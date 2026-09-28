@@ -29,8 +29,8 @@ machine. On Linux without Homebrew, take the binary from the
 [releases page](https://github.com/adevmachine/cli/releases).
 
 A new workspace has git, the GitHub CLI, Node LTS through mise, bun and zsh.
-The machine itself gets nothing beyond the SSH hardening until you add
-packages to it.
+The machine itself gets nothing beyond that lock-down until you add packages
+to it.
 
 Something failed? [Troubleshooting](troubleshooting.md) says what each error
 really means.

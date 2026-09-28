@@ -52,11 +52,13 @@ Ask, one at a time:
 
 Tell the person to run `devmachine setup` themselves — in Claude Code they can
 type `! devmachine setup` in this session. Tell them what it will ask: a name
-for the machine, the address, the login (`root`) and port (`22`), a domain
-(empty is fine), how the CLI should log in (the first option, a key of its
-own, is right when unsure), and the host key fingerprint to compare with the
-provider's console. It then installs the key, proves it works, turns password
-login off and pins the latest packages release.
+for the machine, the address, the login (`root`) and port (`22`), and a domain
+(empty is fine). It also asks how the CLI should log in — the first option, a
+key of its own, is right when unsure — and shows a host key fingerprint to
+compare with the provider's console.
+
+Once they answer, `setup` installs the key, checks it works, turns password
+login off, and pins the latest packages release.
 
 When they say it finished, run `devmachine doctor`. Every line should pass.
 

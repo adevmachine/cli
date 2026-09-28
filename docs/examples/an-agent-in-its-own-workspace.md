@@ -24,7 +24,7 @@ devmachine ssh agent
 curl -fsSL https://openclaw.ai/install.sh | bash
 ```
 
-The installer provisions Node itself if the account has none.
+The installer sets up Node itself if the account has none.
 
 ## 3. Keep it running
 

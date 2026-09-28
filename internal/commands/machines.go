@@ -77,7 +77,7 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "add",
-		Short: "Take over another machine and add it to the configuration",
+		Short: "Connect another server and add it to the configuration",
 		Long: "Asks the same questions as `setup`, minus the domain, and runs the " +
 			"same bootstrap: it installs a key, proves the key on a connection of " +
 			"its own, turns password login off, and installs Ansible.\n\n" +

@@ -56,7 +56,7 @@ The self-machine version of the check above. `sync` and `doctor` both refuse
 before touching anything when Ansible is not on `PATH` on your computer. Run
 `devmachine setup --machine <name>` — on a self machine that only checks
 Homebrew is there and then runs `brew install ansible`, with no key, no
-password and no hardening involved.
+password and no lock-down involved.
 
 ## "machine X is your computer (self: true), so it has no hosts"
 
@@ -91,9 +91,8 @@ a setting overrides.
 
 ## `devmachine ssh` opens a session as the wrong user
 
-`devmachine ssh` with no argument logs in as the machine's **administrative**
-login, which is usually `root`. To land in an environment, name it:
-`devmachine ssh alice`.
+`devmachine ssh` with no argument logs in as the server's **root** account, not
+a workspace. To land in a workspace, name it: `devmachine ssh alice`.
 
 ## Changes to config.yml appear to be ignored
 
