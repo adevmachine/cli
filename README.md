@@ -18,10 +18,10 @@ devmachine ssh alice
 talking to, installs a key, and turns off password logins. `workspaces new`
 adds a workspace to your configuration. `sync` builds it on the server.
 
-**Documentation: https://mydevmachine.github.io/docs/** — getting started,
+**Documentation: https://mydevmachine.sh/** — getting started,
 how it all works, every command, and fixes for common errors. The same pages
 are in [`docs/`](docs/index.md), and an LLM can read them all from
-[llms-full.txt](https://mydevmachine.github.io/docs/llms-full.txt).
+[llms-full.txt](https://mydevmachine.sh/llms-full.txt).
 
 ## The model
 

@@ -90,7 +90,7 @@ token step, before building anything.
 
 ## The documentation site
 
-https://mydevmachine.github.io/docs/ is built by the `mydevmachine/docs`
+https://mydevmachine.sh/ is built by the `mydevmachine/docs`
 repository from this repository's `docs/` on `main`. It rebuilds every six
 hours on its own. After pushing a change under `docs/`, or after a release,
 rebuild it now:

@@ -36,7 +36,7 @@ brews:
       owner: mydevmachine
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    homepage: https://mydevmachine.github.io/docs/
+    homepage: https://mydevmachine.sh/
     description: Turn a VPS into workspaces you develop in
     license: MIT
     # advm is the short name for daily use. The full name is what appears in
@@ -46,6 +46,6 @@ brews:
     caveats: |
       Teach your coding agent devmachine (Claude Code, Codex, and others):
         devmachine skills add
-      Get started: https://mydevmachine.github.io/docs/getting-started/
+      Get started: https://mydevmachine.sh/getting-started/
     test: |
       system "#{bin}/devmachine", "version"
