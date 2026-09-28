@@ -151,6 +151,7 @@
         owner: root
         group: root
         mode: "0644"
+      register: devmachine_extension_0
       tags: [sharing]
 
     - name: files the configuration no longer owns
@@ -167,6 +168,6 @@
       systemd:
         name: caddy
         state: reloaded
-      when: (devmachine_routes_written is defined and devmachine_routes_written is changed) or (devmachine_routes_removed is defined and devmachine_routes_removed is changed)
+      when: (devmachine_routes_written is defined and devmachine_routes_written is changed) or (devmachine_routes_removed is defined and devmachine_routes_removed is changed) or (devmachine_extension_0 is defined and devmachine_extension_0 is changed)
       tags: [routes]
 

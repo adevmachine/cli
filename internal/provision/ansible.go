@@ -276,9 +276,9 @@ func playbook(plan packages.MachinePlan, base string) (string, error) {
 		}
 		tasks += again
 	}
-	extensionsWritten, extensionsRemoved := extensionTasks(plan, base)
+	extensionsWritten, siteChanges := extensionTasks(plan, base)
 	tasks += extensionsWritten
-	tasks += routeTasks(plan, base, extensionsRemoved)
+	tasks += routeTasks(plan, base, siteChanges)
 	if plan.Machine.Self {
 		// A self machine converges on the operator's own Mac. Everything
 		// after this task assumes macOS — Homebrew paths, no become — so the
@@ -555,9 +555,10 @@ func groupBySettings(plan packages.MachinePlan, pkg string) ([]group, error) {
 // opened, then remove whichever file the previous lock recorded writing that
 // the current plan no longer writes — the file a package left behind when it
 // left the configuration. They run last, after the package that creates the
-// directory, and report whether they added the removal task, so routeTasks
-// knows whether its own caddy reload also has to watch for it.
-func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
+// directory, and report the registered results that can change what Caddy
+// serves — a copy into the sites directory, the removal task — so routeTasks
+// makes its caddy reload watch them too.
+func extensionTasks(plan packages.MachinePlan, base string) (string, []string) {
 	found := map[string]packages.Found{}
 	for _, resolved := range append([]packages.Resolved{plan.OnMachine}, plan.Workspaces...) {
 		for _, f := range resolved.Ordered {
@@ -566,6 +567,7 @@ func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 	}
 
 	var out strings.Builder
+	var siteChanges []string
 	current := map[string]bool{}
 	for _, extension := range plan.Extensions {
 		from := found[extension.From]
@@ -581,6 +583,11 @@ func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 		fmt.Fprintf(&out, "    - name: %s extends %s\n", extension.From, where)
 		fmt.Fprintf(&out, "      copy:\n        src: %q\n        dest: %q\n", source, destination)
 		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n")
+		if plan.SitesDir != "" && extension.Into == plan.SitesDir {
+			registered := fmt.Sprintf("devmachine_extension_%d", len(siteChanges))
+			fmt.Fprintf(&out, "      register: %s\n", registered)
+			siteChanges = append(siteChanges, registered)
+		}
 		fmt.Fprintf(&out, "      tags: [%s]\n\n", extension.From)
 	}
 
@@ -592,7 +599,7 @@ func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 	}
 	sort.Strings(removed)
 	if len(removed) == 0 {
-		return out.String(), false
+		return out.String(), siteChanges
 	}
 
 	out.WriteString("    - name: files a package left when it left the plan\n      file:\n")
@@ -601,7 +608,7 @@ func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 		fmt.Fprintf(&out, "        - %q\n", p)
 	}
 	out.WriteString("      register: devmachine_extensions_removed\n      tags: [extensions]\n\n")
-	return out.String(), true
+	return out.String(), append(siteChanges, "devmachine_extensions_removed")
 }
 
 // routeTasks put every workspace's routes file where caddy reads it, take
@@ -610,10 +617,10 @@ func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 // of a workspace with no route left. They run after every package, so caddy
 // has made sites.d, and reload Caddy only when something changed.
 //
-// extensionsRemoved says whether extensionTasks removed an orphaned file
-// earlier in the play: that reload has to watch for it too, or a package
-// leaving the plan would take its file away without Caddy ever noticing.
-func routeTasks(plan packages.MachinePlan, base string, extensionsRemoved bool) string {
+// siteChanges names the results extensionTasks registered earlier in the
+// play: that reload has to watch them too, or a package changing or leaving
+// its site file would do it without Caddy ever noticing.
+func routeTasks(plan packages.MachinePlan, base string, siteChanges []string) string {
 	if plan.SitesDir == "" {
 		return ""
 	}
@@ -655,14 +662,14 @@ func routeTasks(plan packages.MachinePlan, base string, extensionsRemoved bool) 
 		}
 		out.WriteString("      register: devmachine_routes_removed\n      tags: [routes]\n\n")
 	}
-	if len(written) == 0 && len(absent) == 0 && !extensionsRemoved {
+	if len(written) == 0 && len(absent) == 0 && len(siteChanges) == 0 {
 		return ""
 	}
 	out.WriteString("    - name: reload caddy for the routes\n      systemd:\n        name: caddy\n        state: reloaded\n")
 	when := "(devmachine_routes_written is defined and devmachine_routes_written is changed) or " +
 		"(devmachine_routes_removed is defined and devmachine_routes_removed is changed)"
-	if extensionsRemoved {
-		when += " or (devmachine_extensions_removed is defined and devmachine_extensions_removed is changed)"
+	for _, registered := range siteChanges {
+		when += fmt.Sprintf(" or (%s is defined and %s is changed)", registered, registered)
 	}
 	out.WriteString("      when: " + when + "\n")
 	out.WriteString("      tags: [routes]\n\n")

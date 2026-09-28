@@ -866,3 +866,27 @@ func TestGenerateAtRemoteMachineHasNoDarwinGuard(t *testing.T) {
 		t.Fatalf("a remote machine's playbook mentions Darwin:\n%s", files["site.yml"])
 	}
 }
+
+func TestGenerateReloadsCaddyWhenASiteFileChanges(t *testing.T) {
+	plan := planWithExtension(t)
+	plan.SitesDir = "/etc/caddy/sites.d"
+	for i := range plan.Extensions {
+		plan.Extensions[i].Into = plan.SitesDir
+	}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := string(files["site.yml"])
+	if !strings.Contains(site, "register: devmachine_extension_0") {
+		t.Fatalf("the site file's copy is not registered:\n%s", site)
+	}
+	reload := site[strings.Index(site, "state: reloaded"):]
+	if !strings.Contains(reload, "devmachine_extension_0 is changed") {
+		t.Fatalf("the reload does not watch the site file:\n%s", site)
+	}
+	if strings.Count(site, "state: reloaded") != 1 {
+		t.Fatalf("caddy is reloaded more than once:\n%s", site)
+	}
+}

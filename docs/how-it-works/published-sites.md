@@ -31,6 +31,11 @@ Nothing else in `sites.d` is touched. A file another package added, or
 written by hand, is not the configuration's to delete; `expose list`
 reports it as `unmanaged` and says how to adopt it.
 
+A file another package adds to `sites.d` — like the one `caddy-sites`
+writes — also reloads Caddy when `sync` changes or removes it. Without that
+reload, Caddy would keep serving the old file until something else
+reloaded it.
+
 ## Why DNS is still pointed by `add`
 
 The DNS record is not in the configuration, and `sync` does not write it.
