@@ -1,0 +1,41 @@
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_203cec99751ca2 3-6,8-11,15-18,20-23,25-26,31-33,36,41,43-45,47-49,56,58-59,61-62,74-76,80-82,90-92
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_edf78bae96924a 23-25
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_8a75248150c517 3-7,17-21,23,29,31-40,51-55,61-62,64-67
+docs/examples/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_e4c634bfb3d534 11-15
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_a3739ae66c8bb4 5-9,13-16,18,20,25-26,28-32,36-39,43-45,47-49,51,56-61,65-70,74-79,83-85,87-88,90,92-95,97,103-105,109-112,116-118,124-125,129-133,137-144,148-149,153-155,157-159,161,163-170,174-176,178-183,185-189,193-199,207-208,210-213,215-216,220-222,224-226,230-231,233-234,238-242,250-253,259-261,265-269,271-272,278,286-287,294-296,298-301,305-309,313-315,317-318,322-325,327-329,333-340,342-344,348-352,356-360,364-369,373-382,386-392,396-401,405-409,413-415,417-421,424-431,436-440,444-450,454-458,462-469,473-483,487-496,498,502-505,507,513-515,519-525
+docs/examples/an-agent-in-its-own-workspace.md
+  s_a0cbf6c120c4f8::t_601e8bd5672c12 36-39
+  s_a0cbf6c120c4f8::t_22681e9b46dec4 16-17
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_8f8770affa4271 4
+  s_a0cbf6c120c4f8::t_b92f0dd84d4533 34
+docs/examples/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_7852adb8439e37 25-26
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_442b9e41f982c1 3-4,6-9,11,13,15
+docs/index.md
+  s_a0cbf6c120c4f8::t_02a5ba620b0597 3,8-9,13-14,18-22,36-48,52-53,55-58,60,62-64,67-72,74,76,78-80,84-91,95-96,100-102
+README.md
+  s_a0cbf6c120c4f8::t_00c4fb3657ed72 3-5,17-19,22-23,28,30-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5fcbfcade7e4dcf8c7a10a90e02f499e09c9f150",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
