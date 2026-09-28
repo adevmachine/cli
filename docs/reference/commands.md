@@ -179,6 +179,11 @@ devmachine machines delete-local <name> [--yes]   destroy it and everything on i
 `port`, `key` and `workspaces`, and `self: true` on the one that is this
 computer — how a program finds the machine to run something locally.
 
+**This computer is never the implicit choice.** With one server and a `self`
+machine, a command without `--machine` acts on the server, as it did before
+this computer was added; the `self` machine is reached only by name. With two
+or more servers, the command still refuses to guess.
+
 `setup` writes the first machine; `add` writes every one after it. It asks the
 same questions, minus the domain, and runs the same bootstrap: the key first, a
 password only if the key is refused, the proof on a connection of its own, then

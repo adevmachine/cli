@@ -1427,3 +1427,32 @@ machines:
 		t.Fatal(err)
 	}
 }
+
+func TestMachineNeverPicksThisComputerImplicitly(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}}, {Name: "mac", Self: true}}}
+	m, err := cfg.Machine("")
+	if err != nil || m.Name != "main" {
+		t.Fatalf("got %q, %v; the one server is the implicit choice", m.Name, err)
+	}
+	if m, err := cfg.Machine("mac"); err != nil || !m.Self {
+		t.Fatalf("naming it still reaches this computer: %v", err)
+	}
+}
+
+func TestMachineWithOnlyThisComputerPicksIt(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true}}}
+	if m, err := cfg.Machine(""); err != nil || m.Name != "mac" {
+		t.Fatalf("got %q, %v", m.Name, err)
+	}
+}
+
+func TestMachineWithTwoServersStillAsks(t *testing.T) {
+	cfg := Config{Machines: []Machine{
+		{Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}},
+		{Name: "sandbox", Hosts: []Host{{Address: "203.0.113.11"}}},
+		{Name: "mac", Self: true},
+	}}
+	if _, err := cfg.Machine(""); err == nil || !strings.Contains(err.Error(), "--machine") {
+		t.Fatalf("got %v", err)
+	}
+}

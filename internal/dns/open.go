@@ -31,7 +31,7 @@ func buildExternal(found packages.Found, base string, client remote.Client) (*Ex
 			break
 		}
 	}
-	if credential == "" {
+	if credential == "" && m.Kind == KindDNS {
 		return nil, fmt.Errorf(
 			"the %s package declares no credential, so there is nothing to source before it runs", m.Name)
 	}

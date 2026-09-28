@@ -159,8 +159,10 @@ func (e *External) shellFor(args []string, stdin string) string {
 		quoted = append(quoted, quoteArg(a))
 	}
 
-	run := fmt.Sprintf("set -a; . %s; set +a; %s %s",
-		quoteArg(credentials.EnvFile(e.credential)), quoteArg(e.entrypoint), strings.Join(quoted, " "))
+	run := fmt.Sprintf("%s %s", quoteArg(e.entrypoint), strings.Join(quoted, " "))
+	if e.credential != "" {
+		run = fmt.Sprintf("set -a; . %s; set +a; %s", quoteArg(credentials.EnvFile(e.credential)), run)
+	}
 	if stdin == "" {
 		return run
 	}

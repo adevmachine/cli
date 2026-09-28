@@ -381,3 +381,21 @@ func TestAnySaysHowToInstallAPackageThatIsNotThere(t *testing.T) {
 		t.Fatalf("the error does not say how to install it: %v", err)
 	}
 }
+
+func TestAnyCallsAPackageThatNeedsNoCredential(t *testing.T) {
+	dir := configDirWith(t, pkgSpec{name: "tool", entrypoint: "bin/tool", commands: []string{"context"}})
+	client := &recordingClient{out: "ok"}
+
+	got, err := Any(dir, "main", "", provision.RemoteDir, "tool", client)
+	if err != nil {
+		t.Fatalf("a package with no credential must still be reachable: %v", err)
+	}
+	var out strings.Builder
+	if err := got.Call(context.Background(), []string{"context", "--session", "s1"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.commands) != 1 || strings.Contains(client.commands[0], "set -a") ||
+		!strings.Contains(client.commands[0], "bin/tool context --session s1") {
+		t.Fatalf("ran %q", client.commands)
+	}
+}

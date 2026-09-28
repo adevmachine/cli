@@ -278,11 +278,21 @@ func Load(dir string) (Config, error) {
 // a command lands on a server nobody named.
 func (c Config) Machine(name string) (Machine, error) {
 	if name == "" {
-		switch len(c.Machines) {
-		case 0:
+		// This computer is reached only by name: adding it must not change
+		// which server a command without --machine acts on.
+		servers := []Machine{}
+		for _, m := range c.Machines {
+			if !m.Self {
+				servers = append(servers, m)
+			}
+		}
+		switch {
+		case len(c.Machines) == 0:
 			return Machine{}, errors.New("no machine configured: add one under `machines` in " + FileName)
-		case 1:
+		case len(c.Machines) == 1:
 			return c.Machines[0], nil
+		case len(servers) == 1:
+			return servers[0], nil
 		default:
 			return Machine{}, fmt.Errorf(
 				"several machines are configured (%s): say which one with --machine",
