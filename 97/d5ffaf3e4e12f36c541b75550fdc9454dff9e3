@@ -1,0 +1,42 @@
+internal/commands/skills.go
+  s_a0cbf6c120c4f8::t_6eef54849143e8 226-227,230-234,236-238,240-243,254-255,264-265
+  s_a0cbf6c120c4f8::t_1b7e6ee75cc9b3 285,289
+  s_a0cbf6c120c4f8::t_b3b22abd4275ac 20-23
+  s_a0cbf6c120c4f8::t_3c30361ac14be0 239
+  s_a0cbf6c120c4f8::t_d4e4ab664fa5ae 358-362
+internal/commands/skills_test.go
+  s_a0cbf6c120c4f8::t_2b9614f5aa4021 40-101
+internal/packages/latest_test.go
+  s_a0cbf6c120c4f8::t_1c6dde1f8512bb 1-47
+docs/concepts/agent-skills.md
+  s_a0cbf6c120c4f8::t_7a063b38fae6fe 37-41
+internal/skills/install.go
+  s_a0cbf6c120c4f8::t_b969b996fb23ae 50,58
+  s_a0cbf6c120c4f8::t_40e2bc7ea0273c 36-38
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_e03787c3d687d4 341-345
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_17c95e7b4ec245 15-17
+internal/packages/latest.go
+  s_a0cbf6c120c4f8::t_43cc9fc0bd3837 1-49
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_4814ded0e54857 257-261
+.goreleaser.yaml
+  s_a0cbf6c120c4f8::t_bbf3c4591f95c7 38-39,45-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "97d5ffaf3e4e12f36c541b75550fdc9454dff9e3",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
