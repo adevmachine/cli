@@ -1,0 +1,33 @@
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_7201d73d5f193c 1-58
+docs/index.md
+  s_a0cbf6c120c4f8::t_43e3f151d9e28e 21-30
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_bff4db3d73a201 1-49
+docs/examples/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_c75a7b89ad6e2b 1-51
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_b5b7a7e22b68c8 61-62
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_6f26d4fa169cfa 1-15
+docs/examples/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_6ec89434827c17 1-43
+docs/examples/an-agent-in-its-own-workspace.md
+  s_a0cbf6c120c4f8::t_772cc514bb5866 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "37760648357bbe32edb8a3f147e9943363ff5df5",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
