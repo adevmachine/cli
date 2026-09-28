@@ -336,6 +336,6 @@ func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine) err
 	cmd.Printf("%-12s %-28s port %-6d admin: %s\n",
 		m.Name, strings.Join(addresses, ","), m.Port, m.User)
 	cmd.Printf("It has no key on it yet, and the root password is %q.\n", local.Password)
-	cmd.Printf("Take it over with `devmachine setup`.\n")
+	cmd.Printf("Set it up with `devmachine setup` (or `devmachine machines add` if you already have a machine).\n")
 	return nil
 }

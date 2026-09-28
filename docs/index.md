@@ -25,6 +25,7 @@ computer, while you wait for a real one.
 
 Real setups, done in a few steps. Start at [the list](examples/index.md).
 
+- [Try it on your own computer first](examples/a-local-vm-with-lima.md)
 - [Express site with TLS](examples/express-site-with-tls.md)
 - [Docker site on 8080](examples/docker-site-on-8080.md)
 - [Claude Code, controlled from your phone](examples/claude-code-remote-control.md)
