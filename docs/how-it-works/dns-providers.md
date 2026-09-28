@@ -6,149 +6,111 @@ zone. Read it before you touch a real one.
 ## A provider is a package, not a built-in vendor
 
 Talking to Hostinger or Cloudflare is an ordinary package: `devmachine
-packages add hostinger`, run on the machine, never on your computer. There
-is no vendor list inside the CLI binary, and no version of it that
-"supports" a registrar the package repository does not.
+packages add hostinger`, run on the machine, never on your computer.
+There is no vendor list inside the CLI binary.
 
 That gives one safety property: **a provider nobody installed cannot be
 written to.** No code path reaches a registrar's write API unless its
 package is on the lock file for that machine. Adding a provider is a
-decision with a diff. The absence of one is not a missing feature — it is a
-missing credential and a missing package, both visible.
+decision with a diff.
 
 ## What the provider gets from the shell
 
 `PATH`, `HOME`, and the one token its own credential declares — nothing
-else. The CLI sources `/etc/devmachine/<credential>/env` with `set -a; ...
-; set +a` right before running the entrypoint, so nothing else from the
-operator's shell or the machine's environment leaks in. A provider that
-reads a variable its own credential does not declare works by accident, on
-the one machine that happens to have it set, and breaks on everybody
-else's.
+else. The CLI sources `/etc/devmachine/<credential>/env` right before
+running the entrypoint, so nothing else leaks in. A provider that reads a
+variable its credential does not declare works by accident on one
+machine and breaks everywhere else.
 
-The token itself never appears in a command argument, where `ps` would show
-it to every account on the machine. Only the credential's name does, and
+The token never appears in a command argument, where `ps` would show it
+to every account on the machine. Only the credential's name does, and
 that name is not a secret.
 
 ## Hostinger
 
 ### RRsets, not records
 
-Hostinger's API has no idea of a single record. It has **RRsets**: one entry
-per `(name, type)`, holding a list of values. `www A` is one RRset that can
-carry several addresses at once. The provider hides this from you — `list`
-splits each RRset into one entry per value — but every write has to work in
-RRset terms, and that shapes everything below.
+Hostinger's API has no idea of a single record. It has **RRsets**: one
+entry per `(name, type)`, holding a list of values. `www A` is one RRset
+that can carry several addresses at once. `list` splits each RRset into
+one entry per value, but every write has to work in RRset terms.
 
-### `overwrite: false` appends
+### `overwrite: false` appends, and the default is `true`
 
 Hostinger's `PUT` takes a whole RRset and an `overwrite` flag. With
-`overwrite: false`, the values in the request are **added** to whatever is
-already there. Pointing an existing name at a new address with `overwrite:
-false` alone does not replace the old one — it leaves both: a round-robin
-nobody asked for, and a name that resolves correctly only half the time.
-
-### `overwrite` defaults to `true`, so it is always sent
-
-Leave the field out and Hostinger's own default is `overwrite: true`, the
-destructive mode. The provider never relies on that default: every `PUT` it
-sends carries `overwrite` explicitly, `true` or `false`, decided by the
-code — not by whatever Hostinger happens to default to today. A test checks
-this on **every** `PUT` body the fake server saw in a run, not only the
-last one, because a provider that gets the first call right and the second
-wrong would still pass a test that only checked the end state.
+`false`, the request's values are **added** to what is already there —
+pointing an existing name at a new address this way leaves both, a
+round-robin nobody asked for. Leave the field out and Hostinger's own
+default is `overwrite: true`, the destructive mode, so the provider
+always sends it explicitly, decided by the code, never left to
+Hostinger's default.
 
 ### Replacing a value: delete, then append — not one call
 
-Changing what a name already points at needs `upsert` to hold **exactly**
-the new value, not the new value plus the old one. Hostinger's API gives
-two ways to reach that:
-
-- One `PUT` with the whole new value and `overwrite: true`.
-- A `DELETE` of the RRset, then a `PUT` of the new value with `overwrite:
-  false`.
-
-The provider uses the second, and it costs two calls where the first would
-cost one. Hostinger's current OpenAPI description says `overwrite: true`
-replaces the existing records with the records in the payload — a
-one-RRset payload would therefore empty the rest of the zone, every other
-RRset gone. The single-call path is not a shortcut waiting for a test; it
-does far more damage than intended.
-
-The two-call path is checked: the `DELETE` removes only the named RRset by
-an explicit filter, and the `PUT` afterwards only ever writes what the
-provider means to write. It has a real cost — **a name holds nothing for
-the gap between the two calls** — a resolver asking in that window gets
-NXDOMAIN for that name and type. That window was still the better trade
-than a write whose blast radius is the whole zone.
+`upsert` must make a name hold **exactly** the new value. Hostinger gives
+two ways: one `PUT` with `overwrite: true`, or a `DELETE` of the RRset
+then a `PUT` with `overwrite: false`. The provider uses the second, at
+the cost of two calls: Hostinger's own docs say `overwrite: true`
+replaces every record in the payload, so a one-RRset `PUT` would empty
+the rest of the zone. The cost of the two-call path is real — **the name
+holds nothing for the gap between them**, so a resolver asking in that
+window gets NXDOMAIN — but that beats a write whose blast radius is the
+whole zone.
 
 ### A DNS-only token needs its zones configured
 
 Hostinger's DNS API answers about one zone at a time and has no
-list-zones endpoint. Automatic provider selection normally reads the
-account's domains from the Domains portfolio endpoint, but a
-least-privilege DNS token gets a 403 there even though it can read its own
-zone. Set `hostinger.zones` on the machine for that case; the provider then
-answers from the configured list and never asks the portfolio. An empty
-list keeps portfolio discovery for broader tokens.
+list-zones endpoint. Provider selection normally reads the account's
+domains from the Domains portfolio endpoint, but a least-privilege DNS
+token gets a 403 there even though it can read its own zone. Set
+`hostinger.zones` on the machine for that case.
 
 ### A delete filter takes the whole RRset
 
-Hostinger's `DELETE` removes an entire `(name, type)`, not one value inside
-it. Deleting one value out of several means: read the RRset, delete it
-whole, then `PUT` the values you meant to keep back with `overwrite:
-false`. That is not one atomic step — the same gap as above applies — but
-it is the only way to remove one value without the API removing them all.
+Hostinger's `DELETE` removes an entire `(name, type)`, not one value
+inside it. Deleting one value out of several means: read the RRset,
+delete it whole, then `PUT` back the values you meant to keep.
 
 ### Writes are asynchronous
 
-A successful `PUT` or `DELETE` answers "request accepted," not "done." A
-`list` called right after can still show the state from before the write.
-This is why the provider does not check its own writes by reading them
-back straight away — a `list` racing the write would report a real change
-as a failure. Give it a moment before checking with `dns status` or `dns
-list`.
+A successful `PUT` or `DELETE` means "request accepted," not "done." A
+`list` called right after can still show the old state — which is why
+the provider never checks its own writes immediately. Give it a moment
+before checking with `dns status` or `dns list`.
 
 ## Cloudflare
 
 ### `PUT` clears every field it was not given
 
-Cloudflare's DNS record `PUT` replaces the whole record. Send only
-`content` and `ttl`, and `proxied`, `comment` and `tags` reset to their
-defaults — a proxied record silently stops being proxied, a comment
-somebody wrote by hand disappears. The provider never uses `PUT` for a
-change. It uses `PATCH`, which touches only the fields in the request and
-leaves the rest of the record alone.
+Cloudflare's DNS record `PUT` replaces the whole record: send only
+`content` and `ttl`, and `proxied`, `comment` and `tags` reset to
+defaults. The provider always uses `PATCH` instead, which touches only
+the fields in the request.
 
 ### No upsert: every write past a create needs an id
 
-Cloudflare has no "make this name hold this value" call. Creating a record
-returns an id; changing or deleting one needs that id, and the only way to
-get it is to list first. `upsert` therefore always lists before it writes:
-create on no match, `PATCH` by id on exactly one match, and refuse to
-guess when more than one record matches the name and type (`ambiguous`).
+Cloudflare has no "make this name hold this value" call. Creating a
+record returns an id; changing or deleting one needs that id, found by
+listing first. So `upsert` always lists before it writes: create on no
+match, `PATCH` by id on one match, refuse to guess on more than one
+(`ambiguous`).
 
 ### An invisible zone is a 200, not a 404
 
-Ask Cloudflare for a zone the token cannot see, or one that does not
-exist, and the answer is `200` with an empty `result` array — not an error
-status. The provider treats an empty result as `zone_not_found` itself;
-trusting the HTTP status alone here would call a zone that plainly did not
-resolve a success.
+Ask Cloudflare for a zone the token cannot see, and the answer is `200`
+with an empty `result` array, not an error. The provider treats an empty
+result as `zone_not_found` itself.
 
 ### `proxied` is always `false`
 
-The provider never sets a record to be proxied through Cloudflare's
-network. Certificates on this machine renew through the HTTP-01 challenge,
-which needs the challenge request to reach the machine directly. A
-proxied record answers from Cloudflare's edge instead, and the challenge
-fails.
+Certificates on this machine renew through a challenge that needs the
+request to reach the machine directly. A proxied record answers from
+Cloudflare's edge instead, and the challenge fails.
 
 ## Neither provider retries a rate limit
 
-A `429` is reported as `rate_limited` and the provider stops — it never
-sleeps and tries again on its own. Retrying inside the entrypoint would
-hide how throttled the registrar really is from whatever called it, and
-could turn one throttled request into a hang with no visible cause.
-Cloudflare in particular blocks every call from a token for five minutes
-after a single `429`, so a retry loop there would not even help.
+A `429` is reported as `rate_limited` and the provider stops. Retrying
+inside the entrypoint would hide how throttled the registrar really is,
+and could turn one throttled request into a silent hang. Cloudflare
+blocks a token for five minutes after a single `429`, so retrying would
+not even help.

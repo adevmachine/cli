@@ -4,10 +4,8 @@ A package is an Ansible role plus one extra file, `package.yml`. Nothing
 is translated on the way to the machine: what you write is what runs, so
 a failure points at the exact line you wrote.
 
-This page and the validator agree. The page exists because people read
-before they write; the validator is what enforces the rules. When they
-disagree, trust the validator — ask it with `devmachine packages schema
---json`.
+This page and the validator agree. When they disagree, trust the
+validator — ask it with `devmachine packages schema --json`.
 
 ## The layout
 
@@ -27,27 +25,21 @@ packages validate`.
 
 ### `format` (required)
 
-The shape of the file. This CLI reads format `1`.
-
-It comes first because everything else depends on it. Without it, a
-change to the format would break every existing package in a different
-way, with no message explaining why. A validator that meets a format it
-cannot read says so and stops, instead of misreading fields it does not
-understand.
+The shape of the file. This CLI reads format `1`. A validator that meets
+a format it cannot read says so and stops, instead of misreading fields
+it does not understand.
 
 ### `name` (required)
 
-Lower case letters, digits, dashes and underscores. It must match the
-directory name, because a package is found by its directory.
+Lower case letters, digits, dashes and underscores, matching the
+directory name — a package is found by its directory.
 
 ### `scope` (required)
 
-`machine` or `workspace`. Nothing else is valid.
-
-Scope is a fact about the software, not a preference. Docker installs
-once and serves everyone, so it is `machine`. A tool with a login per
-person is `workspace`, and it runs once for each workspace that asks for
-it.
+`machine` or `workspace`, nothing else. A fact about the software, not a
+preference: Docker installs once and serves everyone, so it is
+`machine`; a tool with a login per person is `workspace`, running once
+per workspace that asks for it.
 
 ### `summary` (required)
 
@@ -56,15 +48,11 @@ One line saying what the package installs. `packages list` prints it.
 ### `requires.cli`
 
 Which version of the CLI can run this package: `">= 0.2.0"`, `"> 0.2.0"`
-or `"= 0.2.0"`.
-
-This is different from `format`. `format` says whether the CLI can *read*
-the file. `requires.cli` says whether it can *run* what the file
-describes. The CLI binary and the packages are released on their own
-schedules, so the two can disagree.
-
-A CLI built from source calls itself `dev`, and every constraint allows
-it.
+or `"= 0.2.0"`. Different from `format`: `format` says whether the CLI can
+*read* the file, `requires.cli` says whether it can *run* what it
+describes — the binary and the packages release on their own schedules,
+so the two can disagree. A CLI built from source calls itself `dev`, and
+every constraint allows it.
 
 ### `needs`
 
@@ -74,11 +62,9 @@ Packages that must run before this one:
 needs: [base, firewall]
 ```
 
-This is the only thing that decides run order. The order packages happen
-to be listed in your own configuration means nothing.
-
-A circular dependency is refused, and the error names the packages
-involved.
+The only thing that decides run order — the order packages are listed in
+your own configuration means nothing. A circular dependency is refused,
+naming the packages involved.
 
 ### `provides`
 
@@ -100,12 +86,11 @@ extends:
 ```
 
 The key is `<package>.<place>`, and the value is a path inside this
-package. It can only add a file there, not change what is already there,
-and it cannot reach anywhere else. Extending a place nobody provides is
-refused while devmachine works out the plan, before anything runs.
-
-The file lands as `<extending package>-<basename>`, so two packages
-adding a file with the same name never collide.
+package. It can only add a file there, never change what is already
+there or reach anywhere else. Extending a place nobody provides is
+refused while devmachine plans, before anything runs. The file lands as
+`<extending package>-<basename>`, so two packages adding a same-named
+file never collide.
 
 ### `variables`
 
@@ -120,27 +105,24 @@ variables:
 
 The package's Ansible role reads `devmachine_<package>_<name>`, so a
 package called `tunnel` that declares `port` uses
-`devmachine_tunnel_port`. The package name is part of the variable
-because Ansible has one shared namespace, and two packages might both
-want a `port`.
+`devmachine_tunnel_port` — the package name is part of it since Ansible
+has one shared namespace, and two packages might both want a `port`.
 
 That is the same name used for a target's
 [settings](../concepts/configuration.md#settings): a setting is just a
-default someone overrode. The package does not know or care where the
-value came from.
+default someone overrode, and the package does not know or care where
+the value came from.
 
 A dash works in a package name but never in a variable name, so `-`
-becomes `_`, and so does the `.` a package name may contain. Two names
-that collide this way are refused, rather than letting one silently win.
+becomes `_`, as does the `.` a package name may contain. Names that
+collide this way are refused, rather than one silently winning.
 
 ### `credentials`
 
-What the package's tool needs to log in or authenticate, **and how to
-get it**. How belongs in the package, because the package is the only
-thing that knows.
-
-Each entry has a `name`, a `kind`, and a `scope` (`machine` or
-`workspace`), plus what its kind needs:
+What the package's tool needs to authenticate, **and how to get it** —
+how belongs here because the package is the only thing that knows. Each
+entry has a `name`, a `kind`, and a `scope` (`machine` or `workspace`),
+plus what its kind needs:
 
 | `kind` | also needs | what it means |
 | --- | --- | --- |
@@ -157,28 +139,23 @@ credentials:
     stored_at: ~/.claude/.credentials.json
 ```
 
-`stored_at` is a claim, not a guarantee. It is what lets `doctor` check
+`stored_at` is a claim, not a guarantee — it is what lets `doctor` check
 whether the login worked.
 
 A `manual` credential can also say `shareable: true`: a copy of
 `stored_at` works on another account, the way one GitHub login can serve
-every workspace. This is a fact about the tool, found by testing it: a
-session file copies fine, a token tied to one device or browser does not.
-Leave it out and it defaults to `false`, so the CLI never copies it
-anywhere.
+every workspace. This is a fact about the tool, found by testing it — a
+session file copies fine, a token tied to one device or browser does
+not. Leave it out and it defaults to `false`. A credential recommending
+`scope: machine` must say `shareable: true`, since `scope: machine`
+means "one login, copied into every workspace" — recommending both
+without it asks for something the package itself says cannot work.
 
-A `manual` credential that recommends `scope: machine` must also say
-`shareable: true`, because `scope: machine` means exactly "one login,
-copied into every workspace." Recommending both without `shareable` would
-ask for something the package itself says cannot work.
-
-Only a `manual` credential can be `shareable`. A `secret` or a `file` is
-delivered fresh to each place that needs it, never copied from one place
-to another, so setting `shareable` on either is refused.
-
-`scope` here is only a recommendation. Whether a shareable credential is
-actually shared is the operator's own choice, made per workspace in their
-configuration — see [Configuration](../concepts/configuration.md).
+Only `manual` can be `shareable`. A `secret` or `file` is delivered
+fresh to each place that needs it, never copied, so `shareable` on
+either is refused. `scope` here is only a recommendation — whether a
+shareable credential is actually shared is the operator's own choice,
+per workspace — see [Configuration](../concepts/configuration.md).
 
 ### `requires_files`
 
@@ -194,13 +171,11 @@ skills:
 ```
 
 The path is relative to the package root, and cannot contain `..`, be
-absolute, or escape through a symlink. Each direct child must be one
+absolute, or escape through a symlink. Each direct child must be a
 lower-case, dash-separated skill directory with a `SKILL.md`, whose
-frontmatter `name` matches the directory name and whose `description` is
-not empty. Scripts, references and assets under a valid skill directory
-are included as part of that skill.
+frontmatter `name` matches the directory and `description` is not empty.
 
-This does not replace the Ansible role. A package with skills still has
+This does not replace the Ansible role — a package with skills still has
 `tasks/main.yml`, and may also have defaults, handlers, files and
 templates.
 
@@ -216,15 +191,13 @@ commands: [zones, list, upsert, delete, help]
 
 - `entrypoint` is a path inside the package. It must exist, be
   executable, and start with `#!/usr/bin/env python3` — Ansible already
-  needs Python on any machine this CLI sets up, so an entrypoint with no
-  extra dependencies always works.
-- `commands` lists what it accepts: a list of names, or `["*"]` for
-  anything. Mixing `"*"` with named commands is refused, since it says
-  two contradictory things.
+  needs Python on any machine this CLI sets up.
+- `commands` lists what it accepts: names, or `["*"]` for anything.
+  Mixing `"*"` with named commands is refused.
 - `kind` is a contract. The only one so far is `dns`, which must accept
   `zones`, `list`, `upsert`, `delete` and `help`.
 
-Nothing calls an entrypoint in this version yet. It is validated now so
+Nothing calls an entrypoint in this version yet — it is validated now so
 the first real use cannot invent its own shape later.
 
 ## The rules, and what each one says
@@ -252,12 +225,10 @@ the first real use cannot invent its own shape later.
 | `kind` or `commands` with no entrypoint | ``kind` and `commands` describe an `entrypoint`, and this package declares none`` |
 
 `devmachine packages validate` reports every problem at once, not just
-the first. Fixing one at a time would take several round trips for what
-should be one.
+the first.
 
 ## Why `apt` is refused
 
 A package that calls `apt` only works on Debian. `package:` picks the
-machine's own package manager instead, so the same package keeps working
-even when the machine underneath it changes. This turns a rule people
-have to remember into an error the validator catches.
+machine's own package manager instead, turning a rule people have to
+remember into an error the validator catches.

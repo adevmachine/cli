@@ -2,8 +2,7 @@
 
 `devmachine setup git` turns `<config>/` into a git repository, so it can
 live in a private remote, be reviewed, and be restored. It never runs on
-its own — the directory is an ordinary set of files until you ask for
-this.
+its own.
 
 ## What is committed, and what never is
 
@@ -18,88 +17,70 @@ this.
 | `history.log` | what was run, against which host | **never** |
 | `*.env` | anything a package staged | **never** |
 
-`config.yml` is the interesting line. It holds hostnames and usernames,
-which is exactly why the remote must be private — and why the command says
-so out loud rather than assuming you worked it out.
+`config.yml` holds hostnames and usernames, which is exactly why the
+remote must be private — and why the command says so out loud rather
+than assuming you worked it out.
 
 ## Why the remote must be private
 
 `config.yml` names every machine you run: its address, its admin login,
-which workspaces live on it. That is not a secret in the way a
-token is — nothing in it lets somebody in — but it is a map of your
-infrastructure, and a public one is a map handed to whoever finds the
-repository.
+which workspaces live on it. Nothing in it lets somebody in, but it is a
+map of your infrastructure, and a public repo is a map handed to whoever
+finds it.
 
 `devmachine setup git` offers to create the remote itself with `gh repo
-create --private`, for exactly this reason: the moment somebody chooses to
-publish this directory is the moment they should not have to remember the
-flag.
+create --private`, so the moment somebody chooses to publish this
+directory is the moment they should not have to remember the flag.
 
 ## Why the `.gitignore` comes first
 
 The order is: write `.gitignore` → `git init` → `git add` → guard →
 commit.
 
-Written after `git init`, there would be a window in which `git add -A`
-could pick up `keys/id_ed25519` or `secrets.json` before anything excludes
-them. That window can be milliseconds, and the result is still permanent:
-a private key in a commit is not undone by removing it at the tip. See
-[troubleshooting](../troubleshooting.md#i-already-committed-a-key) for
-what to do if that has already happened.
-
-Writing the file first removes the window rather than shrinking it. There
-is no moment where `git add -A` can see an unignored key, because the
-ignore rule exists before the repository does.
+Written after `git init`, there would be a window where `git add -A`
+could pick up `keys/id_ed25519` or `secrets.json` before anything
+excludes them. That window can be milliseconds, and the result is
+permanent: a private key in a commit is not undone by removing it at the
+tip. See
+[troubleshooting](../troubleshooting.md#i-already-committed-a-key) if
+that has already happened. Writing the file first removes the window
+instead of shrinking it.
 
 ## The guard, and why it refuses rather than warns
 
-Every commit this feature makes goes through the same check: stage
-everything, look at what actually got staged, and refuse if any of it is a
-path that must never be committed. A warning printed above a commit that
-already happened is a warning nobody reads — the commit already exists,
-and printing something after it changes nothing. Refusing before the
-commit is the only version of this that matters.
+Every commit this feature makes stages everything, checks what actually
+got staged, and refuses if any of it is a path that must never be
+committed. A warning printed above a commit that already happened is a
+warning nobody reads — refusing before the commit is the only version
+that matters.
 
 The check is a closed list of paths — `keys/`, `secrets.json`, `cache/`,
-`history.log`, `*.env` — not a scan for things that look like a token. A
-scanner that looks for a key format it has not seen teaches you to trust a
-guard that does not hold everywhere. This list is closed because the CLI
-wrote every one of these paths itself: nothing else lands in the
-configuration directory.
+`history.log`, `*.env` — not a scan for things that look like a token,
+because the CLI wrote every one of these paths itself: nothing else
+lands in the configuration directory.
 
 ## Why the CLI writes its own commit messages
 
-Once the directory is a repository, every write the CLI makes —
-`machines add`, `workspaces new`, `sync` locking a machine's packages —
-commits itself, with a message the command chose: `chore(config): add
-machine box`, `chore(config): lock packages for main`. Nothing here is
-written by a model guessing at what looks like a reasonable thing to have
-happened.
+Every write the CLI makes — `machines add`, `workspaces new`, `sync`
+locking a machine's packages — commits itself, with a message the
+command chose, such as `chore(config): add machine box`. A history is
+only useful if every entry can be trusted to say what actually ran. A
+commit message a language model wrote by looking at a diff is a guess
+dressed as a fact; a commit message the CLI wrote is a report — the
+command that ran is the only thing that could have written that exact
+line.
 
-That is the whole point of the feature. A history is only useful if every
-entry in it can be trusted to say what actually ran. A commit message a
-language model wrote by looking at a diff is a guess dressed as a fact —
-occasionally wrong in a way nobody catches, because it reads as plausible.
-A commit message the CLI wrote is a report: the command that ran is the
-only thing that could have written that exact line.
-
-This also means the auto-commit never fails the command that triggered it.
-A workspace that exists on the machine and not in the history is a
-nuisance; a `workspaces new` that fails after the account already exists
-on the machine is worse. A commit failure — a broken signing key, for
-instance — is written to `history.log` instead, and the configuration
-change stands.
+The auto-commit never fails the command that triggered it: a broken
+signing key, for instance, is written to `history.log` instead, and the
+configuration change stands.
 
 ## Secrets never enter this history, by a different route
 
-`config.yml` can declare that a package needs a secret, but the value
-itself never lives in the configuration directory at all — it is kept in
-the OS keychain (`devmachine secrets set`), with `secrets.json` as the
-fallback when there is no keychain, and that file is in the first
-`.gitignore` this command ever writes.
+A secret's value never lives in the configuration directory — it is kept
+in the OS keychain (`devmachine secrets set`), with `secrets.json` as the
+fallback with no keychain, already in the first `.gitignore` this command
+writes.
 
-`devmachine secrets example` is the other half of this: it lists the
-`<NAME>=` a machine's packages need, with no value, so the *shape* of what
-a machine needs can be reviewed or handed to somebody else without the
-value it asks for ever being at risk of ending up in a file this command's
-guard would otherwise have to catch.
+`devmachine secrets example` lists the `<NAME>=` a machine's packages
+need, with no value — the *shape* of what a machine needs, safe to
+review or hand to somebody else.

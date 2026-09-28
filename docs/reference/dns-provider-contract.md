@@ -5,10 +5,8 @@ back. Follow this page and the CLI works with your provider on the first
 try; guess, and it does not.
 
 `devmachine packages new <name> --scope machine --kind dns` writes an
-entrypoint that already follows this contract — `list` returns an empty
-list, and `upsert` and `delete` return a clear "not implemented yet"
-error. Start from that and replace the placeholders, rather than writing
-an entrypoint from nothing.
+entrypoint that already follows this contract, with placeholders to
+replace rather than writing one from nothing.
 
 ## How it is called
 
@@ -26,10 +24,9 @@ The command is `argv[1]`, the zone is `argv[2]`.
 <entrypoint> help
 ```
 
-`zones` answers which zones the credential can see. The CLI uses this to
-work out which registrar holds a name, so it has to ask this before it
-can even name a zone — and a provider that cannot answer it can never be
-chosen.
+`zones` answers which zones the credential can see, so the CLI can work
+out which registrar holds a name. A provider that cannot answer it can
+never be chosen.
 
 ```json
 {"zones": ["example.com", "example.net"]}
@@ -49,9 +46,8 @@ none.
 ]}
 ```
 
-Both `zones` and `help` are required. A manifest that lists a command its
-entrypoint actually refuses is a lie no validator can catch, because only
-the entrypoint knows.
+Both `zones` and `help` are required. A manifest listing a command its
+entrypoint actually refuses is a lie no validator can catch.
 
 ## What it receives
 
@@ -99,44 +95,39 @@ kind the CLI learns.
 ## What the environment holds
 
 Whatever `/etc/devmachine/<credential>/env` sets for this provider's
-credential, exported, **and nothing else the CLI adds**. A provider that
-reads a variable its own credential does not declare will work on the one
-machine that happens to have it set, and break on everybody else's.
+credential, exported, **and nothing else the CLI adds**. A provider
+reading a variable its own credential does not declare will work by
+accident on one machine and break everywhere else.
 
 ## Where and as whom it runs
 
 On the machine, as root, from `/opt/devmachine/roles/<package>/`. Its
-working directory is not guaranteed, so use absolute paths — never a path
-relative to the entrypoint's own location.
+working directory is not guaranteed — use absolute paths, never a path
+relative to the entrypoint's location.
 
 ## The rules that matter most
 
-- `upsert` makes the name hold **exactly** that one value. Adding to
-  whatever is already there is wrong, even when the registrar's API makes
-  that the easy path.
-- `delete` removes exactly that one value and leaves every other value at
+- `upsert` makes the name hold **exactly** that one value — adding to
+  what is already there is wrong, even if the registrar's API makes that
+  the easy path.
+- `delete` removes exactly that one value, leaving every other value at
   that name untouched.
-- An empty `value` on either call means the whole set at that name and
-  type, not a value that happens to be an empty string.
+- An empty `value` on either call means the whole set, not a value that
+  happens to be an empty string.
 
 ## Python 3, standard library only
 
-Ansible already needs Python on any machine this CLI sets up, so Python 3
-is always there, and an entrypoint with no extra dependencies always
-works. No `requests`, no `pip install`, no shelling out to `jq` — a
-provider that needs a package the machine does not have will fail during
-`sync`, far from wherever that dependency was declared.
+Ansible already needs Python on any machine this CLI sets up, so an
+entrypoint with no extra dependencies always works. No `requests`, no
+`pip install`, no shelling out to `jq` — a provider needing a package the
+machine lacks fails during `sync`, far from where that dependency was
+declared.
 
-## `format` in `package.yml`
-
-`format: 1` lets an older CLI refuse a package it cannot read cleanly,
-instead of misreading a field that changed shape. As a provider author,
-you never have to think about it beyond leaving the number the skeleton
-already put there.
+`format: 1` in `package.yml` lets an older CLI refuse a package it
+cannot read cleanly. Leave the number the skeleton already put there.
 
 ## Never retry a rate limit
 
 A provider that hits a rate limit reports `rate_limited` and stops.
 Retrying inside the entrypoint hides how throttled the registrar really
-is from whatever called it, and turns one slow request into a hang with
-no visible cause.
+is, and can turn one slow request into a hang with no visible cause.
