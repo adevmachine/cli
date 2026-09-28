@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // fakeGhClient stands in for the `gh` binary, so a test proves what the

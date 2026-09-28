@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/credentials"
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/credentials"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // External is a provider that runs as an executable on the machine, with its

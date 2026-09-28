@@ -24,10 +24,10 @@ formula.
 
 ## The credential in place today
 
-A GitHub App called `devmachine-release`, owned by the `adevmachine`
+A GitHub App called `devmachine-release`, owned by the `mydevmachine`
 organisation, installed on `homebrew-tap` only, with `Contents: Read and write`
 and no other permission. Its App ID and private key are already stored as
-secrets on `adevmachine/cli`, and neither expires.
+secrets on `mydevmachine/cli`, and neither expires.
 
 Regenerate the private key only if it leaks: the original download cannot be
 repeated, but a new key can be generated and the old one revoked.
@@ -38,7 +38,7 @@ The rest of this page is how to rebuild that from scratch.
 
 The token GitHub injects into a workflow can only write to the repository the
 workflow runs in. The Homebrew formula lives in another repository
-(`adevmachine/homebrew-tap`), so the release needs a credential that reaches it.
+(`mydevmachine/homebrew-tap`), so the release needs a credential that reaches it.
 
 A **GitHub App** provides that. Unlike a personal access token it does not
 expire, so a release cannot break a year from now because nobody rotated
@@ -60,21 +60,21 @@ anything.
 ### Store the credentials
 
 ```
-gh secret set TAP_APP_ID --repo adevmachine/cli
-gh secret set TAP_APP_PRIVATE_KEY --repo adevmachine/cli < path/to/key.pem
+gh secret set TAP_APP_ID --repo mydevmachine/cli
+gh secret set TAP_APP_PRIVATE_KEY --repo mydevmachine/cli < path/to/key.pem
 ```
 
 Organisation secrets work too, and are worth it if more repositories will
 publish to the tap:
 
 ```
-gh secret set TAP_APP_ID --org adevmachine --visibility all
+gh secret set TAP_APP_ID --org mydevmachine --visibility all
 ```
 
 ### Check it
 
 ```
-gh secret list --repo adevmachine/cli
+gh secret list --repo mydevmachine/cli
 ```
 
 Both names should be listed. Without them the release workflow fails at the
@@ -90,17 +90,17 @@ token step, before building anything.
 
 ## The documentation site
 
-https://adevmachine.github.io/docs/ is built by the `adevmachine/docs`
+https://mydevmachine.github.io/docs/ is built by the `mydevmachine/docs`
 repository from this repository's `docs/` on `main`. It rebuilds every six
 hours on its own. After pushing a change under `docs/`, or after a release,
 rebuild it now:
 
 ```
-gh workflow run deploy.yml -R adevmachine/docs
-gh run watch -R adevmachine/docs $(gh run list -R adevmachine/docs --limit 1 --json databaseId -q '.[0].databaseId')
+gh workflow run deploy.yml -R mydevmachine/docs
+gh run watch -R mydevmachine/docs $(gh run list -R mydevmachine/docs --limit 1 --json databaseId -q '.[0].databaseId')
 ```
 
-The skills in `adevmachine/packages` carry a copy of the reference pages. After
+The skills in `mydevmachine/packages` carry a copy of the reference pages. After
 a release that changed them, regenerate that copy there with
 `scripts/sync-skill-references.sh <path-to-this-release's-docs>`; the packages
 CI fails until it matches the latest release.
@@ -108,6 +108,6 @@ CI fails until it matches the latest release.
 ## Verify
 
 ```
-brew install adevmachine/tap/devmachine
+brew install mydevmachine/tap/devmachine
 devmachine version
 ```

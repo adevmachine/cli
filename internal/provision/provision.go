@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/adevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/packages"
 )
 
 // Options are the choices a caller makes about one run.

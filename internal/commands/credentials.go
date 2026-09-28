@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/credentials"
-	"github.com/adevmachine/cli/internal/packages"
-	"github.com/adevmachine/cli/internal/secrets"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/credentials"
+	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
 

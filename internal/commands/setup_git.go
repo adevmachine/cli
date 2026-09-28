@@ -12,8 +12,8 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/repo"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 

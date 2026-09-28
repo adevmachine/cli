@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // storeWith builds a store whose local directory holds these manifests.

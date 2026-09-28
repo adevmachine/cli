@@ -8,7 +8,7 @@ You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
 Linux computer.
 
 ```
-brew install adevmachine/tap/devmachine
+brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine workspaces new alice && devmachine sync
 devmachine ssh alice
@@ -18,10 +18,10 @@ devmachine ssh alice
 talking to, installs a key, and turns off password logins. `workspaces new`
 adds a workspace to your configuration. `sync` builds it on the server.
 
-**Documentation: https://adevmachine.github.io/docs/** — getting started,
+**Documentation: https://mydevmachine.github.io/docs/** — getting started,
 how it all works, every command, and fixes for common errors. The same pages
 are in [`docs/`](docs/index.md), and an LLM can read them all from
-[llms-full.txt](https://adevmachine.github.io/docs/llms-full.txt).
+[llms-full.txt](https://mydevmachine.github.io/docs/llms-full.txt).
 
 ## The model
 
@@ -32,7 +32,7 @@ are in [`docs/`](docs/index.md), and an LLM can read them all from
 - A **package** adds one thing: a coding agent, Docker, a GitHub login, a
   reverse proxy. `sync` installs the packages your configuration asks for.
   Browse the ready-made ones at
-  [adevmachine/packages](https://github.com/adevmachine/packages), or write
+  [mydevmachine/packages](https://github.com/mydevmachine/packages), or write
   your own.
 
 Your configuration lives in a folder you control, `~/.config/devmachine`.
@@ -42,7 +42,7 @@ server between commands.
 ## From source
 
 ```
-git clone https://github.com/adevmachine/cli.git
+git clone https://github.com/mydevmachine/cli.git
 cd cli && make build && ./devmachine help
 ```
 

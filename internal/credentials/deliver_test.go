@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/packages"
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // awkward is what a naive implementation gets wrong: a space, a single quote

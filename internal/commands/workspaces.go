@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/expose"
-	"github.com/adevmachine/cli/internal/keys"
-	"github.com/adevmachine/cli/internal/repo"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/expose"
+	"github.com/mydevmachine/cli/internal/keys"
+	"github.com/mydevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

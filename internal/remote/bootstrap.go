@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // installKeyScript adds one line to the admin account's authorized_keys.

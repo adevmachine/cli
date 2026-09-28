@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // limactl is the only thing this package shells out to.

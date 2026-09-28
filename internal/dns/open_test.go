@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adevmachine/cli/internal/packages"
-	"github.com/adevmachine/cli/internal/provision"
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/provision"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // pkgSpec is what a fixture package.yml needs to say, kept small on purpose:

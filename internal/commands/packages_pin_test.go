@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 func TestPackagesPinWithNoReleasePinsTheLatest(t *testing.T) {

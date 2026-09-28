@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // selfConfig is a configuration with one self machine and nothing else, the

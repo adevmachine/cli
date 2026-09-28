@@ -29,8 +29,8 @@ server over SSH.
 ## 1. Install the CLI
 
 Check with `devmachine version`. If it is missing: on macOS run
-`brew install adevmachine/tap/devmachine`; on Linux, get the binary from
-https://github.com/adevmachine/cli/releases and put it on the `PATH`.
+`brew install mydevmachine/tap/devmachine`; on Linux, get the binary from
+https://github.com/mydevmachine/cli/releases and put it on the `PATH`.
 
 Then run `devmachine skills add`. It teaches you, and any other agent the
 person uses, the whole CLI. This only takes effect in a new session, so keep

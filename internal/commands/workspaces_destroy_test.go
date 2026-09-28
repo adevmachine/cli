@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // destroyClient is a remote.Client a test drives by hand: it plays the shell

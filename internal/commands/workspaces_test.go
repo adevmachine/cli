@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // withKey writes the public half of the machine's key, which is the thing a

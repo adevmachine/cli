@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/packages"
-	agentskills "github.com/adevmachine/cli/internal/skills"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/packages"
+	agentskills "github.com/mydevmachine/cli/internal/skills"
 	"github.com/spf13/cobra"
 )
 

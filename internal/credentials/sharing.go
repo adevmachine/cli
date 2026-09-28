@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/packages"
 )
 
 // Resolve says what happens about one credential in one workspace: one login

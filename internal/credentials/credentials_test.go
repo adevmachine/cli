@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/packages"
 )
 
 func TestEnvFileIsTheContractTheNextVersionReads(t *testing.T) {

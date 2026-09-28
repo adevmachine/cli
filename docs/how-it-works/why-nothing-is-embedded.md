@@ -2,7 +2,7 @@
 
 The CLI ships with no packages built in. Every package — even the ones
 every machine gets — is fetched from a pinned release of
-`github.com/adevmachine/packages`, checked against a checksum, and
+`github.com/mydevmachine/packages`, checked against a checksum, and
 cached.
 
 ## What that buys
@@ -25,7 +25,7 @@ published are the same kind of thing, resolved by the same code — no
 unreachable.** There is nothing embedded to fall back on:
 
 ```
-error: fetching https://github.com/adevmachine/packages/releases/download/v1/packages-v1.tar.gz: ...
+error: fetching https://github.com/mydevmachine/packages/releases/download/v1/packages-v1.tar.gz: ...
 ```
 
 Once a release is in the cache this stops mattering — the packages are on

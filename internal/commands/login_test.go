@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // loggingIn drives a login without opening a session and without a machine: it

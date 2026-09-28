@@ -5,7 +5,7 @@ Docker, your GitHub login.
 
 Add one with `devmachine packages add <name>`, then run `devmachine sync`
 to install it. `devmachine packages list` shows what exists. The
-published packages live at `github.com/adevmachine/packages`, and you can
+published packages live at `github.com/mydevmachine/packages`, and you can
 write your own.
 
 ## Which packages exist

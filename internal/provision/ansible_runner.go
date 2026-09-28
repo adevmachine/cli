@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/packages"
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // Ansible provisions a machine by running ansible-playbook on it.

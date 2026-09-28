@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/remote"
+	"github.com/mydevmachine/cli/internal/remote"
 )
 
 // The commands a snapshot is built from. Byte counts everywhere, so nothing

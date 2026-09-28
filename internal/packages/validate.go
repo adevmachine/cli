@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/skills"
+	"github.com/mydevmachine/cli/internal/skills"
 )
 
 // Problem is one thing wrong with a package, and where it is.

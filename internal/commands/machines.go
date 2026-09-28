@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/local"
-	"github.com/adevmachine/cli/internal/repo"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/local"
+	"github.com/mydevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 )
 

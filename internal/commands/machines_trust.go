@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/hostkeys"
-	"github.com/adevmachine/cli/internal/repo"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/hostkeys"
+	"github.com/mydevmachine/cli/internal/repo"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/knownhosts"
 )

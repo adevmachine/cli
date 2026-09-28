@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/adevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/config"
 )
 
 // target is where a command acts: a machine, and the user to log in as.

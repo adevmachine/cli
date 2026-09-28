@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/expose"
-	"github.com/adevmachine/cli/internal/packages"
-	agentskills "github.com/adevmachine/cli/internal/skills"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/expose"
+	"github.com/mydevmachine/cli/internal/packages"
+	agentskills "github.com/mydevmachine/cli/internal/skills"
 	"gopkg.in/yaml.v3"
 )
 

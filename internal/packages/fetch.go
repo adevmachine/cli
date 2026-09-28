@@ -18,7 +18,7 @@ import (
 // releaseBase is where the published recipes live. A release asset, not the
 // tag's own archive: a tag can be moved and its archive silently changes
 // underneath you, while an asset's checksum goes in the lock file.
-const releaseBase = "https://github.com/adevmachine/packages/releases/download"
+const releaseBase = "https://github.com/mydevmachine/packages/releases/download"
 
 // checksumFile records which tarball produced a cache directory, so a cached
 // release can be used without the network and still be identified in the lock.

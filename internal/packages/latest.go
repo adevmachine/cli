@@ -10,7 +10,7 @@ import (
 
 // latestReleaseAPIURL is where GitHub answers with the newest published
 // release. A variable so a test can answer without the network.
-var latestReleaseAPIURL = "https://api.github.com/repos/adevmachine/packages/releases/latest"
+var latestReleaseAPIURL = "https://api.github.com/repos/mydevmachine/packages/releases/latest"
 
 // Latest resolves the release tag of the newest published packages release.
 //

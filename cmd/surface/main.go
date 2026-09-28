@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/adevmachine/cli/internal/commands"
+	"github.com/mydevmachine/cli/internal/commands"
 )
 
 func main() {

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adevmachine/cli/internal/aliases"
-	"github.com/adevmachine/cli/internal/config"
-	"github.com/adevmachine/cli/internal/hostkeys"
+	"github.com/mydevmachine/cli/internal/aliases"
+	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/cli/internal/hostkeys"
 )
 
 var errNotFound = errors.New("not found")
