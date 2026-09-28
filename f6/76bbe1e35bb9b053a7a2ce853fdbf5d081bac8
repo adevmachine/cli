@@ -1,0 +1,24 @@
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_f6f17ea2687b2b 43
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_f6f17ea2687b2b 76-79
+  s_a0cbf6c120c4f8::t_be1f381995afa4 1-75,80-88
+docs/index.md
+  s_a0cbf6c120c4f8::t_51f22bb852b8cc 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f676bbe1e35bb9b053a7a2ce853fdbf5d081bac8",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
