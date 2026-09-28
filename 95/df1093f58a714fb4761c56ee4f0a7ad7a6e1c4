@@ -1,0 +1,23 @@
+.goreleaser.yaml
+  s_a0cbf6c120c4f8::t_2935036d24e2f2 39,49
+README.md
+  s_a0cbf6c120c4f8::t_183c2422b3b5f6 21,24
+docs/releasing.md
+  s_a0cbf6c120c4f8::t_197c0bdab64815 93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "95df1093f58a714fb4761c56ee4f0a7ad7a6e1c4",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
