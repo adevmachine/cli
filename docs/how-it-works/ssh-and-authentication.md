@@ -1,24 +1,14 @@
 # SSH and authentication
 
-## The CLI offers one method, never everything it has
+## devmachine logs in with one key, not all of yours
 
-When a machine has `key:`, the CLI offers that key and nothing else.
-Otherwise it offers the SSH agent and nothing else. Never both.
+If a machine has a `key:` in your configuration, devmachine uses that key.
+If not, it asks your SSH agent. It never tries every key you have.
 
-This is not tidiness. **An SSH server gives up after a few attempts** —
-`MaxAuthTries`, six by default. A client that offers every key an agent
-holds burns those attempts on keys the server does not want, cutting the
-connection before the method that would have worked is ever tried.
-
-The failure is confusing: everything works, then you add two unrelated
-keys to your agent, and hosts that worked yesterday start refusing you
-with an error that names no key. It is worse for a password — a server
-that accepts one will never ask for it if the agent used up the attempts
-first, so "it never prompts me" looks like the server refusing
-passwords.
-
-The CLI talks to the SSH library directly, instead of running the `ssh`
-command, so it can decide exactly what to offer.
+The reason: a server lets you try only a few times — six, usually — and
+then hangs up. If devmachine tried every key in your agent, it could use
+up those tries on the wrong keys before reaching the right one, and you
+would get a refusal that makes no sense.
 
 ## Two different programs
 

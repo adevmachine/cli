@@ -45,6 +45,8 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 - [DNS](concepts/dns.md) — pointing a domain at your server.
 - [Publishing](concepts/publishing.md) — `expose` and `tunnel`: showing
   something running in a workspace to the outside world, or just to you.
+- [Reaching your server](concepts/reaching-your-server.md) — the public address,
+  a private network with Tailscale, and private access to your apps.
 - [Agent Skills](concepts/agent-skills.md) — teaching a coding agent to use
   devmachine.
 
