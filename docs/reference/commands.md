@@ -716,6 +716,7 @@ devmachine packages new <name> [--scope machine|workspace] [--into <dir>]
 devmachine packages validate <dir>
 devmachine packages schema [--json]
 devmachine packages help <name> [--json]
+devmachine packages pin [release]
 ```
 
 `list` reads the recipes and the configuration together, so a package appears
@@ -740,6 +741,12 @@ exits 1 when it found any.
 `schema` prints the `package.yml` format this binary reads. It is the answer
 that cannot drift, because the validator is what enforces it. The whole format
 is in [the package format](package-format.md).
+
+`pin` writes `packages: <release>` to `config.yml`: the release of the
+packages repository every recipe is read from. With no release it pins the
+latest one. `setup` pins the latest when it writes a new configuration, so
+this is for moving to a newer release, or for a configuration written by hand.
+A release is a tag such as `v8`, never a branch.
 
 `help` asks an installed package what it accepts, by running its own `help`
 and printing the answer — a table by default, the raw shape under `--json`.

@@ -234,7 +234,7 @@ func skillSource(ctx context.Context, configDir, requested string) (agentskills.
 	}
 	if requested == "" && cfg.Packages == "" {
 		if !missing {
-			return agentskills.Source{}, errors.New("no package release is pinned; run `devmachine setup` or set `packages:` before `devmachine skills add`")
+			return agentskills.Source{}, errors.New("no package release is pinned; run `devmachine packages pin` before `devmachine skills add`")
 		}
 		version, err := latestPackagesRelease(ctx)
 		if err != nil {

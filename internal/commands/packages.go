@@ -24,6 +24,7 @@ func newPackagesCmd(opts *options) *cobra.Command {
 		newPackagesValidateCmd(opts),
 		newPackagesSchemaCmd(opts),
 		newPackagesHelpCmd(opts),
+		newPackagesPinCmd(opts),
 	)
 	return cmd
 }

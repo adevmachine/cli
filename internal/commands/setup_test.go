@@ -752,3 +752,34 @@ func TestSetupSeedsTheDefaultPackagesForAWorkspace(t *testing.T) {
 		t.Fatalf("got %#v", cfg.Defaults.Workspace)
 	}
 }
+
+func TestSetupPinsTheLatestPackagesRelease(t *testing.T) {
+	defer stubLatestPackagesRelease(t, "v8")()
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	dir := t.TempDir()
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "example.com", "1"), setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Packages != "v8" {
+		t.Fatalf("a new configuration must pin the latest release, got %q", cfg.Packages)
+	}
+}
+
+func TestSetupWithoutTheLatestReleaseSaysHowToPin(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	out, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "example.com", "1"), setupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "devmachine packages pin") {
+		t.Fatalf("it does not say how to pin: %q", out)
+	}
+}

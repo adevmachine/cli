@@ -79,6 +79,10 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 	}
 	plan, err := packages.ResolveMachine(store, cfg, machine, version)
 	if err != nil {
+		if cfg.Packages == "" {
+			return fmt.Errorf("%w; no packages release is pinned, so only local packages exist: "+
+				"run `devmachine packages pin` to pin the latest release", err)
+		}
 		return err
 	}
 	// Generate stays pure: it never reads the lock itself, so the previous

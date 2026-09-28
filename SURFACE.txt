@@ -38,6 +38,7 @@ devmachine packages add
 devmachine packages help
 devmachine packages list
 devmachine packages new
+devmachine packages pin
 devmachine packages rm
 devmachine packages schema
 devmachine packages validate

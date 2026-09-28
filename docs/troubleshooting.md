@@ -449,3 +449,11 @@ ssh -O exit -o ControlPath=<user cache dir>/devmachine/cm/%C <user>@<address>
 or, when the exact address is not at hand, delete the stale socket file
 directly from `<user cache dir>/devmachine/cm/`. Either clears it, and the
 next `run` opens a fresh connection.
+
+## "no package named X, and none is available"
+
+Either the name is wrong, or no packages release is pinned. With no
+`packages:` line in `config.yml`, only your local packages exist, so `sync`
+finds nothing called `workspace` or `dev`. Run `devmachine packages pin`,
+which pins the latest release, then `devmachine sync`. A configuration made
+by `setup` from version 0.7.7 on is pinned from the start.

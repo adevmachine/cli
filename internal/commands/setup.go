@@ -137,7 +137,14 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	}
 	m.Key = key.Path
 
+	release, err := latestPackagesRelease(ctx)
+	if err != nil {
+		fmt.Fprintf(out, "\nno packages release is pinned (%v): run `devmachine packages pin` before the first sync.\n", err)
+		release = ""
+	}
+
 	if err := writeConfig(dir, path, configFile{
+		Packages: release,
 		Machines: []machineFile{machineEntry(m)},
 		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
 		Domain:   domain,
@@ -222,7 +229,7 @@ func finishSetup(ctx context.Context, dir string, in io.Reader, out io.Writer) e
 		return err
 	}
 	if cfg.Packages == "" {
-		fmt.Fprintln(out, "\nAgent skills: no package release is pinned. Pin `packages:` in config.yml, then run `devmachine skills add`.")
+		fmt.Fprintln(out, "\nAgent skills: no package release is pinned. Run `devmachine packages pin`, then `devmachine skills add`.")
 		return nil
 	}
 	return setupSkills(ctx, dir, in, out)
@@ -593,6 +600,7 @@ func machineEntry(m config.Machine) machineFile {
 // configFile is the shape written to disk. It is separate from config.Config so
 // the file keeps its intended field order and omits what was left empty.
 type configFile struct {
+	Packages   string          `yaml:"packages,omitempty"`
 	Machines   []machineFile   `yaml:"machines"`
 	Workspaces []workspaceFile `yaml:"workspaces,omitempty"`
 	Defaults   defaultsFile    `yaml:"defaults,omitempty"`
