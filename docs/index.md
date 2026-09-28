@@ -18,6 +18,16 @@ as a bought one arrives.
 - [Getting started](getting-started.md) — install it, point it at a machine, see
   that it works.
 
+## Examples
+
+Real setups, done in a few steps. Start at [the list](examples/index.md).
+
+- [Express site with TLS](examples/express-site-with-tls.md)
+- [Docker site on 8080](examples/docker-site-on-8080.md)
+- [Claude Code, controlled from your phone](examples/claude-code-remote-control.md)
+- [Start Claude from your phone](examples/start-claude-from-your-phone.md)
+- [An agent in its own workspace](examples/an-agent-in-its-own-workspace.md)
+
 ## Concepts
 
 - [Machines and workspaces](concepts/machines-and-workspaces.md) — the two ideas
