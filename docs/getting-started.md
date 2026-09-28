@@ -40,7 +40,7 @@ really means.
 - **A coding agent:** `devmachine packages add claude-code --workspace alice`,
   then `devmachine sync`.
 - **GitHub, signed in once for every workspace:** `devmachine login gh`, then
-  `devmachine credentials push`. See [credentials](concepts/credentials.md).
+  `devmachine sync`. See [credentials](concepts/credentials.md).
 - **Docker:** `devmachine packages add docker`, and let the workspace use it
   with `devmachine workspaces edit alice --set workspace.groups=[docker]`, then
   `devmachine sync`.

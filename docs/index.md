@@ -17,6 +17,8 @@ as a bought one arrives.
 
 - [Getting started](getting-started.md) — install it, point it at a machine, see
   that it works.
+- [Set up with a coding agent](agent-setup.md) — the page to hand your agent:
+  it asks what it needs and runs everything except the steps only you can do.
 
 ## Examples
 
