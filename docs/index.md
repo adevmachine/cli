@@ -68,8 +68,8 @@ these when something behaves in a way that surprises you.
   into several workspaces, and keeping one workspace's login separate.
 - [DNS providers](how-it-works/dns-providers.md) — what each built-in provider
   does, and its rough edges.
-- [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you
-  have never logged into becomes one devmachine can trust.
+- [Setting up a server for the first time](how-it-works/trust-bootstrap.md) —
+  how `setup` makes sure it is talking to your server, and locks it down.
 - [Your computer as a machine](how-it-works/your-computer-as-a-machine.md) —
   using your own computer instead of a server.
 - [Versioning your configuration](how-it-works/versioning-your-configuration.md)

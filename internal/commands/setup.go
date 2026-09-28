@@ -66,11 +66,10 @@ func newSetupCmd(opts *options) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "setup",
 		Short: "Connect a new server, or prepare the configured one",
-		Long: "With no configuration, asks where the machine is and how to log in to it, then makes it " +
-			"the CLI's own: it installs a key, proves the key on a connection of " +
-			"its own, turns password login off, and installs Ansible. With an existing " +
-			"configuration, it reuses the configured trust and authentication and only " +
-			"ensures Ansible is installed; --force explicitly starts over.\n\n" +
+		Long: "With no configuration, asks for your server's address and how to log in, " +
+			"then gets it ready: it sets up a key, checks the key works, turns off password " +
+			"logins and installs Ansible. With a configuration, it only makes sure Ansible " +
+			"is installed; --force starts over.\n\n" +
 			"It never asks which situation you are in. A key that already works " +
 			"is found by trying it, and the root password is asked for only when " +
 			"that fails — many servers arrive with a key already pasted in, and " +
