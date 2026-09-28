@@ -1,0 +1,55 @@
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_283644baffcdb1 213-225,227-247,249-260,262-305
+  s_a0cbf6c120c4f8::t_dfb00a2efd3133 261
+  s_a0cbf6c120c4f8::t_d60f9761daf940 226
+  s_a0cbf6c120c4f8::t_83f0368c464eb6 248
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_2889a47ba61fee 658,662-667
+  s_a0cbf6c120c4f8::t_92f3164b53c13b 555-560,569,573-574,577,582,586-604
+  s_a0cbf6c120c4f8::t_a550f991865f2e 279-281
+  s_a0cbf6c120c4f8::t_4ed4e19092ea0a 612-616
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_34ace3c6ef5bb2 234-245,247-251,253-254
+  s_a0cbf6c120c4f8::t_69e75999403eaa 246,252
+docs/how-it-works/what-sync-removes.md
+  s_a0cbf6c120c4f8::t_9109323866e670 1-32,34
+  s_a0cbf6c120c4f8::t_1bff5394e93ee2 33,35-38
+docs/index.md
+  s_a0cbf6c120c4f8::t_747cdbba6f21bc 70-72
+internal/packages/lock_test.go
+  s_a0cbf6c120c4f8::t_765498a9dd8fbf 6
+  s_a0cbf6c120c4f8::t_a52a15708425d6 137-191
+internal/packages/lock.go
+  s_a0cbf6c120c4f8::t_a6d557abf84a2e 69-71
+  s_a0cbf6c120c4f8::t_763f518a6c1e4f 50
+  s_a0cbf6c120c4f8::t_0d576c79266634 9
+  s_a0cbf6c120c4f8::t_5df095e3e446ca 36-41
+  s_a0cbf6c120c4f8::t_f4ce707628f9b9 85,93-95,101-112
+internal/commands/sync.go
+  s_a0cbf6c120c4f8::t_24db5bc1075070 76-79,84-86
+internal/packages/resolve.go
+  s_a0cbf6c120c4f8::t_14cfd4c15dac31 78-83
+  s_a0cbf6c120c4f8::t_a5adda1f92cafa 5
+  s_a0cbf6c120c4f8::t_142db0670dac41 257
+  s_a0cbf6c120c4f8::t_48c6097b63497e 46-61
+internal/commands/sync_test.go
+  s_a0cbf6c120c4f8::t_b63582d8300199 176-184
+  s_a0cbf6c120c4f8::t_a3d94249c42929 189-191,199-202
+  s_a0cbf6c120c4f8::t_0747901718788c 161-175,185-188,192-198,203-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "347eb9eb71c2da16a55f6e5ef6a5fb5e749cb381",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
