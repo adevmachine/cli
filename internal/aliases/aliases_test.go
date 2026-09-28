@@ -89,6 +89,24 @@ func twoAddresses(t *testing.T) config.Config {
 	return cfg
 }
 
+// twoLiteralAddresses is a machine with two plain addresses configured
+// directly, neither behind a `tailscale:` name: a tailnet address first, a
+// public one second.
+func twoLiteralAddresses(t *testing.T) config.Config {
+	t.Helper()
+	withResolver(t, map[string][]string{"main": {"100.64.0.5", "203.0.113.10"}})
+	cfg := config.Config{
+		Machines: []config.Machine{{
+			Name:  "main",
+			Hosts: []config.Host{{Address: "100.64.0.5"}, {Address: "203.0.113.10"}},
+			User:  "root", Port: 22, Key: "/keys/main",
+		}},
+		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
+	}
+	pinMachine(t, &cfg.Machines[0], false)
+	return cfg
+}
+
 func oneAddress(t *testing.T) config.Config {
 	t.Helper()
 	withResolver(t, map[string][]string{"main": {"203.0.113.10"}})
@@ -263,6 +281,69 @@ func TestRenderPointsThePubAliasAtTheLiteralAddress(t *testing.T) {
 	after := block[strings.Index(block, "Host alice-devmachine-pub"):]
 	if !strings.Contains(after, "HostName 203.0.113.10") {
 		t.Fatalf("the fallback is not the public address:\n%s", block)
+	}
+}
+
+func TestRenderWritesAPubAliasForTwoLiteralAddresses(t *testing.T) {
+	block, err := Render(twoLiteralAddresses(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(block, "Host alice-devmachine-pub") {
+		t.Fatalf("got:\n%s", block)
+	}
+	after := block[strings.Index(block, "Host alice-devmachine-pub"):]
+	if !strings.Contains(after, "HostName 203.0.113.10") {
+		t.Fatalf("the fallback is not the second address:\n%s", block)
+	}
+	if !strings.Contains(after, "HostKeyAlias main-devmachine") {
+		t.Fatalf("the pub alias must share the primary's HostKeyAlias:\n%s", block)
+	}
+}
+
+func TestRenderLeavesOutAPubAliasThatWouldRepeatThePrimaryForTwoLiteralAddresses(t *testing.T) {
+	// Both entries are literal and identical, so there is nowhere else to
+	// fall back to.
+	withResolver(t, map[string][]string{"main": {"203.0.113.10", "203.0.113.10"}})
+	cfg := config.Config{
+		Machines: []config.Machine{{
+			Name:  "main",
+			Hosts: []config.Host{{Address: "203.0.113.10"}, {Address: "203.0.113.10"}},
+			User:  "root", Port: 22,
+		}},
+		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
+	}
+	pinMachine(t, &cfg.Machines[0], false)
+
+	block, err := Render(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(block, "-pub") {
+		t.Fatalf("got:\n%s", block)
+	}
+}
+
+func TestWriteBetweenTheMarkersIncludesThePubAlias(t *testing.T) {
+	block, err := Render(twoLiteralAddresses(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := fileWith(t, "Host work-jump\n    HostName jump.example.com\n")
+
+	if err := Write(path, block); err != nil {
+		t.Fatal(err)
+	}
+
+	body := read(t, path)
+	start := strings.Index(body, Begin)
+	stop := strings.LastIndex(body, End)
+	if start < 0 || stop < start {
+		t.Fatalf("no managed block:\n%s", body)
+	}
+	managed := body[start:stop]
+	if !strings.Contains(managed, "Host alice-devmachine-pub") || !strings.Contains(managed, "HostName 203.0.113.10") {
+		t.Fatalf("the written block is missing the pub alias:\n%s", managed)
 	}
 }
 

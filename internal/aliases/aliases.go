@@ -95,7 +95,7 @@ func List(cfg config.Config) ([]Alias, error) {
 		// it only earns its place when it points somewhere else. With one
 		// address, or with the tailnet already down and the primary resolved
 		// to the public address, it would only repeat the entry above it.
-		if fallback := literalAddress(machine); fallback != "" && fallback != entry.Host {
+		if fallback := literalAddress(machine, entry.Host); fallback != "" {
 			pub := entry
 			pub.Name = w.Name + suffix + "-pub"
 			pub.Host = fallback
@@ -105,10 +105,12 @@ func List(cfg config.Config) ([]Alias, error) {
 	return out, nil
 }
 
-// literalAddress is the first host entry ssh can dial as written.
-func literalAddress(m config.Machine) string {
+// literalAddress is the first host entry ssh can dial as written that is not
+// the primary address, so it names somewhere the `-pub` alias would actually
+// reach.
+func literalAddress(m config.Machine, primary string) string {
 	for _, h := range m.Hosts {
-		if remote.Literal(h.Address) {
+		if remote.Literal(h.Address) && h.Address != primary {
 			return h.Address
 		}
 	}
