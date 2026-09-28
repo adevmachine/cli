@@ -23,7 +23,7 @@ Scripts, references and assets travel with `SKILL.md`. Ownership records let
 Devmachine update its own paths while refusing to overwrite an unmanaged skill
 or one owned by another package.
 
-## Skills on this computer
+## Skills on your computer
 
 ```bash
 devmachine skills add
@@ -37,7 +37,7 @@ Bare `add` installs the official `devmachine-skills` package from the package
 release pinned by the effective configuration. It works before `devmachine
 setup` too: with no configuration yet, it takes the latest published packages
 release instead of a pin. `--package` selects an operator-owned local package.
-These commands only read and write this computer; they never connect to a
+These commands only read and write your computer; they never connect to a
 configured machine.
 
 ## Skills in a workspace
