@@ -231,6 +231,27 @@ The same error appears when the provider is installed but does not declare that
 place. Check its `provides:` against the `extends:` that names it — the point is
 written `<package>.<place>`, and both halves have to match.
 
+## A file a removed package left behind is still on the machine
+
+`sync` removes an extension file only when it remembers writing it — see
+[What sync removes](how-it-works/what-sync-removes.md). That memory starts
+with this version: a package removed from the configuration *before* you
+upgraded left a file `sync` never recorded, so no later sync ever takes it
+away.
+
+Find it under the directory the extended package provides (`sites.d` for
+caddy) and remove it by hand:
+
+```
+devmachine run --machine <name> -- 'rm /etc/caddy/sites.d/<package>-<file>'
+```
+
+Then, if Caddy is on the machine, reload it:
+
+```
+devmachine run --machine <name> -- 'systemctl reload caddy'
+```
+
 ## `sync --check` fails on a machine nothing has been applied to yet
 
 A dry run against a machine that has no packages on it reports failures like:

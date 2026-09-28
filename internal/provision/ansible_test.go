@@ -210,6 +210,99 @@ func TestGenerateReadsAnExtensionFromTheCopyThatWon(t *testing.T) {
 	}
 }
 
+// A path the previous lock recorded and the current plan no longer writes is
+// a file a package left behind when it left the configuration.
+func TestGenerateRemovesAnExtensionThePlanNoLongerWrites(t *testing.T) {
+	plan := planWithExtension(t) // sharing extends caddy.sites.d
+	plan.PreviousExtensions = []string{"/etc/caddy/sites.d/orphan-old.caddy"}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var removed []string
+	for _, task := range tasksIn(t, files["site.yml"]) {
+		if task["name"] != "files a package left when it left the plan" {
+			continue
+		}
+		for _, item := range task["loop"].([]any) {
+			removed = append(removed, item.(string))
+		}
+	}
+	if len(removed) != 1 || removed[0] != "/etc/caddy/sites.d/orphan-old.caddy" {
+		t.Fatalf("got %#v", removed)
+	}
+}
+
+// A path still written by the current plan is never removed, whatever the
+// previous lock says.
+func TestGenerateNeverRemovesAPathStillWritten(t *testing.T) {
+	plan := planWithExtension(t) // sharing extends caddy.sites.d, for alice
+	plan.PreviousExtensions = []string{"/etc/caddy/sites.d/alice-sharing-sharing.caddy"}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["site.yml"]), "files a package left when it left the plan") {
+		t.Fatalf("a path the plan still writes was removed:\n%s", files["site.yml"])
+	}
+}
+
+// An empty previous list is the ordinary first-run state, and Generate must
+// not invent a removal out of it.
+func TestGenerateWithNoPreviousExtensionsRemovesNothing(t *testing.T) {
+	plan := planWithExtension(t)
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["site.yml"]), "files a package left when it left the plan") {
+		t.Fatalf("nothing was recorded before, and something was removed anyway:\n%s", files["site.yml"])
+	}
+}
+
+// The removal reloads caddy when it changed something, sharing the reload
+// that the routes already add rather than running Caddy twice.
+func TestGenerateReloadsCaddyWhenAnExtensionIsRemoved(t *testing.T) {
+	plan := planWithExtension(t)
+	plan.SitesDir = "/etc/caddy/sites.d"
+	plan.PreviousExtensions = []string{"/etc/caddy/sites.d/orphan-old.caddy"}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := string(files["site.yml"])
+	if !strings.Contains(site, "devmachine_extensions_removed") {
+		t.Fatalf("the reload does not watch the removal:\n%s", site)
+	}
+	if strings.Count(site, "state: reloaded") != 1 {
+		t.Fatalf("caddy is reloaded more than once:\n%s", site)
+	}
+}
+
+// Without caddy on the machine there is nothing to reload, whatever an
+// extension removal changed.
+func TestGenerateWithoutCaddyReloadsNothingOnRemoval(t *testing.T) {
+	store := storeWithCatalogue(t)
+	plan := planFor(t, store, "main", nil, nil)
+	plan.PreviousExtensions = []string{"/some/other/place.caddy"}
+	plan.Extensions = []packages.Extension{
+		{From: "sharing", Target: "alice", Point: "other.place", Source: "files/sharing.caddy",
+			Into: "/some/other", Scope: packages.ScopeWorkspace},
+	}
+
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["site.yml"]), "state: reloaded") {
+		t.Fatalf("no caddy on the machine, and it reloaded anyway:\n%s", files["site.yml"])
+	}
+}
+
 func TestGenerateHostVarsCarryTheWorkspaces(t *testing.T) {
 	files, err := Generate(planWith(t, "main", nil, map[string][]string{"alice": {"claude-code"}}))
 	if err != nil {

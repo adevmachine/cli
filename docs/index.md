@@ -67,6 +67,9 @@ when something behaves in a way that surprises you.
 - [Why a published site lives in the configuration](how-it-works/published-sites.md)
   — why `expose` writes to the configuration instead of the machine, and what
   `sync` removes on its way to matching it.
+- [What sync removes](how-it-works/what-sync-removes.md) — why `sync` only
+  takes away a file it remembers writing, routes and extension files alike,
+  and never a glob over `sites.d`.
 
 ## Reference
 

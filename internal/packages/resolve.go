@@ -2,6 +2,7 @@ package packages
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -42,6 +43,22 @@ type Extension struct {
 	Source string `json:"source"`
 	// Into is the absolute path on the machine the extended package provides.
 	Into string `json:"into"`
+	// Scope is the extending package's own scope, ScopeMachine or
+	// ScopeWorkspace, carried here so Path can name the file without looking
+	// the package back up.
+	Scope string `json:"scope"`
+}
+
+// Path is the absolute path this extension is written to on the machine: the
+// package's name and the file's own name, and for a workspace package the
+// workspace too, so two packages — or the same package for two workspaces —
+// never collide on one destination.
+func (e Extension) Path() string {
+	name := e.From + "-" + path.Base(e.Source)
+	if e.Scope == ScopeWorkspace {
+		name = e.Target + "-" + name
+	}
+	return path.Join(e.Into, name)
 }
 
 // MachinePlan is everything that has to happen on one machine.
@@ -58,6 +75,12 @@ type MachinePlan struct {
 	// ResolveMachine refuses a route with nowhere to go.
 	Routes   []Route
 	SitesDir string
+	// PreviousExtensions is the absolute path of every extension file the
+	// last successful sync of this machine wrote, from the lock. It is empty
+	// on the first run after upgrading, and then Generate removes nothing —
+	// ResolveMachine never sets it; the caller reads the lock and carries it
+	// over, which keeps Generate pure.
+	PreviousExtensions []string
 }
 
 // Route is a workspace's port answering to a public host.
@@ -231,6 +254,7 @@ func wireExtensions(plan MachinePlan) ([]Extension, error) {
 					Point:  point,
 					Source: f.Manifest.Extends[point],
 					Into:   into,
+					Scope:  f.Manifest.Scope,
 				})
 			}
 		}

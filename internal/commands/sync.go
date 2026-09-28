@@ -73,10 +73,17 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 	if err != nil {
 		return err
 	}
+	lock, err := packages.LoadLock(dir)
+	if err != nil {
+		return err
+	}
 	plan, err := packages.ResolveMachine(store, cfg, machine, version)
 	if err != nil {
 		return err
 	}
+	// Generate stays pure: it never reads the lock itself, so the previous
+	// extensions come in on the plan.
+	plan.PreviousExtensions = lock.Extensions[machine.Name]
 	if err := validateLocalPackages(plan); err != nil {
 		return err
 	}
@@ -122,10 +129,6 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 	// A dry run changed nothing, so recording it as applied would make the
 	// lock claim something nobody did.
 	if !check {
-		lock, err := packages.LoadLock(dir)
-		if err != nil {
-			return err
-		}
 		if err := packages.SaveLock(dir, lock.WithPlan(plan, store, time.Now())); err != nil {
 			return err
 		}

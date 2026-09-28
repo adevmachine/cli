@@ -3,6 +3,7 @@ package packages
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -130,6 +131,61 @@ func TestLockClearsAWorkspaceThatNowDeclaresNothing(t *testing.T) {
 	got := existing.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
 	if len(got.Workspaces["alice"]) != 0 {
 		t.Fatalf("got %#v", got.Workspaces["alice"])
+	}
+}
+
+// planWithExtensions builds a plan carrying resolved extensions, so a lock
+// test can say what it records without going through a store.
+func planWithExtensions(machine string, extensions []Extension) MachinePlan {
+	plan := planWith(machine, nil, nil)
+	plan.Extensions = extensions
+	return plan
+}
+
+func TestLockRecordsTheExtensionsAPlanWrites(t *testing.T) {
+	plan := planWithExtensions("main", []Extension{
+		{From: "sharing", Target: "alice", Into: "/etc/caddy/sites.d", Source: "files/sharing.caddy", Scope: ScopeWorkspace},
+	})
+
+	got := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	want := []string{"/etc/caddy/sites.d/alice-sharing-sharing.caddy"}
+	if !reflect.DeepEqual(got.Extensions["main"], want) {
+		t.Fatalf("got %#v", got.Extensions["main"])
+	}
+}
+
+// A lock file from before this field existed has no extensions key at all,
+// and it has to load as an empty list rather than fail.
+func TestLockWithoutExtensionsLoadsAsAnEmptyList(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, LockFile), "applied_at: \"2026-09-18T12:00:00Z\"\nmachines:\n  main: []\nworkspaces: {}\n")
+
+	got, err := LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Extensions["main"]) != 0 {
+		t.Fatalf("got %#v", got.Extensions)
+	}
+}
+
+func TestLockExtensionsRoundTripThroughSaveAndLoad(t *testing.T) {
+	dir := t.TempDir()
+	plan := planWithExtensions("main", []Extension{
+		{From: "sharing", Target: "alice", Into: "/etc/caddy/sites.d", Source: "files/sharing.caddy", Scope: ScopeWorkspace},
+	})
+	lock := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	if err := SaveLock(dir, lock); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"/etc/caddy/sites.d/alice-sharing-sharing.caddy"}
+	if !reflect.DeepEqual(got.Extensions["main"], want) {
+		t.Fatalf("got %#v", got.Extensions["main"])
 	}
 }
 

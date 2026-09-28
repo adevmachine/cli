@@ -158,6 +158,88 @@ func TestSyncStreamsTheMachineOutputSomewhere(t *testing.T) {
 	}
 }
 
+// configWithExtension is a machine with caddy and a workspace package that
+// extends caddy.sites.d, the ordinary shape a lock's extensions list has to
+// cover.
+func configWithExtension(t *testing.T) string {
+	t.Helper()
+	dir := configWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [caddy]
+workspaces:
+  - name: alice
+    packages: [sharing]
+`)
+	writeCaddyPackage(t, dir)
+	caddyTasks := filepath.Join(packages.LocalDir(dir), "caddy", "tasks")
+	if err := os.MkdirAll(caddyTasks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(caddyTasks, "main.yml"),
+		[]byte("---\n- name: Install caddy\n  package: {name: caddy, state: present}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pkgDir := filepath.Join(packages.LocalDir(dir), "sharing")
+	if err := os.MkdirAll(filepath.Join(pkgDir, "files"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(pkgDir, "tasks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "format: 1\nname: sharing\nscope: workspace\nsummary: File sharing behind the proxy.\n" +
+		"extends:\n  caddy.sites.d: files/sharing.caddy\n"
+	if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgDir, "files", "sharing.caddy"),
+		[]byte("example.com {\n  respond \"ok\"\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgDir, "tasks", "main.yml"),
+		[]byte("---\n- name: Install sharing\n  package: {name: sharing, state: present}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestSyncWritesTheExtensionPathsToTheLock(t *testing.T) {
+	stubSync(t)
+	dir := configWithExtension(t)
+
+	if _, err := execute(t, "--config", dir, "sync", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := packages.LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"/etc/caddy/sites.d/alice-sharing-sharing.caddy"}
+	if got := lock.Extensions["main"]; len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSyncCheckDoesNotWriteTheExtensionPaths(t *testing.T) {
+	stubSync(t)
+	dir := configWithExtension(t)
+
+	if _, err := execute(t, "--config", dir, "sync", "--check"); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := packages.LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lock.Extensions["main"]) != 0 {
+		t.Fatalf("a dry run recorded the extension anyway: %#v", lock.Extensions)
+	}
+}
+
 func TestSyncWritesTheLockOnSuccess(t *testing.T) {
 	stubSync(t)
 	dir := configWithPackages(t)

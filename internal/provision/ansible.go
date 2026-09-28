@@ -276,8 +276,9 @@ func playbook(plan packages.MachinePlan, base string) (string, error) {
 		}
 		tasks += again
 	}
-	tasks += extensionTasks(plan, base)
-	tasks += routeTasks(plan, base)
+	extensionsWritten, extensionsRemoved := extensionTasks(plan, base)
+	tasks += extensionsWritten
+	tasks += routeTasks(plan, base, extensionsRemoved)
 	if plan.Machine.Self {
 		// A self machine converges on the operator's own Mac. Everything
 		// after this task assumes macOS — Homebrew paths, no become — so the
@@ -551,8 +552,12 @@ func groupBySettings(plan packages.MachinePlan, pkg string) ([]group, error) {
 }
 
 // extensionTasks copy each contribution into the directory its provider
-// opened. They run last, after the package that creates the directory.
-func extensionTasks(plan packages.MachinePlan, base string) string {
+// opened, then remove whichever file the previous lock recorded writing that
+// the current plan no longer writes — the file a package left behind when it
+// left the configuration. They run last, after the package that creates the
+// directory, and report whether they added the removal task, so routeTasks
+// knows whether its own caddy reload also has to watch for it.
+func extensionTasks(plan packages.MachinePlan, base string) (string, bool) {
 	found := map[string]packages.Found{}
 	for _, resolved := range append([]packages.Resolved{plan.OnMachine}, plan.Workspaces...) {
 		for _, f := range resolved.Ordered {
@@ -561,28 +566,42 @@ func extensionTasks(plan packages.MachinePlan, base string) string {
 	}
 
 	var out strings.Builder
+	current := map[string]bool{}
 	for _, extension := range plan.Extensions {
 		from := found[extension.From]
 		source := path.Join(base, rolesDir(from.Source), extension.From, extension.Source)
+		destination := extension.Path()
+		current[destination] = true
 
-		// The destination is named after what contributed it, so two packages
-		// shipping the same file name cannot collide. The workspace is in the
-		// name too, or the same package installed for two people would have
-		// one of them quietly overwrite the other.
-		destination := extension.From + "-" + path.Base(extension.Source)
 		where := extension.Point
-		if from.Manifest.Scope == packages.ScopeWorkspace {
-			destination = extension.Target + "-" + destination
+		if extension.Scope == packages.ScopeWorkspace {
 			where += " for " + extension.Target
 		}
 
 		fmt.Fprintf(&out, "    - name: %s extends %s\n", extension.From, where)
-		fmt.Fprintf(&out, "      copy:\n        src: %q\n        dest: %q\n",
-			source, path.Join(extension.Into, destination))
+		fmt.Fprintf(&out, "      copy:\n        src: %q\n        dest: %q\n", source, destination)
 		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n")
 		fmt.Fprintf(&out, "      tags: [%s]\n\n", extension.From)
 	}
-	return out.String()
+
+	var removed []string
+	for _, p := range plan.PreviousExtensions {
+		if !current[p] {
+			removed = append(removed, p)
+		}
+	}
+	sort.Strings(removed)
+	if len(removed) == 0 {
+		return out.String(), false
+	}
+
+	out.WriteString("    - name: files a package left when it left the plan\n      file:\n")
+	out.WriteString("        path: \"{{ item }}\"\n        state: absent\n      loop:\n")
+	for _, p := range removed {
+		fmt.Fprintf(&out, "        - %q\n", p)
+	}
+	out.WriteString("      register: devmachine_extensions_removed\n      tags: [extensions]\n\n")
+	return out.String(), true
 }
 
 // routeTasks put every workspace's routes file where caddy reads it, take
@@ -590,7 +609,11 @@ func extensionTasks(plan packages.MachinePlan, base string) string {
 // now owns — Caddy refuses a reload that names one host twice — and the file
 // of a workspace with no route left. They run after every package, so caddy
 // has made sites.d, and reload Caddy only when something changed.
-func routeTasks(plan packages.MachinePlan, base string) string {
+//
+// extensionsRemoved says whether extensionTasks removed an orphaned file
+// earlier in the play: that reload has to watch for it too, or a package
+// leaving the plan would take its file away without Caddy ever noticing.
+func routeTasks(plan packages.MachinePlan, base string, extensionsRemoved bool) string {
 	if plan.SitesDir == "" {
 		return ""
 	}
@@ -632,12 +655,16 @@ func routeTasks(plan packages.MachinePlan, base string) string {
 		}
 		out.WriteString("      register: devmachine_routes_removed\n      tags: [routes]\n\n")
 	}
-	if len(written) == 0 && len(absent) == 0 {
+	if len(written) == 0 && len(absent) == 0 && !extensionsRemoved {
 		return ""
 	}
 	out.WriteString("    - name: reload caddy for the routes\n      systemd:\n        name: caddy\n        state: reloaded\n")
-	out.WriteString("      when: (devmachine_routes_written is defined and devmachine_routes_written is changed) or " +
-		"(devmachine_routes_removed is defined and devmachine_routes_removed is changed)\n")
+	when := "(devmachine_routes_written is defined and devmachine_routes_written is changed) or " +
+		"(devmachine_routes_removed is defined and devmachine_routes_removed is changed)"
+	if extensionsRemoved {
+		when += " or (devmachine_extensions_removed is defined and devmachine_extensions_removed is changed)"
+	}
+	out.WriteString("      when: " + when + "\n")
 	out.WriteString("      tags: [routes]\n\n")
 	return out.String()
 }

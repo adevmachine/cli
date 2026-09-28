@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -32,6 +33,12 @@ type Lock struct {
 	AppliedAt  string                 `yaml:"applied_at" json:"applied_at"`
 	Machines   map[string][]LockEntry `yaml:"machines" json:"machines"`
 	Workspaces map[string][]LockEntry `yaml:"workspaces" json:"workspaces"`
+	// Extensions is, per machine, the absolute path of every extension file
+	// the sync that locked it wrote. A lock from before this field existed
+	// loads with it empty, and Generate then removes nothing on that first
+	// run — the files an already-removed package left stay until `devmachine
+	// run` removes them by hand.
+	Extensions map[string][]string `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 }
 
 // LockPath is where the lock lives.
@@ -40,7 +47,7 @@ func LockPath(configDir string) string { return filepath.Join(configDir, LockFil
 // LoadLock reads the lock. A missing one is the ordinary first state, not an
 // error.
 func LoadLock(configDir string) (Lock, error) {
-	lock := Lock{Machines: map[string][]LockEntry{}, Workspaces: map[string][]LockEntry{}}
+	lock := Lock{Machines: map[string][]LockEntry{}, Workspaces: map[string][]LockEntry{}, Extensions: map[string][]string{}}
 
 	path := LockPath(configDir)
 	body, err := os.ReadFile(path)
@@ -59,6 +66,9 @@ func LoadLock(configDir string) (Lock, error) {
 	if lock.Workspaces == nil {
 		lock.Workspaces = map[string][]LockEntry{}
 	}
+	if lock.Extensions == nil {
+		lock.Extensions = map[string][]string{}
+	}
 	return lock, nil
 }
 
@@ -72,6 +82,7 @@ func (l Lock) WithPlan(plan MachinePlan, store *Store, now time.Time) Lock {
 		AppliedAt:  now.UTC().Format(time.RFC3339),
 		Machines:   maps.Clone(l.Machines),
 		Workspaces: maps.Clone(l.Workspaces),
+		Extensions: maps.Clone(l.Extensions),
 	}
 	if out.Machines == nil {
 		out.Machines = map[string][]LockEntry{}
@@ -79,11 +90,26 @@ func (l Lock) WithPlan(plan MachinePlan, store *Store, now time.Time) Lock {
 	if out.Workspaces == nil {
 		out.Workspaces = map[string][]LockEntry{}
 	}
+	if out.Extensions == nil {
+		out.Extensions = map[string][]string{}
+	}
 
 	out.Machines[plan.Machine.Name] = lockEntries(plan.OnMachine.Ordered, store)
 	for _, w := range plan.Workspaces {
 		out.Workspaces[w.Target.Name] = lockEntries(w.Ordered, store)
 	}
+	out.Extensions[plan.Machine.Name] = extensionPaths(plan.Extensions)
+	return out
+}
+
+// extensionPaths is every path a plan's extensions write, sorted so the lock
+// does not churn when the same set is resolved in a different order.
+func extensionPaths(extensions []Extension) []string {
+	out := make([]string, 0, len(extensions))
+	for _, e := range extensions {
+		out = append(out, e.Path())
+	}
+	sort.Strings(out)
 	return out
 }
 
