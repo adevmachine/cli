@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 func TestDialReturnsALocalClientForASelfMachine(t *testing.T) {

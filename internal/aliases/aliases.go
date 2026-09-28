@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/hostkeys"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // The block's markers. Everything between them belongs to the CLI, and

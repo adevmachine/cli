@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/repo"
+	"github.com/mydevmachine/devmachine/internal/repo"
 )
 
 // gitRepoDir turns a freshly written configuration directory into a real git

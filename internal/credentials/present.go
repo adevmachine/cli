@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // Place is where a credential is expected to be found on the machine.

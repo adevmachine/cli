@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/repo"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
 )
 

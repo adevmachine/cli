@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/hostkeys"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
 )
 
 // StrictSSHArgs is the one host-identity policy for every process that hands

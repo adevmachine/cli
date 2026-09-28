@@ -18,7 +18,7 @@ linters:
       exclude-functions:
         - (io.Closer).Close
         - (*os.File).Close
-        - (github.com/mydevmachine/cli/internal/remote.Client).Close
+        - (github.com/mydevmachine/devmachine/internal/remote.Client).Close
         - (*golang.org/x/crypto/ssh.Client).Close
         - (*golang.org/x/crypto/ssh.Session).Close
         - fmt.Fprint

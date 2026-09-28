@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 // Target is one place packages are installed: a machine, or one workspace on

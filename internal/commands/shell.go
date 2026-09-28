@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/dns"
-	"github.com/mydevmachine/cli/internal/history"
-	"github.com/mydevmachine/cli/internal/provision"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
+	"github.com/mydevmachine/devmachine/internal/history"
+	"github.com/mydevmachine/devmachine/internal/provision"
+	"github.com/mydevmachine/devmachine/internal/remote"
 	"github.com/spf13/cobra"
 )
 

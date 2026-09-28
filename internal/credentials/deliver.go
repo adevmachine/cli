@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // workspaceDir is where a workspace keeps the credentials delivered to it,

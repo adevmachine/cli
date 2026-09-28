@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 // recordingClient keeps what was asked of the machine, so a test can read the

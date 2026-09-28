@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 // planWith builds a plan straight from names, so a lock test says what it is

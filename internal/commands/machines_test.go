@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 // withoutLima empties PATH, which is the only honest way to meet the machine

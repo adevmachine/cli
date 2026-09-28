@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 func freePort(t *testing.T) int {

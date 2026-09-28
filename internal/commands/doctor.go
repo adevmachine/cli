@@ -3,9 +3,9 @@ package commands
 import (
 	"errors"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/credentials"
-	"github.com/mydevmachine/cli/internal/doctor"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/credentials"
+	"github.com/mydevmachine/devmachine/internal/doctor"
 	"github.com/spf13/cobra"
 )
 

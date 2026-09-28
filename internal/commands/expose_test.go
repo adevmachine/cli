@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/expose"
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/expose"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // writeCaddyPackage writes a fixture caddy package that declares the same

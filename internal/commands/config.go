@@ -3,7 +3,7 @@ package commands
 import (
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/spf13/cobra"
 )
 

@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/packages"
 )
 
 const preamble = `# Settings

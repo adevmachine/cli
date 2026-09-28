@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/provision"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/provision"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // KindDNS is what a package.yml writes in `kind` to be a DNS provider.

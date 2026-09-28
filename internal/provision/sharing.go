@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/credentials"
-	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/credentials"
+	"github.com/mydevmachine/devmachine/internal/packages"
 )
 
 // credentialsTag runs the distribution of the shared logins on its own,

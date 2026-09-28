@@ -42,7 +42,7 @@ server between commands.
 ## From source
 
 ```
-git clone https://github.com/mydevmachine/cli.git
+git clone https://github.com/mydevmachine/devmachine.git
 cd cli && make build && ./devmachine help
 ```
 

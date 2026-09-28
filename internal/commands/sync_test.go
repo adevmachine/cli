@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/provision"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/provision"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // syncStub stands in for the thing that runs Ansible, so a sync can be driven

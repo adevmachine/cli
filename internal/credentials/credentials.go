@@ -9,7 +9,7 @@ package credentials
 import (
 	"path"
 
-	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/packages"
 )
 
 // root is the one directory every machine-scoped credential lives under.

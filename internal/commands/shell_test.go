@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/history"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/history"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // captureInteractive records what would have been launched instead of

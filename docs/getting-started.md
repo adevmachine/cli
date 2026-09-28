@@ -15,7 +15,7 @@ devmachine workspaces new alice && devmachine sync
 ```
 
 On Linux without Homebrew, get the binary from the
-[releases page](https://github.com/mydevmachine/cli/releases).
+[releases page](https://github.com/mydevmachine/devmachine/releases).
 
 `devmachine skills add` teaches your coding agent how to use devmachine. You
 can run it before `setup`, too.

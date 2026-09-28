@@ -27,7 +27,7 @@ formula.
 A GitHub App called `devmachine-release`, owned by the `mydevmachine`
 organisation, installed on `homebrew-tap` only, with `Contents: Read and write`
 and no other permission. Its App ID and private key are already stored as
-secrets on `mydevmachine/cli`, and neither expires.
+secrets on `mydevmachine/devmachine`, and neither expires.
 
 Regenerate the private key only if it leaks: the original download cannot be
 repeated, but a new key can be generated and the old one revoked.
@@ -60,8 +60,8 @@ anything.
 ### Store the credentials
 
 ```
-gh secret set TAP_APP_ID --repo mydevmachine/cli
-gh secret set TAP_APP_PRIVATE_KEY --repo mydevmachine/cli < path/to/key.pem
+gh secret set TAP_APP_ID --repo mydevmachine/devmachine
+gh secret set TAP_APP_PRIVATE_KEY --repo mydevmachine/devmachine < path/to/key.pem
 ```
 
 Organisation secrets work too, and are worth it if more repositories will
@@ -74,7 +74,7 @@ gh secret set TAP_APP_ID --org mydevmachine --visibility all
 ### Check it
 
 ```
-gh secret list --repo mydevmachine/cli
+gh secret list --repo mydevmachine/devmachine
 ```
 
 Both names should be listed. Without them the release workflow fails at the

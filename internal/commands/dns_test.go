@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/dns"
-	"github.com/mydevmachine/cli/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // configDir is a plain, one-machine configuration: the ordinary starting

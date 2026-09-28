@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
+	"github.com/mydevmachine/devmachine/internal/config"
 )
 
 func muxTestMachine(t *testing.T) config.Machine {

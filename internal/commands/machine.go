@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/aliases"
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/spf13/cobra"
 )
 

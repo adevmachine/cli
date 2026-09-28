@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mydevmachine/cli/internal/history"
+	"github.com/mydevmachine/devmachine/internal/history"
 )
 
 // AutoCommit commits a change the CLI just made, when dir is already a git

@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/dns"
-	"github.com/mydevmachine/cli/internal/expose"
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/provision"
-	"github.com/mydevmachine/cli/internal/remote"
-	"github.com/mydevmachine/cli/internal/repo"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
+	"github.com/mydevmachine/devmachine/internal/expose"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/provision"
+	"github.com/mydevmachine/devmachine/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
 )
 

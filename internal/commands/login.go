@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/credentials"
-	"github.com/mydevmachine/cli/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/credentials"
+	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/spf13/cobra"
 )
 

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mydevmachine/cli/internal/config"
-	"github.com/mydevmachine/cli/internal/hostkeys"
-	"github.com/mydevmachine/cli/internal/packages"
-	"github.com/mydevmachine/cli/internal/remote"
-	"github.com/mydevmachine/cli/internal/secrets"
+	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/secrets"
 	"golang.org/x/crypto/ssh"
 )
 

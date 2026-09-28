@@ -1,4 +1,4 @@
-module github.com/mydevmachine/cli
+module github.com/mydevmachine/devmachine
 
 go 1.26.0
 

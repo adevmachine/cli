@@ -3,8 +3,8 @@ package commands
 import (
 	"fmt"
 
-	"github.com/mydevmachine/cli/internal/remote"
-	"github.com/mydevmachine/cli/internal/stats"
+	"github.com/mydevmachine/devmachine/internal/remote"
+	"github.com/mydevmachine/devmachine/internal/stats"
 	"github.com/spf13/cobra"
 )
 
