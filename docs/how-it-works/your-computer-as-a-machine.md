@@ -1,100 +1,80 @@
 # Your computer as a machine
 
-A machine can declare `self: true`: your computer as a machine, the one the
-CLI itself runs on. This is why it exists, why it is named `self` and not
-`local`, and what it changes about `sync` and `setup`.
+A machine can declare `self: true`: this means your own computer, the one
+running the CLI. This page explains why that exists, why it is called
+`self` and not `local`, and what changes about `sync` and `setup` when you
+use it.
 
 ## Why `self`, not `local`
 
-`machines create-local` already means something: a Lima VM, made on your
-computer, that stands in for a bought server while you learn or test the CLI.
-That VM has its own address, its own port, its own root login, its own key —
-and its own `setup`, exactly like anything else. It is a remote machine in
-every way that matters. It only happens to live here.
+`machines create-local` already means something else: a small virtual
+machine made on your computer, that stands in for a real server while you
+learn or test the CLI. That VM has its own address, its own port, its own
+root login, its own key — and its own `setup`, exactly like a real server.
+It only happens to live on your computer.
 
-`self` is a different thing entirely: your computer as a machine, the one the
-command is running on, right now, with no address to dial and nothing to
-install a key into. Reusing "local" for it would make two different ideas
-share one word, and the first time somebody typed the wrong one they would
-find out the hard way. So this got its own word.
+`self` is a different thing: your own computer, right now, with no
+address to dial and no key to install. Reusing the word "local" for both
+would make two different ideas share one word, and the first time someone
+typed the wrong one, they would find out the hard way. So this one got its
+own word.
 
 ## Why no address fields
 
-`hosts`, `user`, `port` and `key` describe how to reach a machine that is not
-your computer. A self machine has none of that to describe — there is no
-dial, no login, no key to install — so `config.Validate` refuses all four
-outright rather than let one sit there unused and eventually mean something
-to nobody. The refusal names the field:
+`hosts`, `user`, `port` and `key` describe how to reach a machine that is
+not your computer. A self machine has none of that to describe — there is
+nothing to dial, no login, no key to install — so devmachine refuses all
+four if you try to set them, naming the field:
 
 ```
 machine "mac" is your computer (self: true), so it has no hosts: remove it
 ```
 
-The same reasoning is why a workspace can never live on one. A workspace is a
-Linux account on a server, reached by a key the CLI installed for it. A self
-machine has no account model like that and no SSH server of its own for a
-workspace to be reached through.
+The same reason is why a workspace can never live on a self machine. A
+workspace is a Linux account on a server, reached over SSH with a key the
+CLI installed. Your own computer has no account system like that and no
+SSH server for a workspace to connect through.
 
-## Why no `become`
+## Why it never needs `sudo` for the work itself
 
-Two guards carry over from the era before this CLI had a name for a self
-machine, when a single unmanaged playbook did this job by hand: the run
-escalates nothing, because Homebrew, mise and Claude all live under `$HOME` on
-a Mac and none of it needs root; and the run refuses outside macOS, because
-nothing about this path has ever been tried anywhere else.
-
-The generated play reflects both. Its header carries `become: false` instead of
-`become: true`, and its first task is a guard that fails the run before
-anything else happens:
-
-```yaml
-- name: refuses anywhere but macOS
-  fail:
-    msg: "a self machine is converged on macOS only; this is {{ ansible_facts['system'] }}"
-  when: ansible_facts['system'] != 'Darwin'
-```
-
-A remote machine gets neither: it still escalates, and it carries no such
-guard, because none of this is a question there.
+A self machine's setup does not ask for extra permissions the way a
+server's setup does: Homebrew, mise and Claude all live under your own
+home folder on a Mac, and none of them need root. And it only runs on
+macOS — nothing about this path has been tried anywhere else, so it stops
+with a clear error on anything else.
 
 ## Why `setup` prints the Homebrew command instead of running it
 
-Ansible cannot install itself, so something has to run before the first
-`sync`. On a remote machine that is `setup`'s whole bootstrap: a key, a proof,
-hardening, then Ansible. None of that applies here — there is no address to
-bootstrap — so `setup` on a self machine only makes sure two things are true:
-Homebrew is on `PATH`, and Ansible is too.
+Ansible, the tool devmachine uses to apply changes, cannot install
+itself — something has to install it first. On a real server, that is what
+`setup`'s whole first-time process does: install a key, prove it works,
+lock the server down, then install Ansible. None of that applies to your
+own computer — there is no address to reach — so `setup` on a self machine
+only checks two things: is Homebrew on your `PATH`, and is Ansible.
 
-If Homebrew is missing, `setup` prints the official one-line install command
-from [brew.sh](https://brew.sh) and stops. It does not run it. That command
-asks for `sudo`, and asking for `sudo` on the operator's own computer, on their
-behalf, without them typing it themselves, is not something this CLI does. Once
-Homebrew is there, `setup` runs `brew install ansible` itself and streams the
-output — that part needs no elevated privilege, so there is nothing stopping
-it.
+If Homebrew is missing, `setup` prints the official one-line install
+command from [brew.sh](https://brew.sh) and stops. It does not run that
+command itself, because it asks for `sudo` — and asking for your password
+on your own computer, without you typing it yourself, is not something
+this CLI does. Once Homebrew is there, `setup` runs `brew install ansible`
+itself and shows you the output, since that part needs no extra
+permission.
 
-`sync` follows the same rule from the other side: if `ansible-playbook` is not
-on `PATH`, it refuses before touching anything and names `setup` as the fix,
-the same way it would point at a missing prerequisite on a remote machine.
+`sync` follows the same rule: if `ansible-playbook` is not on your `PATH`,
+it stops before touching anything and tells you to run `setup`, the same
+way it would point out a missing requirement on a real server.
 
-## Where the bundle lives, and why not `/opt`
+## Where files end up, and why not `/opt`
 
-A remote machine gets its bundle at `/opt/devmachine` — root's territory,
-which is fine, because `setup` already has root on a server it took over
-deliberately. `/opt` is not writable without root on a Mac, and asking for
-`sudo` here runs into the same objection as installing Homebrew for someone:
-it is not this CLI's to ask for.
+On a real server, devmachine's files live at `/opt/devmachine` — that is
+fine there, because `setup` already has full access to a server it was
+given control of. On a Mac, writing to `/opt` needs `sudo`, and asking for
+that runs into the same rule as installing Homebrew: it is not this CLI's
+place to ask.
 
-So a self machine's bundle lives under the operator's own home instead, right
-next to everything else unprivileged tooling already puts there:
+So on a self machine, those files live under your own home folder
+instead, next to everything else your other tools already put there:
 
 ```
 $HOME/.local/share/devmachine/bundle
 ```
-
-Internally this is `provision.Base(machine)`: `RemoteDir` for anything reached
-over SSH, and this path for anything `self: true`. The playbook, the inventory,
-`ansible.cfg`, every role and every extension point are generated against
-whichever base applies — `provision.GenerateAt` takes it as a plain argument,
-never read from the environment inside the pure function that builds the
-files, so the same plan and the same base always produce the same bytes.
