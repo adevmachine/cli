@@ -35,7 +35,7 @@ reachable by anybody.
 All three speak HTTP. All three could, technically, go through `expose`.
 None of them should: none has its own login, so whoever reaches the
 hostname reaches the data. `tunnel` answers the same need — looking at the
-thing from this computer — without ever putting a hostname in DNS.
+thing from your computer — without ever putting a hostname in DNS.
 
 ## Where a published site is recorded
 

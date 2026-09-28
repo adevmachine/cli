@@ -23,7 +23,7 @@ import (
 const RemoteDir = "/opt/devmachine"
 
 // Base is where the bundle lives on a machine: RemoteDir for one reached over
-// SSH, or a directory under this computer's own home for one that declares
+// SSH, or a directory under your computer's own home for one that declares
 // `self: true`. /opt is not writable without root on a Mac, so a self
 // machine's bundle lives where Homebrew, mise and Claude already do.
 func Base(m config.Machine) (string, error) {

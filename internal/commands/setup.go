@@ -44,7 +44,7 @@ var (
 // sudo on the operator's own computer is not this CLI's to do.
 const brewInstallCommand = `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
 
-// streamLocalCommand runs a command on this computer with its output
+// streamLocalCommand runs a command on your computer with its output
 // streamed to out as it arrives, the same way installing Ansible on a remote
 // machine streams over SSH.
 func streamLocalCommand(ctx context.Context, out io.Writer, name string, args ...string) error {
@@ -203,11 +203,11 @@ func prepareExisting(ctx context.Context, dir string, out io.Writer, name string
 
 // prepareExistingSelf is `setup`'s whole job for a self machine: no host key
 // to trust, no key to install, no password, no hardening. It only makes sure
-// Homebrew and Ansible are on this computer.
+// Homebrew and Ansible are on your computer.
 func prepareExistingSelf(ctx context.Context, out io.Writer, m config.Machine) error {
 	if _, err := lookPath("brew"); err != nil {
 		return fmt.Errorf(
-			"homebrew is not installed on this computer: run this, then `devmachine setup --machine %s` again:\n%s",
+			"homebrew is not installed on your computer: run this, then `devmachine setup --machine %s` again:\n%s",
 			m.Name, brewInstallCommand)
 	}
 	if _, err := lookPath("ansible-playbook"); err == nil {
@@ -397,7 +397,7 @@ func askForKey(r *bufio.Reader, out io.Writer, dir, machine string) (chosenKey, 
 	} else {
 		fmt.Fprintf(out, "  1) make a key of its own, used for nothing else (recommended)\n")
 	}
-	fmt.Fprintf(out, "  2) use a key file already on this computer\n")
+	fmt.Fprintf(out, "  2) use a key file already on your computer\n")
 	for i, k := range held {
 		fmt.Fprintf(out, "  %d) %s  %s  (from the SSH agent)\n", i+3, k.Fingerprint, k.Comment)
 	}

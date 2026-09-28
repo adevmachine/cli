@@ -24,7 +24,7 @@ concepts, the command reference and troubleshooting. The same pages are in
 
 ## The model
 
-- A **machine** is a server the CLI reaches over SSH, or this computer itself
+- A **machine** is a server the CLI reaches over SSH, or your computer itself
   (`self: true`).
 - A **workspace** is one Linux account on one machine. You name it in a
   command and never type an address.

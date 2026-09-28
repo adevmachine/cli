@@ -1353,7 +1353,7 @@ func TestValidateRefusesAWorkspaceOnASelfMachineNamedExplicitly(t *testing.T) {
 		Workspaces: []Workspace{{Name: "alice", Machine: "mac"}},
 	}
 	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "alice") || !strings.Contains(err.Error(), "this computer") {
+	if err == nil || !strings.Contains(err.Error(), "alice") || !strings.Contains(err.Error(), "your computer") {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -1435,7 +1435,7 @@ func TestMachineNeverPicksThisComputerImplicitly(t *testing.T) {
 		t.Fatalf("got %q, %v; the one server is the implicit choice", m.Name, err)
 	}
 	if m, err := cfg.Machine("mac"); err != nil || !m.Self {
-		t.Fatalf("naming it still reaches this computer: %v", err)
+		t.Fatalf("naming it still reaches your computer: %v", err)
 	}
 }
 

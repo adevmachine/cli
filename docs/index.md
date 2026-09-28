@@ -10,7 +10,7 @@ devmachine sync       fetch the recipes and converge the machine
 devmachine workspaces new alice && devmachine sync
 ```
 
-No server? `devmachine machines create-local dev` makes one on this computer,
+No server? `devmachine machines create-local dev` makes one on your computer,
 as a bought one arrives.
 
 ## Start here
@@ -58,9 +58,9 @@ when something behaves in a way that surprises you.
   does, and the mistakes its API design invites.
 - [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
   never logged into becomes one the CLI owns, and why the order matters.
-- [This computer](how-it-works/this-computer.md) — why a machine can be `self:
-  true`, why it has no address, no `become` and no `sudo` for Homebrew, and
-  where its bundle lives.
+- [Your computer as a machine](how-it-works/your-computer-as-a-machine.md) —
+  why a machine can be `self: true`, why it has no address, no `become` and no
+  `sudo` for Homebrew, and where its bundle lives.
 - [Versioning your configuration](how-it-works/versioning-your-configuration.md)
   — what `devmachine setup git` commits, why the remote must be private, and
   why the `.gitignore` comes first.

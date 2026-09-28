@@ -11,7 +11,7 @@ make surface      regenerate SURFACE.txt
 
 ## Testing against a real machine
 
-Tests that touch a machine run against a throwaway VPS on this computer, never
+Tests that touch a machine run against a throwaway VPS on your computer, never
 against a real server. It needs Lima (`brew install lima`).
 
 ```

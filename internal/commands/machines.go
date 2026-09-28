@@ -82,7 +82,7 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 			"same bootstrap: it installs a key, proves the key on a connection of " +
 			"its own, turns password login off, and installs Ansible.\n\n" +
 			"`setup` writes the first machine. This writes every one after it.\n\n" +
-			"--self <name> adds this computer instead: no address, no key, no " +
+			"--self <name> adds your computer as a machine instead: no address, no key, no " +
 			"password. It only makes sure Homebrew and Ansible are on PATH.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -99,7 +99,7 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"leave password login on (the key is still installed and proved)")
 	c.Flags().StringVar(&selfName, "self", "",
-		"add this computer as a machine, named <name>, instead of asking for an address")
+		"add your computer as a machine, named <name>, instead of asking for an address")
 	return c
 }
 
@@ -116,7 +116,7 @@ func runMachinesAddSelf(ctx context.Context, dir string, out io.Writer, name str
 	for _, m := range current.Machines {
 		if m.Self {
 			return fmt.Errorf(
-				"machine %q is already `self: true`: only one machine can be this computer", m.Name)
+				"machine %q is already `self: true`: only one machine can be your computer", m.Name)
 		}
 	}
 	if _, err := current.Machine(name); err == nil {
@@ -128,7 +128,7 @@ func runMachinesAddSelf(ctx context.Context, dir string, out io.Writer, name str
 		return err
 	}
 	repo.AutoCommit(ctx, dir, "chore(config): add machine "+name)
-	fmt.Fprintf(out, "\nadded %s (this computer) to %s\n\n", name, filepath.Join(dir, config.FileName))
+	fmt.Fprintf(out, "\nadded %s (your computer) to %s\n\n", name, filepath.Join(dir, config.FileName))
 
 	if err := prepareExistingSelf(ctx, out, m); err != nil {
 		return err
@@ -173,7 +173,7 @@ func newMachinesRmCmd(opts *options) *cobra.Command {
 			cmd.Printf("The server itself is untouched and still running: nothing on it was " +
 				"changed or deleted, and the key still gets in.\n")
 			cmd.Printf("`machines delete-local` is the one that destroys a machine, and only " +
-				"one on this computer.\n")
+				"one on your computer.\n")
 			return nil
 		},
 	}
@@ -231,8 +231,8 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "create-local <name>",
-		Short: "Create a machine on this computer, as a bought server arrives",
-		Long: "Create a machine on this computer, as a bought server arrives.\n\n" +
+		Short: "Create a machine on your computer, as a bought server arrives",
+		Long: "Create a machine on your computer, as a bought server arrives.\n\n" +
 			"It needs Lima. The machine comes up with root reachable over SSH by " +
 			"password and no key installed, which is where `devmachine setup` starts.\n\n" +
 			"Nothing is written to the configuration: `setup` does that.",
@@ -252,8 +252,8 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 func newMachinesStartCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "start <name>",
-		Short: "Start a machine on this computer",
-		Long: "Start a machine on this computer.\n\n" +
+		Short: "Start a machine on your computer",
+		Long: "Start a machine on your computer.\n\n" +
 			"Only a local machine, created with `create-local`: a bought server " +
 			"is not the CLI's to switch on.",
 		Args: cobra.ExactArgs(1),
@@ -270,8 +270,8 @@ func newMachinesStartCmd() *cobra.Command {
 func newMachinesStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <name>",
-		Short: "Stop a machine on this computer",
-		Long: "Stop a machine on this computer, keeping its disk.\n\n" +
+		Short: "Stop a machine on your computer",
+		Long: "Stop a machine on your computer, keeping its disk.\n\n" +
 			"Only a local machine, created with `create-local`: a bought server " +
 			"is not the CLI's to switch off.",
 		Args: cobra.ExactArgs(1),
@@ -290,8 +290,8 @@ func newMachinesDeleteLocalCmd() *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "delete-local <name>",
-		Short: "Destroy a machine on this computer",
-		Long: "Destroy a machine on this computer, and everything on it.\n\n" +
+		Short: "Destroy a machine on your computer",
+		Long: "Destroy a machine on your computer, and everything on it.\n\n" +
 			"Only a local machine, created with `create-local`. This is the one " +
 			"that destroys: `machines rm` only forgets a server, and leaves it " +
 			"running.",

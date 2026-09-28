@@ -40,7 +40,7 @@ func newDNSStatusCmd(opts *options) *cobra.Command {
 		Use:   "status [host]",
 		Short: "Check a name from outside: DNS, TLS and one request",
 		Long: "With no host it checks the configured domain. The check is made " +
-			"from this computer, not from the machine, so it sees what anybody " +
+			"from your computer, not from the machine, so it sees what anybody " +
 			"else would see.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

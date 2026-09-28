@@ -116,7 +116,7 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 		return append([]Check{{
 			Name:   CheckConfiguration,
 			Status: StatusPass,
-			Detail: fmt.Sprintf("machine %q, this computer, %d workspace(s)", m.Name, len(cfg.WorkspacesOn(m.Name))),
+			Detail: fmt.Sprintf("machine %q, your computer as a machine, %d workspace(s)", m.Name, len(cfg.WorkspacesOn(m.Name))),
 		}}, selfChecks(ctx, dir, m, dial, wanted)...)
 	}
 
@@ -150,13 +150,13 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 }
 
 // selfChecks is doctor's whole surface for a self machine: no SSH checks —
-// there is no address to check one against — only whether this computer is
-// what a self machine is allowed to be.
+// there is no address to check one against — only whether your computer as
+// a machine is what a self machine is allowed to be.
 func selfChecks(ctx context.Context, dir string, m config.Machine, dial Dialer, wanted []credentials.Declared) []Check {
 	client, _, err := dial(ctx, m, "")
 	if err != nil {
 		checks := []Check{{Name: CheckOperatingSystem, Status: StatusFail, Detail: err.Error()}}
-		return append(checks, skipRest(selfOrder(wanted), CheckOperatingSystem, "this computer could not be reached")...)
+		return append(checks, skipRest(selfOrder(wanted), CheckOperatingSystem, "your computer could not be reached")...)
 	}
 	defer client.Close()
 
@@ -208,7 +208,7 @@ func selfAnsibleCheck(ctx context.Context, client remote.Client) Check {
 	path, err := client.Run(ctx, ansibleCommand)
 	if err != nil {
 		return Check{Name: CheckAnsible, Status: StatusFail,
-			Detail: "ansible-playbook is not on this computer: run `devmachine setup --machine <name>`"}
+			Detail: "ansible-playbook is not on your computer: run `devmachine setup --machine <name>`"}
 	}
 	return Check{Name: CheckAnsible, Status: StatusPass, Detail: strings.TrimSpace(path)}
 }

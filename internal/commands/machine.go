@@ -21,7 +21,7 @@ const (
 	machineFail = "fail"
 )
 
-// machineCheck is one thing `machine doctor` looked at on this computer.
+// machineCheck is one thing `machine doctor` looked at on your computer.
 type machineCheck struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
@@ -134,7 +134,7 @@ func machineDoctorChecks(opts *options) []machineCheck {
 func newMachineDoctorCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
-		Short: "Say what is missing on this computer",
+		Short: "Say what is missing on your computer",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			checks := machineDoctorChecks(opts)
@@ -169,7 +169,7 @@ func newMachineSetupCmd(_ *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "setup",
-		Short: "Install what this computer is missing to operate a machine",
+		Short: "Install what your computer is missing to operate a machine",
 		Long: "Installs `ssh` and `mosh` through Homebrew, on a Mac. On Linux " +
 			"it says what to install rather than guessing a package manager.\n\n" +
 			"It does not install an editor, shell plugins or language runtimes " +

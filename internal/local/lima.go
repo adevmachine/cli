@@ -1,4 +1,4 @@
-// Package local creates a machine on this computer.
+// Package local creates a machine on your computer.
 //
 // It exists so the CLI can be used, and tested, without buying a server. What
 // comes back is an ordinary machine in the model, and everything after that is
@@ -31,7 +31,7 @@ const limactl = "limactl"
 
 // Password is the root password a local machine is created with.
 //
-// It is public on purpose: the VM sits behind this computer's NAT, holds no
+// It is public on purpose: the VM sits behind your computer's NAT, holds no
 // data, and exists to be destroyed.
 const Password = "devmachine"
 
@@ -72,7 +72,7 @@ func Available() error {
 	return nil
 }
 
-// Create starts a machine on this computer and returns it as a machine the
+// Create starts a machine on your computer and returns it as a machine the
 // rest of the CLI already knows how to use.
 //
 // Progress goes to out as it arrives: the first run downloads an image and

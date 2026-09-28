@@ -101,7 +101,7 @@ whether or not it has taken effect anywhere else yet. That is a provider
 question, and it needs a provider installed.
 
 `dns status` asks **the public internet**: resolve the name, fetch its
-certificate, make one request — from this computer, the way anybody else would
+certificate, make one request — from your computer, the way anybody else would
 see it. It needs no provider and no machine at all, because it is not asking
 either of them anything; it is asking the internet what they produced.
 

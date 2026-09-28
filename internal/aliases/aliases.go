@@ -29,7 +29,7 @@ const (
 const suffix = "-devmachine"
 
 // resolve is the seam a test replaces, so what gets written does not depend on
-// whether this computer is on a tailnet right now.
+// whether your computer is on a tailnet right now.
 var resolve = remote.Resolve
 
 func errNoAddress(machine string) error {

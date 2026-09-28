@@ -95,8 +95,8 @@ type Machine struct {
 	//
 	// It is not `machines create-local`'s Lima VM. That VM has an address, a
 	// port, a root login and a key of its own — a remote machine that
-	// happens to live on this computer. Self is the computer the command
-	// runs on, and the two must never share a name.
+	// happens to live on your computer. Self is your computer as a machine,
+	// the one the command runs on, and the two must never share a name.
 	Self bool `yaml:"self,omitempty"`
 	// Hosts are tried in order, so the first is the preferred path and the
 	// rest are fallbacks.
@@ -278,7 +278,7 @@ func Load(dir string) (Config, error) {
 // a command lands on a server nobody named.
 func (c Config) Machine(name string) (Machine, error) {
 	if name == "" {
-		// This computer is reached only by name: adding it must not change
+		// Your computer as a machine is reached only by name: adding it must not change
 		// which server a command without --machine acts on.
 		servers := []Machine{}
 		for _, m := range c.Machines {
@@ -383,7 +383,7 @@ func (c Config) Validate() error {
 
 		if m.Self {
 			if selfMachine != "" {
-				return fmt.Errorf("machine %q and machine %q are both `self: true`: only one machine can be this computer", selfMachine, m.Name)
+				return fmt.Errorf("machine %q and machine %q are both `self: true`: only one machine can be your computer", selfMachine, m.Name)
 			}
 			selfMachine = m.Name
 			if err := refusesAddress(m); err != nil {
@@ -430,7 +430,7 @@ func (c Config) Validate() error {
 		}
 		if resolved := w.resolvedMachine(c); resolved != "" && selfByName[resolved] {
 			return fmt.Errorf(
-				"workspace %q runs on %q, which is this computer: a workspace is a Linux account on a server",
+				"workspace %q runs on %q, which is your computer as a machine: a workspace is a Linux account on a server",
 				w.Name, resolved)
 		}
 		if name, dup := firstDuplicate(w.Packages); dup {
@@ -475,13 +475,13 @@ func (c Config) Validate() error {
 func refusesAddress(m Machine) error {
 	switch {
 	case len(m.Hosts) > 0:
-		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "hosts")
+		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "hosts")
 	case m.User != "":
-		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "user")
+		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "user")
 	case m.Port != 0:
-		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "port")
+		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "port")
 	case m.Key != "":
-		return fmt.Errorf("machine %q is this computer (self: true), so it has no %s: remove it", m.Name, "key")
+		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "key")
 	}
 	return nil
 }

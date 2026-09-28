@@ -1,4 +1,4 @@
-# A machine on this computer, created by `devmachine machines create-local`.
+# A machine on your computer, created by `devmachine machines create-local`.
 #
 # It reproduces a freshly bought server: root reachable over SSH with a
 # password and no key installed. That is the hardest bootstrap path and the one
@@ -19,7 +19,7 @@ cpus: 2
 memory: "4GiB"
 disk: "20GiB"
 
-# No `vmType` and no `networks`: Lima picks what this computer can run, and
+# No `vmType` and no `networks`: Lima picks what your computer can run, and
 # the SSH port it forwards is the whole address the CLI needs. Naming a
 # hypervisor here would tie a local machine to one operating system.
 

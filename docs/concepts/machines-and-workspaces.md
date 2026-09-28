@@ -8,9 +8,14 @@ own addresses, administrative login, port and key.
 A **workspace** is an environment: normally one Linux user on one machine. It is
 what a person works in and what they name in a command.
 
-## This computer
+## Your computer
 
-A machine can also be `self: true` — the computer the CLI itself runs on:
+**Your computer** is the one you run `devmachine` on — usually your laptop.
+The VPS is never "your computer" in this manual. Your computer can also be a
+machine the CLI manages, with `self: true`.
+
+A machine can also be `self: true` — your computer as a machine, the one the
+CLI itself runs on:
 
 ```yaml
 machines:
@@ -24,10 +29,11 @@ runs Ansible directly, with no SSH in between. Everything else about planning
 stays the same.
 
 This is not `machines create-local`'s Lima VM. That VM has its own address, its
-own key, its own `setup` — a machine that happens to live on this computer, but
+own key, its own `setup` — a machine that happens to live on your computer, but
 reached exactly like any other. `self` is the one command runs on, and the two
 names are kept apart on purpose: see
-[This computer](../how-it-works/this-computer.md) for why.
+[Your computer as a machine](../how-it-works/your-computer-as-a-machine.md)
+for why.
 
 **A workspace can never run on a self machine.** A workspace is a Linux account
 on a server, reached over SSH by a key the CLI installed; a self machine has

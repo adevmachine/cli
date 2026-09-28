@@ -42,14 +42,14 @@ func newTunnelCmd(opts *options) *cobra.Command {
 				return err
 			}
 			if _, err := lookPath("ssh"); err != nil {
-				return errors.New("ssh is not installed on this computer")
+				return errors.New("ssh is not installed on your computer")
 			}
 			// A bind error nobody reads is the worst way to find out a port
 			// is already in use; naming it and offering --local is the point.
 			ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", local))
 			if err != nil {
 				return fmt.Errorf(
-					"127.0.0.1:%d is already in use on this computer; pick another with --local: %w", local, err)
+					"127.0.0.1:%d is already in use on your computer; pick another with --local: %w", local, err)
 			}
 			if err := ln.Close(); err != nil {
 				return err
@@ -67,6 +67,6 @@ func newTunnelCmd(opts *options) *cobra.Command {
 			return runInteractive("ssh", argv...)
 		},
 	}
-	c.Flags().IntVar(&localPort, "local", 0, "the port on this computer (default: the same as the remote port)")
+	c.Flags().IntVar(&localPort, "local", 0, "the port on your computer (default: the same as the remote port)")
 	return c
 }

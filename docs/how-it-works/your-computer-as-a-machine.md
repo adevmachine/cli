@@ -1,33 +1,33 @@
-# This computer
+# Your computer as a machine
 
-A machine can declare `self: true`: the computer the CLI itself runs on. This
-is why it exists, why it is named `self` and not `local`, and what it changes
-about `sync` and `setup`.
+A machine can declare `self: true`: your computer as a machine, the one the
+CLI itself runs on. This is why it exists, why it is named `self` and not
+`local`, and what it changes about `sync` and `setup`.
 
 ## Why `self`, not `local`
 
-`machines create-local` already means something: a Lima VM, made on this
+`machines create-local` already means something: a Lima VM, made on your
 computer, that stands in for a bought server while you learn or test the CLI.
 That VM has its own address, its own port, its own root login, its own key —
 and its own `setup`, exactly like anything else. It is a remote machine in
 every way that matters. It only happens to live here.
 
-`self` is a different thing entirely: the computer the command is running on,
-right now, with no address to dial and nothing to install a key into. Reusing
-"local" for it would make two different ideas share one word, and the first
-time somebody typed the wrong one they would find out the hard way. So this
-got its own word.
+`self` is a different thing entirely: your computer as a machine, the one the
+command is running on, right now, with no address to dial and nothing to
+install a key into. Reusing "local" for it would make two different ideas
+share one word, and the first time somebody typed the wrong one they would
+find out the hard way. So this got its own word.
 
 ## Why no address fields
 
 `hosts`, `user`, `port` and `key` describe how to reach a machine that is not
-this one. A self machine has none of that to describe — there is no dial, no
-login, no key to install — so `config.Validate` refuses all four outright
-rather than let one sit there unused and eventually mean something to nobody.
-The refusal names the field:
+your computer. A self machine has none of that to describe — there is no
+dial, no login, no key to install — so `config.Validate` refuses all four
+outright rather than let one sit there unused and eventually mean something
+to nobody. The refusal names the field:
 
 ```
-machine "mac" is this computer (self: true), so it has no hosts: remove it
+machine "mac" is your computer (self: true), so it has no hosts: remove it
 ```
 
 The same reasoning is why a workspace can never live on one. A workspace is a

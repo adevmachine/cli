@@ -33,8 +33,8 @@ import (
 )
 
 // SelfAddress is what Dial reports for a self machine: there is no address,
-// only this computer.
-const SelfAddress = "this computer"
+// only your computer.
+const SelfAddress = "your computer"
 
 // tailscalePrefix marks an address that something closer to the network has to
 // resolve. The CLI knows the prefix, not the product: a host entry is either a
@@ -591,7 +591,7 @@ func shellQuote(s string) string {
 
 func (c *sshClient) Close() error { return c.conn.Close() }
 
-// localClient runs commands on this computer instead of over SSH, for a
+// localClient runs commands on your computer instead of over SSH, for a
 // machine that declares `self: true`. Every command still goes through
 // /bin/bash -c, exactly as it does on a remote machine, so a package's tasks
 // see the same shell either way.
@@ -631,7 +631,7 @@ func (c *localClient) Stream(ctx context.Context, command string, stdout, stderr
 	return nil
 }
 
-// Upload extracts a gzipped tar into a directory on this computer.
+// Upload extracts a gzipped tar into a directory on your computer.
 func (c *localClient) Upload(_ context.Context, dir string, tarball io.Reader) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)

@@ -14,7 +14,7 @@ import (
 )
 
 // withResolver replaces the address lookup, so a test of what is written does
-// not depend on whether this computer is on a tailnet.
+// not depend on whether your computer is on a tailnet.
 func withResolver(t *testing.T, addresses map[string][]string) {
 	t.Helper()
 	was := resolve

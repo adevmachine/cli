@@ -24,7 +24,7 @@ administrative login, a port and a domain, then how the CLI should log in:
 
 1. a key of its own, kept in `<config>/keys/<machine>` and used for nothing
    else — the recommendation, and the answer if you have no opinion;
-2. a key file already on this computer;
+2. a key file already on your computer;
 3. a key your SSH agent holds, offered by fingerprint and comment.
 
 The third is how a key kept in a password manager works: it never touches the
@@ -166,22 +166,23 @@ a configuration.
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden]     take over another machine and record it
-devmachine machines add --self <name>     add this computer as a machine, with no address
+devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines trust [name] [--check] [--replace] [--yes]   inspect or update its SSH host key
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
-devmachine machines create-local <name>   a machine on this computer
+devmachine machines create-local <name>   a machine on your computer
 devmachine machines start <name>          start a local machine
 devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
 ```
 
 `list --format json` prints each machine with `name`, `hosts`, `admin_user`,
-`port`, `key` and `workspaces`, and `self: true` on the one that is this
-computer — how a program finds the machine to run something locally.
+`port`, `key` and `workspaces`, and `self: true` on the one that is your
+computer as a machine — how a program finds the machine to run something
+locally.
 
-**This computer is never the implicit choice.** With one server and a `self`
+**Your computer is never the implicit choice.** With one server and a `self`
 machine, a command without `--machine` acts on the server, as it did before
-this computer was added; the `self` machine is reached only by name. With two
+your computer was added; the `self` machine is reached only by name. With two
 or more servers, the command still refuses to guess.
 
 `setup` writes the first machine; `add` writes every one after it. It asks the
@@ -199,12 +200,12 @@ which makes a Lima VM: that VM has its own address and key, like any other
 machine; `self` has none, because it is the one you are standing on.
 
 A self machine has no `hosts`, `user`, `port` or `key`, and `sync` writes its
-bundle to a directory on this computer and runs Ansible without SSH instead of
+bundle to a directory on your computer and runs Ansible without SSH instead of
 sending it over the network. Every command that needs an actual address to
 reach a machine over SSH — `ssh`, `mosh`, `tunnel`, `login`, `expose`, `dns`
 where it points a record at the machine, `machines trust`, and `aliases`
 (which silently leaves it out, since there is no `Host` entry to write for it)
-— refuses on a self machine with the same message: `<name> is this computer
+— refuses on a self machine with the same message: `<name> is your computer
 (self: true): <command> needs a machine it reaches over SSH`. A workspace can
 never run on a self machine: a workspace is a Linux account on a server, and a
 self machine is not one.
@@ -225,9 +226,9 @@ It asks first unless `--yes` is given, and it refuses to leave a workspace
 pointing at a machine that is no longer there.
 
 **`rm` is not `delete-local`.** They look alike and only one destroys anything:
-`rm` forgets a server, `delete-local` erases a machine on this computer.
+`rm` forgets a server, `delete-local` erases a machine on your computer.
 
-`create-local` builds a machine on this computer and hands it back as an
+`create-local` builds a machine on your computer and hands it back as an
 ordinary machine: an address, a port and an admin login. It comes up the way a
 bought server arrives — root reachable over SSH with a password and **no key
 installed** — so `devmachine setup` has the same work to do on it as on
@@ -592,7 +593,7 @@ HTTP. All three have no authentication of their own. All three are `tunnel`.
 | **HTTP** | `expose` | `tunnel` |
 | **Anything else** | nothing | `tunnel` |
 
-`--local` picks the port on this computer, when the remote port is already
+`--local` picks the port on your computer, when the remote port is already
 taken here — a busy port is reported by name, with `--local` offered as the
 way out, rather than a bind error nobody reads.
 

@@ -24,7 +24,7 @@ var latestPackagesRelease = packages.Latest
 func newSkillsCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skills",
-		Short: "Install package-contributed Agent Skills on this computer",
+		Short: "Install package-contributed Agent Skills on your computer",
 		Long:  "Local only: these commands never connect to a configured machine. `devmachine sync` installs skills in remote workspaces.",
 	}
 	cmd.AddCommand(
@@ -86,7 +86,7 @@ func newSkillsAddCmd(opts *options) *cobra.Command {
 func newSkillsListCmd(opts *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List skills managed on this computer",
+		Short: "List skills managed on your computer",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			home, err := os.UserHomeDir()
@@ -202,7 +202,7 @@ func newSkillsRemoveCmd(opts *options) *cobra.Command {
 				return fmt.Errorf("skill %q is not managed by Devmachine", name)
 			}
 			if !yes {
-				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Remove skill "+name+" from this computer?")
+				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), "Remove skill "+name+" from your computer?")
 				if err != nil {
 					return err
 				}

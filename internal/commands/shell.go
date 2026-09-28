@@ -94,7 +94,7 @@ func requiresAddress(m config.Machine, command string) error {
 	if !m.Self {
 		return nil
 	}
-	return fmt.Errorf("%s is this computer (self: true): `%s` needs a machine it reaches over SSH", m.Name, command)
+	return fmt.Errorf("%s is your computer (self: true): `%s` needs a machine it reaches over SSH", m.Name, command)
 }
 
 // firstAddress is the address an interactive session should use. It is the
