@@ -1,0 +1,108 @@
+docs/concepts/publishing.md
+  s_a0cbf6c120c4f8::t_007b8d2778b90f 38
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_32cb4232d035a4 11,13-18,32,35-36
+internal/local/lima.go
+  s_a0cbf6c120c4f8::t_dadfb65bb9441f 1
+  s_a0cbf6c120c4f8::t_df13471732ce43 75
+  s_a0cbf6c120c4f8::t_2ec8b80c880acc 34
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_1a6b7ea4342946 211
+  s_a0cbf6c120c4f8::t_bfec63e5a3a42f 153-154
+  s_a0cbf6c120c4f8::t_db9ac28ec8fe42 159
+  s_a0cbf6c120c4f8::t_f84fb891f5b2d7 119
+docs/concepts/dns.md
+  s_a0cbf6c120c4f8::t_d514c4032d50bd 104
+internal/local/machine.yaml
+  s_a0cbf6c120c4f8::t_23288d0c303592 1
+  s_a0cbf6c120c4f8::t_5da337dcba0450 22
+README.md
+  s_a0cbf6c120c4f8::t_82f73877ee8f28 27
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_e7c28e62663aac 206
+  s_a0cbf6c120c4f8::t_3ca888180f6327 400
+  s_a0cbf6c120c4f8::t_724a70e5dfe46e 210
+  s_a0cbf6c120c4f8::t_af405aae71cbdc 47
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_2ef99621fa5a5c 1356
+  s_a0cbf6c120c4f8::t_48c4ea6564cc15 1438
+internal/commands/machine.go
+  s_a0cbf6c120c4f8::t_4138dbb20da4a0 137
+  s_a0cbf6c120c4f8::t_504cc1dbde213f 24
+  s_a0cbf6c120c4f8::t_c0b7564ef90479 172
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_5b378ac11a73af 32
+internal/commands/tunnel.go
+  s_a0cbf6c120c4f8::t_b265b36f9ad3b8 45
+  s_a0cbf6c120c4f8::t_93e5e6a4ea4dd1 70
+  s_a0cbf6c120c4f8::t_e6376cfe2d4f4c 52
+docs/how-it-works/your-computer-as-a-machine.md
+  s_a0cbf6c120c4f8::t_cdbec2549d3960 1-30
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_b86aeb30c75dae 386
+  s_a0cbf6c120c4f8::t_65d6bbd988ac4a 478,480,482,484
+  s_a0cbf6c120c4f8::t_1b80aa140e11f0 98-99
+  s_a0cbf6c120c4f8::t_c9830217d40928 433
+  s_a0cbf6c120c4f8::t_bf198376b31f36 281
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_6ddf8ad7c46fa4 26
+internal/commands/skills.go
+  s_a0cbf6c120c4f8::t_5b8af346ba3ec0 27
+  s_a0cbf6c120c4f8::t_423c04fcd2e5e2 89
+  s_a0cbf6c120c4f8::t_a978e56e254422 205
+internal/commands/dns.go
+  s_a0cbf6c120c4f8::t_33ec1847573bed 43
+internal/commands/sync.go
+  s_a0cbf6c120c4f8::t_f601562549d38a 68
+internal/commands/shell.go
+  s_a0cbf6c120c4f8::t_285afdc189c7e3 97
+internal/remote/remote.go
+  s_a0cbf6c120c4f8::t_726e1870a79327 36-37
+  s_a0cbf6c120c4f8::t_66772cf1355c7e 594
+  s_a0cbf6c120c4f8::t_3f3351de762159 634
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_ab0d84af3de79e 17
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_d0ed311ff201e2 117
+  s_a0cbf6c120c4f8::t_e4445e3fc7fff8 53,56
+  s_a0cbf6c120c4f8::t_07f90883359ce2 61
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_323bae92dac250 27
+  s_a0cbf6c120c4f8::t_803724ca42802e 172
+  s_a0cbf6c120c4f8::t_f2bf257c80a3f0 203,208
+  s_a0cbf6c120c4f8::t_073f0701699bd6 229,231
+  s_a0cbf6c120c4f8::t_a88258c584d635 169
+  s_a0cbf6c120c4f8::t_1f8a7242ddfad4 179-181,183,185
+  s_a0cbf6c120c4f8::t_65061ca2f0dc68 596
+docs/development.md
+  s_a0cbf6c120c4f8::t_046d3c5c372174 14
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_3aeea1e7b5410b 102
+  s_a0cbf6c120c4f8::t_e841efd551a003 176
+  s_a0cbf6c120c4f8::t_8e59cdefdd2fcd 234-235
+  s_a0cbf6c120c4f8::t_0478f799c563fc 119
+  s_a0cbf6c120c4f8::t_f6e658d14b2a95 131
+  s_a0cbf6c120c4f8::t_f8619cdf5e5c7f 293-294
+  s_a0cbf6c120c4f8::t_ec7e4caef8b22b 255-256
+  s_a0cbf6c120c4f8::t_5cecf7492de683 273-274
+  s_a0cbf6c120c4f8::t_3d548c6ba441b6 85
+docs/index.md
+  s_a0cbf6c120c4f8::t_ced6725373eba2 13
+  s_a0cbf6c120c4f8::t_91ad29dbb1314a 61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "75204a0af1c075c546cb79cf3d53237430074ad2",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
