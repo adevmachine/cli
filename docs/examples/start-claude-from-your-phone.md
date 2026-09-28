@@ -8,13 +8,11 @@ see [Claude Code, controlled from your phone](claude-code-remote-control.md).
 
 ## What `claude-remote-control` does
 
-It installs a systemd user unit, plus `loginctl enable-linger`, so the
-account's systemd keeps running with nobody logged in. The unit runs `claude
-remote-control`, which starts in server mode and pre-creates one session in
-its working directory — the same session a person would get by running that
-command by hand. `Restart=always` brings it back after a crash or a network
-drop. It only starts once the account has logged in to `claude`; with no
-login yet, `sync` says so instead of looping.
+It runs `claude remote-control` in the background on the server, and starts
+it again on its own after a crash, a network drop, or a reboot — so a session
+is always waiting for you, even with nobody logged in. It only starts once
+the account has signed in to `claude`; with no sign-in yet, `sync` tells you
+that instead of trying anyway.
 
 ## 1. Add the package
 

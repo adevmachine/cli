@@ -1,8 +1,10 @@
 # Getting started
 
-devmachine turns a VPS into workspaces you develop in: one Linux account per
-project or client, each with its own tools and logins. You need a Debian or
-Ubuntu VPS you can reach as root over SSH, and a Mac or Linux computer.
+devmachine sets up a VPS for you to code on. Each project or client gets its
+own account on the server, called a workspace, with its own tools and logins.
+
+You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
+Linux computer.
 
 Three commands:
 
@@ -12,25 +14,30 @@ devmachine setup
 devmachine workspaces new alice && devmachine sync
 ```
 
-`devmachine skills add` teaches your coding agent devmachine, and it works
-before `setup`.
+On Linux without Homebrew, get the binary from the
+[releases page](https://github.com/adevmachine/cli/releases).
 
-Then work in it:
+`devmachine skills add` teaches your coding agent how to use devmachine. You
+can run it before `setup`, too.
+
+Then work in your new workspace:
 
 ```
 devmachine ssh alice
 ```
 
-`setup` asks for the machine's address and shows its host key fingerprint
-before trusting it — compare it with your provider's console. It installs a
-key, checks the key works, and turns password login off. `workspaces new`
-adds a Linux account to your configuration, and `sync` builds it on the
-machine. On Linux without Homebrew, take the binary from the
-[releases page](https://github.com/adevmachine/cli/releases).
+## What each command does
 
-A new workspace has git, the GitHub CLI, Node LTS through mise, bun and zsh.
-The machine itself gets nothing beyond that lock-down until you add packages
-to it.
+`setup` asks for your server's address. It shows a code called the
+fingerprint: check it matches the one in your provider's dashboard, so you
+know you are talking to your own server. Then it sets up a key and turns off
+password logins, so only you can get in.
+
+`workspaces new alice` creates a workspace called alice. `sync` builds it on
+the server.
+
+A new workspace comes with git, the GitHub CLI, Node LTS (through mise), bun
+and zsh. The server itself gets nothing else until you add packages to it.
 
 Something failed? [Troubleshooting](troubleshooting.md) says what each error
 really means.
@@ -41,21 +48,23 @@ really means.
   then `devmachine sync`.
 - **GitHub, signed in once for every workspace:** `devmachine login gh`, then
   `devmachine sync`. See [credentials](concepts/credentials.md).
-- **Docker:** `devmachine packages add docker`, and let the workspace use it
-  with `devmachine workspaces edit alice --set workspace.groups=[docker]`, then
-  `devmachine sync`.
-- **Anything else:** `devmachine packages list` shows what exists;
-  [packages](concepts/packages.md) says how to add one or write your own.
+- **Docker:** `devmachine packages add docker`, then let the workspace use it
+  with `devmachine workspaces edit alice --set workspace.groups=[docker]`,
+  then `devmachine sync`.
+- **Anything else:** `devmachine packages list` shows what is available.
+  [Packages](concepts/packages.md) says how to add one or write your own.
 - **Teach your coding agent this CLI:** `devmachine skills add`. See
   [agent skills](concepts/agent-skills.md).
 
 ## Extras
 
-- **See an app you run in the workspace at a URL** — anything listening on a
-  port, a dev server or a Docker container: add the reverse proxy once with
+- **Show an app at a URL** — anything listening on a port, a dev server or a
+  Docker container. Add a reverse proxy once with
   `devmachine packages add caddy`, then
-  `devmachine expose add alice 3000 --host app.example.com` and `devmachine sync`. To reach it only from your computer, without a URL,
-  use `devmachine tunnel alice 3000`. See [publishing](concepts/publishing.md).
+  `devmachine expose add alice 3000 --host app.example.com` and
+  `devmachine sync`. To reach it only from your own computer, with no public
+  URL, use `devmachine tunnel alice 3000` instead. See
+  [publishing](concepts/publishing.md).
 - **Keep your configuration in git:** `devmachine setup git`. See
   [versioning your configuration](how-it-works/versioning-your-configuration.md).
 

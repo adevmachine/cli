@@ -22,8 +22,8 @@ opens, instead of waiting for somebody to type `/rc`.
 devmachine login alice/claude
 ```
 
-This opens a real terminal, because a device login reaches a person or it
-reaches nobody — see [credentials](../concepts/credentials.md).
+This opens a real terminal, so a person is there to finish the sign-in — see
+[credentials](../concepts/credentials.md).
 
 ## 3. Start a session
 

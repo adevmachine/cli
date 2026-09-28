@@ -1,7 +1,7 @@
 # Express site with TLS
 
 Run an Express app in workspace `alice`, reachable at `https://app.example.com`
-with an automatic certificate.
+with an HTTPS certificate that renews itself.
 
 **You need:** workspace `alice` from [Getting started](../getting-started.md),
 and `app.example.com` pointed at your machine (or a DNS provider package
@@ -31,8 +31,7 @@ EOF
 npx pm2 start server.js --name app
 ```
 
-pm2 runs the app as a background daemon, so it keeps running after you log
-out.
+pm2 keeps the app running in the background, even after you log out.
 
 ## 3. Expose the port
 

@@ -20,8 +20,9 @@ devmachine workspaces edit alice --set workspace.groups=[docker]
 devmachine sync
 ```
 
-The `docker` group is effectively root, so a workspace only joins it on
-purpose — [workspaces](../reference/commands.md#workspaces) says why.
+A workspace in the `docker` group can do almost anything on the server, so
+this is a deliberate step, not the default —
+[workspaces](../reference/commands.md#workspaces) says why.
 
 ## 3. Run the container
 

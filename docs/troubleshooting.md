@@ -2,174 +2,201 @@
 
 ## "several machines are configured: say which one with --machine"
 
-Working as intended. With more than one machine, a command that acts on a server
-will not pick for you. Add `--machine <name>`, or use a workspace name, which
-already says where it lives.
+**What it means:** You have more than one server configured, and this command
+needs to know which one to act on.
+
+**What to do:** Add `--machine <name>`, or use a workspace name — that already
+says which server it lives on.
 
 ## "no address answered"
 
-Nothing is listening, or nothing can reach it. The error lists every address it
-tried and what each one said.
+**What it means:** Nothing answered at the address devmachine tried. The error
+lists every address it tried and what happened for each.
 
-- Is the port right? A machine on a non-standard port needs `port:` in its
+**What to do:**
+
+- Check the port. A server on a non-standard port needs `port:` set in its
   configuration.
-- Does a second address exist? See
+- Check for a second address — see
   [Addresses and fallback](how-it-works/addresses-and-fallback.md).
 
 ## "answered on … but refused the login"
 
-The machine is there, so the network is not the problem. The account or the key
-is.
+**What it means:** The server is there, so the network is fine. The account
+or the key is the problem.
 
-- Does that account exist on that machine? A workspace configured here does not
-  exist on the server until it is created there.
-- Is the key authorised for that account?
+**What to do:**
+
+- Check that account exists on the server. A workspace in your configuration
+  is not created on the server until you run `sync`.
+- Check the key is allowed to log in to that account.
 
 ## "no key in the configuration and no SSH agent"
 
-There is nothing to authenticate with. Either point `key:` at a private key, or
-start an agent and load one.
+**What it means:** devmachine has nothing to log in with.
+
+**What to do:** Either set `key:` on the server to a private key, or start an
+SSH agent and load one.
 
 ## It used to connect, and now it does not
 
-If you recently added keys to your SSH agent, that is very likely the cause. A
-server gives up after a few attempts, and an agent full of keys can use them all
-before reaching the one that works.
+**What it means:** If you recently added keys to your SSH agent, that is very
+likely the cause. A server gives up after a few tries, and an agent holding
+many keys can use them all up before it reaches the one that works.
 
-The CLI avoids this by offering one method at a time — but `ssh` run by hand
-does not, and neither does anything else on your machine. Setting `key:` on the
-machine makes the CLI's behaviour immune to whatever the agent is holding.
+devmachine avoids this by offering one key at a time. Plain `ssh`, and
+anything else on your computer, does not. Setting `key:` on the server makes
+devmachine immune to whatever your agent is holding.
 
-The full explanation:
+**What to do:** Set `key:` on the server. Full explanation:
 [SSH and authentication](how-it-works/ssh-and-authentication.md).
 
 ## "ansible-playbook is not on the machine"
 
-`sync` runs Ansible on the machine, so the machine needs it. Install it there
-once — `apt install ansible`, or whatever that distribution calls it — and
-everything after that is `sync`'s job. Everything else in `doctor` still tells
-you the truth without it.
+**What it means:** `sync` runs Ansible, the tool devmachine uses to apply
+packages, on the server — so the server needs it installed.
+
+**What to do:** Install it once: `apt install ansible`, or whatever your
+distribution calls it. Everything after that is `sync`'s job. `doctor` still
+tells you the truth about everything else without it.
 
 ## "ansible-playbook is not on your computer"
 
-The self-machine version of the check above. `sync` and `doctor` both refuse
-before touching anything when Ansible is not on `PATH` on your computer. Run
-`devmachine setup --machine <name>` — on a self machine that only checks
-Homebrew is there and then runs `brew install ansible`, with no key, no
-password and no lock-down involved.
+**What it means:** The same check as above, for your own computer. `sync` and
+`doctor` both refuse to touch anything when Ansible is not on your `PATH`.
+
+**What to do:** Run `devmachine setup --machine <name>`. On your own computer
+this only checks that Homebrew is there and runs `brew install ansible` — no
+key, no password, no lock-down involved.
 
 ## "machine X is your computer (self: true), so it has no hosts"
 
-A machine with `self: true` in `config.yml` also carries `hosts`, `user`,
-`port` or `key` — whichever the message names. There is no address for the
-computer the CLI is running on, so remove the field it names. This also
-appears for `user`, `port` and `key`, one at a time, for the same reason.
+**What it means:** A server marked `self: true` in `config.yml` also has
+`hosts`, `user`, `port` or `key` set — whichever the message names. Your own
+computer has no address, so it cannot carry these.
+
+**What to do:** Remove the field the message names. The same error appears,
+one field at a time, for `user`, `port` and `key`.
 
 ## A `tailscale:` address is being ignored
 
-It is dropped when `tailscale` is not installed or does not know that name, and
-the next address is tried. That is deliberate.
+**What it means:** devmachine drops it when Tailscale is not installed, or
+does not know that name, and tries the next address instead. This is by
+design.
 
-To see what happened, run `tailscale status` and check the machine is there
-under the name you wrote.
+**What to do:** Run `tailscale status` and check the server is listed under
+the name you wrote.
 
-## A setting is accepted and the recipe still uses its default
+## A setting is accepted, but the package still uses its default
 
-A setting reaches the machine as `devmachine_<package>_<name>`, with a dash or
-a dot turned into an underscore. If the recipe reads some other variable, the
-value arrives and nothing looks at it.
+**What it means:** A setting reaches the server as
+`devmachine_<package>_<name>`, with dashes and dots turned into underscores.
+If the package reads a different variable name, your value arrives but
+nothing looks at it.
 
-Read what was sent, which settles it in one command:
+**What to do:** See what was actually sent:
 
 ```
 devmachine run --machine main -- "cat /opt/devmachine/host_vars/devmachine.yml"
 ```
 
-The variable is there, and the recipe's `defaults/main.yml` names a different
-one. The recipe is what has to change: the name in its defaults is the contract
-a setting overrides.
+If your variable is there under a different name than the package's own
+`defaults/main.yml` uses, the package needs fixing — the name in its defaults
+is the name a setting has to match.
 
 ## `devmachine ssh` opens a session as the wrong user
 
-`devmachine ssh` with no argument logs in as the server's **root** account, not
-a workspace. To land in a workspace, name it: `devmachine ssh alice`.
+**What it means:** `devmachine ssh` with no argument logs you in as the
+server's **root** account, not a workspace.
+
+**What to do:** Name the workspace: `devmachine ssh alice`.
 
 ## Changes to config.yml appear to be ignored
 
-Check which file is actually being read:
+**What it means:** devmachine may be reading a different file than you think.
+
+**What to do:** Check which one:
 
 ```
 devmachine config path
 ```
 
-`DEVMACHINE_CONFIG` in your shell beats the default location, and a `--config`
-flag beats everything.
+`DEVMACHINE_CONFIG` in your shell beats the default location, and a
+`--config` flag beats everything.
 
 ## `secrets list` shows nothing after storing one
 
-Check the configuration directory is the same one used when storing it — see
-above. The list of names lives in the configuration directory, even when the
-values live in the keychain.
+**What it means:** The list of names lives in your configuration directory,
+even though the values themselves live in your keychain.
+
+**What to do:** Check you are using the same configuration directory you used
+when storing it — see `devmachine config path` above.
 
 ## `dns status` says a name does not resolve, but it works in the browser
 
-The check runs from **your computer**, not from the machine, and it does not use
-your browser's cache or a proxy. A name that works in the browser and not here
-usually means DNS has not propagated everywhere yet, or something local — a VPN,
-a `/etc/hosts` entry — is resolving it for you and not for anyone else.
+**What it means:** The check runs from **your computer**, not the server, and
+it ignores your browser's cache and any proxy you use. A name that works in
+the browser but not here usually means DNS has not finished propagating
+everywhere, or something local — a VPN, an `/etc/hosts` entry — is resolving
+it just for you.
+
+**What to do:** Wait a few minutes and check again, or check your own network
+settings for something overriding DNS.
 
 ## `dns add`/`dns rm`/`dns list`/`dns check` fail with one of these
 
-Every provider reports one of a fixed set of `kind`s, and the CLI turns each
-into the same error whichever provider sent it:
+Every DNS provider reports one of a fixed set of errors, shown here in plain
+words:
 
 | Error | What it means |
 | --- | --- |
-| `zone not found, or the token cannot see it` | The zone does not exist under this provider, or the token cannot see it. |
-| `the token was rejected` | The credential is wrong or expired. Push a fresh one with `devmachine secrets set` and `devmachine credentials push`. |
-| `the token cannot change this zone` | The token can read the zone but not write to it. |
+| `zone not found, or the token cannot see it` | This domain does not exist under this provider, or your token cannot see it. |
+| `the token was rejected` | Your credential is wrong or expired. Push a fresh one with `devmachine secrets set` and `devmachine credentials push`. |
+| `the token cannot change this zone` | Your token can read the domain but not write to it. |
 | `the record was rejected` | The registrar refused the value — a bad type, a bad value, or a name it will not accept. |
-| `rate limited` | The registrar's API is throttling this token. The CLI never retries a rate limit on its own; wait and run the command again. |
-| `this record type is not supported yet` | Only `A`, `AAAA`, `CNAME` and `TXT` carry one value cleanly across every provider. `MX` and `SRV` are refused by name rather than guessed at. |
-| `the name holds several values` | Two installed providers both claim the zone. Say which one with `--dns-provider`. |
+| `rate limited` | The registrar's API is temporarily blocking this token from making more requests. devmachine never retries this on its own; wait and run the command again. |
+| `this record type is not supported yet` | Only `A`, `AAAA`, `CNAME` and `TXT` work the same way across every provider. `MX` and `SRV` are refused by name rather than guessed at. |
+| `the name holds several values` | Two installed providers both claim this domain. Say which one with `--dns-provider`. |
 
-Two more that are not errors, but change what a command does:
+Two more lines that are not errors, but change what a command does:
 
-- **"no installed provider holds this zone"** — none of the providers this
-  machine has installed listed the zone when asked. This is the ordinary
-  state for a registrar with no package yet: the command falls back to
-  `manual` and prints the record to create by hand.
-- **"the provider failed"**, with what looks like a traceback — this means a
-  bug in the provider package itself, not in the CLI. The package answered
-  something that is not the JSON the [DNS provider
-  contract](reference/dns-provider-contract.md) requires.
+- **"no installed provider holds this zone"** — none of the providers you
+  have installed recognized this domain. This is normal for a registrar with
+  no devmachine package yet: the command falls back to `manual` and prints
+  the record for you to create by hand.
+- **"the provider failed"**, with something that looks like a crash — this is
+  a bug in the provider package, not in devmachine itself. The package sent
+  back something that does not match the [DNS provider
+  contract](reference/dns-provider-contract.md).
 
 ## A certificate never arrives after `expose add`
 
-The block reaches the machine on `sync`, so a certificate cannot arrive
-before `sync` ran. Once it has, Caddy only gets a certificate for a name that
-already resolves to the machine. Two ordinary causes:
+**What it means:** The site only reaches the server on the next `sync`. Once
+it has, Caddy (the reverse proxy) only gets a certificate for a name that
+already points at the server. Two common causes:
 
-- **The name does not resolve yet.** DNS can take a few minutes to
-  propagate, even when `expose add` wrote the record (or printed it for you
-  to create by hand) a moment ago. Caddy retries on its own — there is
-  nothing to do but wait, and `devmachine dns status <host>` says when it
-  has caught up.
-- **Caddy has not noticed the new site yet.** It watches `sites.d`, but a
-  reload can be missed on a busy machine. Force one:
+- **The name does not resolve yet.** DNS can take a few minutes to catch up,
+  even if `expose add` already wrote the record (or printed it for you to add
+  by hand). Caddy keeps retrying on its own; `devmachine dns status <host>`
+  tells you when it has caught up.
+- **Caddy has not noticed the new site yet.** It watches for changes, but can
+  miss one on a busy server.
 
-  ```
-  devmachine run --machine <name> -- 'systemctl reload caddy'
-  ```
+**What to do:** Wait for DNS, or force Caddy to reload:
+
+```
+devmachine run --machine <name> -- 'systemctl reload caddy'
+```
 
 ## `expose add` served, and the response is "Blocked request"
 
-This is the application's own host check, not Caddy and not `expose`. Many
-frameworks refuse a `Host` header they do not recognise, by default, as a
-guard against a different kind of attack — and a name that was just
-published is exactly the kind of header the app has never seen. Add the
-published hostname to the application's own list of allowed hosts; `expose`
-has nothing to do with that list.
+**What it means:** This is your application's own check, not Caddy and not
+`expose`. Many frameworks refuse a `Host` header they do not recognize by
+default, as a safety guard — and a name you just published is exactly the
+kind of header the app has never seen before.
+
+**What to do:** Add the published hostname to your application's own list of
+allowed hosts. `expose` has nothing to do with that list.
 
 ## A sync cannot fetch the release
 
@@ -177,41 +204,42 @@ has nothing to do with that list.
 fetching https://github.com/.../packages-v1.tar.gz: the server answered 404
 ```
 
-The pin in `config.yml` names a release that is not published. Check `packages:`
-there against the tags the packages repository actually has. A pin is a release
-tag, never a branch.
+**What it means:** The pin in `config.yml` names a release that does not
+exist.
 
-If the URL is right, the network is the problem: the fetch is an ordinary
-anonymous download, so a proxy or a firewall that blocks GitHub blocks this.
+**What to do:** Check `packages:` in your configuration against the tags the
+packages repository actually has — a pin is a release tag, never a branch. If
+the URL looks right, the problem is your network: this is a plain anonymous
+download, so a proxy or firewall that blocks GitHub blocks this too.
 
-Once a release is fetched it is cached, and a later sync at the same pin needs
-no network at all.
+Once a release is downloaded, it is cached — a later sync at the same pin
+needs no network at all.
 
 ## "the asset changed, which a pin exists to prevent"
 
-The tarball downloaded does not have the checksum the release published. The
-CLI refuses it and stops.
+**What it means:** The file downloaded does not match the checksum the
+release published. devmachine refuses it and stops, rather than send it to
+your server.
 
-That means the asset was replaced after it was released, or something rewrote
-it on the way. Neither is worth guessing about: get the release fixed, or pin a
-different one. Nothing was sent to the machine.
+**What to do:** This means the release was changed after it was published, or
+something altered it in transit. Get the release fixed, or pin a different
+one.
 
 ## "package X needs a CLI >= 0.3.0, and this one is 0.2.1"
 
-The recipe says which CLI can read it, and this binary is older. Upgrade it:
+**What it means:** The package says which CLI version can read it, and yours
+is older.
 
-```
-brew upgrade devmachine
-```
-
-Pinning an older release of the packages is the other way out, and it is the
-right one when the upgrade is not yours to make.
+**What to do:** Upgrade: `brew upgrade devmachine`. Or pin an older release of
+the packages instead, if upgrading is not your call to make.
 
 ## "package X is a workspace package, and main is a machine"
 
-Scope is a property of the software, not a preference. Docker is installed once
-and serves everyone; Claude Code has a login per person. The error names the
-command that puts it in the right place:
+**What it means:** Some packages belong on a server (shared by everyone, like
+Docker); others belong to one workspace (like Claude Code, which needs its
+own sign-in per person). You tried to add this one in the wrong place.
+
+**What to do:** Use the command the error shows, for example:
 
 ```
 devmachine packages add claude-code --workspace alice
@@ -219,33 +247,35 @@ devmachine packages add claude-code --workspace alice
 
 ## "package X extends caddy.sites.d, but caddy is not installed on machine main"
 
-An extension writes into a place another package opened, so that other package
-has to be on the same machine. Add it:
+**What it means:** This package adds files into a place another package
+manages, so that other package has to be on the same server.
+
+**What to do:**
 
 ```
 devmachine packages add caddy --machine main
 ```
 
-The same error appears when the provider is installed but does not declare that
-place. Check its `provides:` against the `extends:` that names it — the point is
-written `<package>.<place>`, and both halves have to match.
+The same error appears if the package is installed but does not declare that
+it provides that place — check its `provides:` against the `extends:` that
+names it.
 
 ## A file a removed package left behind is still on the machine
 
-`sync` removes an extension file only when it remembers writing it — see
-[What sync removes](how-it-works/what-sync-removes.md). That memory starts
-with this version: a package removed from the configuration *before* you
-upgraded left a file `sync` never recorded, so no later sync ever takes it
-away.
+**What it means:** `sync` only removes a file it remembers writing — see
+[What sync removes](how-it-works/what-sync-removes.md). If a package was
+removed from your configuration before you upgraded to the version that
+started tracking this, `sync` never recorded that file, so it never cleans it
+up.
 
-Find it under the directory the extended package provides (`sites.d` for
-caddy) and remove it by hand:
+**What to do:** Find it under the directory the extending package used
+(`sites.d` for Caddy) and remove it by hand:
 
 ```
 devmachine run --machine <name> -- 'rm /etc/caddy/sites.d/<package>-<file>'
 ```
 
-Then, if Caddy is on the machine, reload it:
+Then reload Caddy, if it is on the server:
 
 ```
 devmachine run --machine <name> -- 'systemctl reload caddy'
@@ -253,206 +283,243 @@ devmachine run --machine <name> -- 'systemctl reload caddy'
 
 ## `sync --check` fails on a machine nothing has been applied to yet
 
-A dry run against a machine that has no packages on it reports failures like:
+A dry run against a server with no packages applied yet reports failures
+like:
 
 ```
 No package matching 'docker-ce' is available
 Could not find the requested service caddy: host
 ```
 
-**Nothing is wrong.** This is what `--check` cannot do rather than something it
-found. A dry run changes nothing, so a package's repository is never really
-added, the package index is never really refreshed, and the package that
-repository would have provided is genuinely not available to look at. The same
-goes for a service belonging to software that was never installed.
+**What it means:** Nothing is actually wrong. A dry run changes nothing, so a
+package's software repository is never really added, and the package it
+would have provided genuinely is not there to look at yet.
 
-Ansible has this limit with any third-party repository; it is not particular to
-this CLI.
-
-What to do: run `devmachine sync` for real once. From then on `--check` is
-meaningful, because the packages and their repositories exist and it is
-comparing against something. A dry run is a tool for seeing what a change would
-do to a machine you already built, not for previewing the build itself.
+**What to do:** Run `devmachine sync` for real once. After that, `--check` is
+meaningful, because there is something on the server to compare against. Use
+a dry run to preview a change to a server you already built — not to preview
+the first build itself.
 
 ## `sync` asks and I answered nothing
 
-An empty answer is no, and so is a closed input. A command that changes a
-machine defaults to changing nothing. Pass `--yes` to skip the question, or
-`--check` to see what would happen without being asked at all.
+**What it means:** An empty answer counts as no, and so does closing the
+input. A command that changes a server defaults to changing nothing.
+
+**What to do:** Pass `--yes` to skip the question, or `--check` to see what
+would happen without being asked at all.
 
 ## `ERROR! Invalid options for include_role: devmachine_<package>_<name>`
 
-A setting for a workspace package was written among `include_role`'s own
-options instead of in the task's `vars:`. `include_role` takes a fixed set of
-options and refuses the whole play when it meets one it does not know, so the
-run stops before anything happens.
+**What it means:** This was a bug in how devmachine generated its internal
+Ansible playbook, and it is fixed. If you see it, your binary predates the
+fix.
 
-This was a defect in the generated playbook and it is fixed. If you see it,
-your binary predates the fix: build or install a newer one. Nothing on the
-machine is wrong, and nothing was half applied — the play never started.
+**What to do:** Build or install a newer devmachine. Nothing on the server
+was changed — the run stopped before it started.
 
 ## `credential "X" cannot be shared`
 
-You asked for `X: machine`, and the package that declares it does not say
-`shareable: true`. That is the package saying a copy of its session file does
-not work on another account — a token bound to a device or a browser, usually.
-Sharing it would put a file where the tool looks, the tool would reject it, and
-nothing on the machine would say why.
+**What it means:** You asked to share this login (`X: machine`), but the
+package that declares it says it cannot be — usually because the tool's
+session file is tied to one device or browser, and a copy of it would not
+work anywhere else.
 
-What to do: ask for `own` instead, and log in once in each workspace. If you
-know a copy does work for that tool, the fix belongs in the package, not in
-your configuration: add `shareable: true` there.
+**What to do:** Ask for `own` instead, and sign in once in each workspace.
+If you know a copy really does work for that tool, the fix belongs in the
+package: add `shareable: true` to its declaration.
 
 ## The shared login did not reach a workspace
 
-Two ordinary reasons, in this order:
+**What it means:** Two common reasons, in this order:
 
-- **Nobody has logged in yet.** The copy comes from
-  `/etc/devmachine/<name>/`, and `sync` skips rather than fails when nothing is
-  there. Run `devmachine login <name>`, then `devmachine sync --tags
-  credentials`.
-- **That workspace asked to keep its own.** A workspace with `<name>: own` in
-  its `credentials:` is left out of the copying on purpose, so it never loses
-  the account it logged in with. Remove that line if you meant to share.
+- **Nobody has signed in yet.** The copy comes from a login already stored on
+  the server, and `sync` skips a workspace rather than fail when there is
+  nothing to copy.
+- **That workspace keeps its own login.** A workspace with `<name>: own` in
+  its `credentials:` is deliberately left out of the copy, so it never loses
+  the account it signed in with.
 
-The other direction — a workspace whose own login was overwritten — is the same
-setting read the other way: it had no `own` and the shared login reached it.
+**What to do:** Run `devmachine login <name>` then
+`devmachine sync --tags credentials`, or remove the `own` line if you meant to
+share after all.
+
 ## `credentials list` says `unknown`
 
-The package that declared it never said where its tool keeps the result, so
-there is nowhere to look. The credential may well be there. Add `stored_at:` to
-the package's declaration and the row starts answering.
+**What it means:** The package never said where its tool keeps this login,
+so devmachine has nowhere to look. The login may well be there.
+
+**What to do:** Add `stored_at:` to the package's declaration, and the row
+starts giving a real answer.
 
 ## "credential X belongs to a workspace: name it with --workspace"
 
-Two workspaces log into the same tool with different accounts, so there is no
-one answer to "log in where". Name the workspace. The list in the error is
-every workspace that asks for it.
+**What it means:** Two workspaces sign in to the same tool with different
+accounts, so "where do I log in" has no single answer.
+
+**What to do:** Name the workspace. The list in the error shows every
+workspace that uses it.
 
 ## The SSH host key is not trusted
 
-Configurations created by v0.6 and earlier have no stored server identity.
-Normal commands will not learn one silently. Run `devmachine machines trust
-<machine>`, compare the displayed fingerprint with the provider console or
-another trusted source, and approve it. The command reads the key without
-authenticating.
+**What it means:** Configurations made by v0.6 and earlier have no stored
+server identity. devmachine will not learn one silently.
+
+**What to do:** Run `devmachine machines trust <machine>`, compare the
+fingerprint it shows with your provider's dashboard or another source you
+trust, and approve it. This command reads the key without logging in.
 
 ## The SSH host key changed
 
-Stop and verify the address and both fingerprints. A changed key can mean a
-deliberate rebuild, a configuration mistake, or an attack; the CLI cannot tell
-which and will not authenticate. For a verified rebuild, run `devmachine
-machines trust <machine> --replace`. `--check --replace` previews without
-writing. `--yes` skips confirmation but never substitutes for `--replace`.
+**What it means:** Something about the server no longer matches what
+devmachine trusted before. This can mean a deliberate rebuild, a
+configuration mistake, or an attack — devmachine cannot tell which, and will
+not connect until you decide.
+
+**What to do:** Verify the address and both fingerprints yourself. If you
+just rebuilt the server on purpose, run
+`devmachine machines trust <machine> --replace`. Add `--check` to preview
+without writing, and `--yes` to skip confirmation — that never substitutes
+for `--replace`.
 
 ## The SSH trust file is malformed
 
-The error names `<config>/known_hosts` and the bad line. Do not delete the
-whole file: it may hold pins for other machines. Correct that line, or remove
-only the selected machine's entry and run `devmachine machines trust <machine>`
-to approve it again. The file uses ordinary OpenSSH known-hosts syntax.
+**What it means:** The error names `<config>/known_hosts` and the bad line.
+This file may hold entries for other servers too, so do not delete the whole
+thing.
+
+**What to do:** Fix that one line, or remove just that server's entry, then
+run `devmachine machines trust <machine>` to approve it again. The file uses
+plain OpenSSH `known_hosts` syntax.
 
 ## "the login left nothing at …"
 
-The login command ran and the file the package promised is not there. Either it
-was cancelled or declined, or the tool keeps its session somewhere else than
-the package's `stored_at` says. `stored_at` is a claim by the package, not a
-guarantee — check where the tool really writes, and correct the package.
+**What it means:** The login command ran, but the file the package promised
+is not there. Either the sign-in was cancelled, or the tool actually stores
+its session somewhere else than the package says.
+
+**What to do:** Check where the tool really writes its session, and fix the
+package's `stored_at`.
 
 ## `credentials push` says "nothing to deliver" and the value is out of date
 
-`push` writes only what is missing, so a machine that already has the file
-keeps the old value. To replace one, remove the file on the machine — the path
-is in `credentials list` — and push again.
+**What it means:** `push` only writes files that are missing. A server that
+already has the file keeps its old value.
+
+**What to do:** Remove the file on the server first — its path is in
+`devmachine credentials list` — then push again.
 
 ## I already committed a key
 
-Untracking it is not enough. `git rm --cached` takes a file out of the next
-commit, but it stays in every commit that already has it — anyone with a clone,
-or the history itself if the remote is ever made public, still has it.
+**What it means:** Removing a file from git's index is not enough. It stays
+in every past commit — anyone with a clone, or the history itself if the
+repository is ever made public, can still find it.
 
-1. **Rotate the key first.** Generate a new one and get it authorised wherever
-   the old one was, so the copy sitting in your history stops being able to get
-   in anywhere.
+**What to do:**
+
+1. **Rotate the key first.** Generate a new one and get it authorized
+   wherever the old one was, so the copy in your history stops being able to
+   get in anywhere.
 2. Then untrack it: `git rm --cached <path>`, commit that, and add it to
    `.gitignore` if `devmachine setup git` had not already.
-3. If the repository was ever pushed anywhere, rewriting history
-   (`git filter-repo`, or deleting and recreating the remote) removes the key
-   from the copy other people can see — but the key is still compromised the
-   moment it was committed, whatever you do to the history afterwards. Step 1
-   is the one that actually fixes anything.
+3. If the repository was ever pushed anywhere, rewriting history (with
+   `git filter-repo`, or by deleting and recreating the remote) removes the
+   key from what other people can see — but it was compromised the moment it
+   was committed, whatever you do to the history afterwards. Step 1 is the
+   one that actually fixes anything.
 
-`devmachine setup git` refuses to run against a directory that already tracks
-one of these paths, and its error says exactly this — see
+`devmachine setup git` refuses to run against a directory that already
+tracks one of these paths, and says so — see
 [versioning your configuration](how-it-works/versioning-your-configuration.md).
 
 ## `expose add` said "recorded", and the site does not answer
 
-`add` writes the configuration and nothing else. The block reaches Caddy on
-the next `devmachine sync`. Run it, then `devmachine expose list` says
-`published`.
+**What it means:** `add` only writes to your configuration. The change
+reaches Caddy on the next `devmachine sync`.
+
+**What to do:** Run `devmachine sync`, then `devmachine expose list` should
+say `published`.
 
 ## `expose list` says `unmanaged`
 
-The machine has a site the configuration does not: written by the old
-`expose`, which wrote straight to the machine, or by hand. It works today and
-is gone the day the machine is rebuilt. The row prints the `expose add` that
-adopts it; after that, `sync` writes the workspace's file and removes the old
-one-host file, so Caddy sees the host once.
+**What it means:** The server has a site your configuration does not know
+about — written by hand, or by an old version of `expose`. It works today,
+but is lost the day the server is rebuilt.
+
+**What to do:** Run the `expose add` the row prints, to adopt it. After that,
+`sync` writes the workspace's own file and removes the old one, so Caddy
+sees the host only once.
 
 ## `expose list` says `differs`
 
-The configuration and the machine disagree on the port or the owner of a
-host. The configuration is the truth: `devmachine sync` makes the machine
-match it.
+**What it means:** Your configuration and the server disagree on the port or
+the owner of a host.
+
+**What to do:** Run `devmachine sync` — your configuration is treated as the
+source of truth, and the server is made to match it.
 
 ## "workspace X publishes Y, but caddy is not on machine Z"
 
-A route has nowhere to go. Add caddy to the machine
-(`devmachine packages add caddy --machine Z`) and run `sync`.
+**What it means:** This route has nowhere to go.
+
+**What to do:**
+
+```
+devmachine packages add caddy --machine Z
+devmachine sync
+```
 
 ## `sync` failed at "reload caddy for the routes"
 
-Caddy refused the new set of files. The most common cause is one host in two
-files under `sites.d`: a file another package contributed, or one written by
-hand, naming a host the configuration also publishes. `devmachine run
-'caddy validate --config /etc/caddy/Caddyfile'` names the duplicate. Remove it
-from the side that should not own it.
+**What it means:** Caddy refused the new set of site files. The most common
+cause is the same host named in two files — one from another package, or one
+written by hand — as one the configuration also publishes.
+
+**What to do:** Find the duplicate:
+
+```
+devmachine run 'caddy validate --config /etc/caddy/Caddyfile'
+```
+
+Remove it from whichever side should not own that host.
 
 ## `workspaces destroy` failed at userdel
 
-Something is still running as the account: a process started outside its
-login session, or a container. `destroy` already turned off linger for the
-account, terminated its session and killed what it could find, and `userdel`
-still refused because a process outlived that. The configuration was left
-untouched, so `destroy` can be retried.
+**What it means:** Something is still running as that account — a process
+started outside its login session, or a container. `destroy` already
+disabled the account and stopped everything it could find, but something
+outlived that. Your configuration was left untouched, so you can retry.
 
-Find what is left with `devmachine run "ps -u <user>"`, stop it, then run
-`devmachine workspaces destroy <name>` again.
+**What to do:**
+
+```
+devmachine run "ps -u <user>"
+```
+
+Stop what is listed, then run `devmachine workspaces destroy <name>` again.
 
 ## `run` hangs, or answers with a login from a machine that no longer exists
 
-`run` keeps its SSH connection open for five minutes and reuses it (see
-[the `run` reference](reference/commands.md#run)), through a control socket
-under `<user cache dir>/devmachine/cm`. A socket can outlive the machine it
-was talking to — the address changed, the machine was rebuilt, or it was
-deleted — and a dead master leaves the next `run` waiting on a connection
-that will never answer.
+**What it means:** `run` keeps its SSH connection open for five minutes and
+reuses it (see [the `run` reference](reference/commands.md#run)). If the
+server it was talking to changed address, was rebuilt, or was deleted, that
+old connection can be left open and never answer again.
 
-Close that one master with:
+**What to do:** Close it:
 
 ```
 ssh -O exit -o ControlPath=<user cache dir>/devmachine/cm/%C <user>@<address>
 ```
 
-or, when the exact address is not at hand, delete the stale socket file
-directly from `<user cache dir>/devmachine/cm/`. Either clears it, and the
-next `run` opens a fresh connection.
+If you do not have the exact address, delete the stale connection file
+directly from `<user cache dir>/devmachine/cm/` instead. Either way, the next
+`run` opens a fresh connection.
 
 ## "no package named X, and none is available"
 
-Either the name is wrong, or no packages release is pinned. With no
-`packages:` line in `config.yml`, only your local packages exist, so `sync`
-finds nothing called `workspace` or `dev`. Run `devmachine packages pin`,
-which pins the latest release, then `devmachine sync`. A configuration made
-by `setup` from version 0.7.7 on is pinned from the start.
+**What it means:** Either the name is wrong, or no packages release is
+pinned. With no `packages:` line in `config.yml`, only your own local
+packages exist.
+
+**What to do:** Run `devmachine packages pin`, which pins the latest release,
+then `devmachine sync`. A configuration made by `setup` from version 0.7.7 on
+is already pinned.

@@ -1,7 +1,8 @@
 # devmachine
 
-devmachine turns a VPS into workspaces you develop in: one Linux account per
-project, each with its own tools, logins and coding agent.
+devmachine sets up a VPS for you to code on. Each project gets its own
+account on the server, called a workspace, with its own tools, logins and
+coding agent.
 
 You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
 Linux computer.
@@ -13,29 +14,30 @@ devmachine workspaces new alice && devmachine sync
 devmachine ssh alice
 ```
 
-`setup` connects to the machine and locks it down: it checks the host key
-with you, installs a key, and turns password login off. `workspaces new` adds
-a workspace to your configuration, and `sync` builds it on the machine.
+`setup` connects to the server and locks it down: it checks who you are
+talking to, installs a key, and turns off password logins. `workspaces new`
+adds a workspace to your configuration. `sync` builds it on the server.
 
 **Documentation: https://adevmachine.github.io/docs/** — getting started,
-concepts, the command reference and troubleshooting. The same pages are in
-[`docs/`](docs/index.md), and an LLM can read them all from
+how it all works, every command, and fixes for common errors. The same pages
+are in [`docs/`](docs/index.md), and an LLM can read them all from
 [llms-full.txt](https://adevmachine.github.io/docs/llms-full.txt).
 
 ## The model
 
-- A **machine** is a server the CLI reaches over SSH, or your computer itself
+- A **machine** is a server the CLI reaches over SSH, or your own computer
   (`self: true`).
-- A **workspace** is one Linux account on one machine. You name it in a
-  command and never type an address.
-- A **package** is a recipe: the coding agent, Docker, a GitHub login, a
-  reverse proxy. `sync` applies the packages your configuration asks for. The
-  published ones live in [adevmachine/packages](https://github.com/adevmachine/packages),
-  and you can write your own.
+- A **workspace** is one account on one machine. You give it a name and use
+  that name in every command — you never type an address.
+- A **package** adds one thing: a coding agent, Docker, a GitHub login, a
+  reverse proxy. `sync` installs the packages your configuration asks for.
+  Browse the ready-made ones at
+  [adevmachine/packages](https://github.com/adevmachine/packages), or write
+  your own.
 
-Your configuration lives in a directory you control, `~/.config/devmachine`;
-nothing personal is ever part of this repository. Nothing runs on the machine
-between commands: no agent, no daemon.
+Your configuration lives in a folder you control, `~/.config/devmachine`.
+Nothing personal is ever part of this repository, and nothing runs on the
+server between commands.
 
 ## From source
 

@@ -1,24 +1,25 @@
 # devmachine documentation
 
-Set up and operate a personal development VPS.
+Set up and run your own development server.
 
 Three commands turn a server nobody has logged into into one that is yours:
 
 ```
-devmachine setup      connect, install a key, prove it works, lock it down, install Ansible
-devmachine sync       fetch the recipes and apply them to the machine
+devmachine setup      connect to the server, lock it down, get it ready
+devmachine sync       apply your packages to the server
 devmachine workspaces new alice && devmachine sync
 ```
 
-No server? `devmachine machines create-local dev` makes one on your computer,
-as a bought one arrives.
+No server yet? `devmachine machines create-local dev` makes one on your own
+computer, while you wait for a real one.
 
 ## Start here
 
-- [Getting started](getting-started.md) — install it, point it at a machine, see
-  that it works.
-- [Set up with a coding agent](agent-setup.md) — the page to hand your agent:
-  it asks what it needs and runs everything except the steps only you can do.
+- [Getting started](getting-started.md) — install devmachine, connect it to a
+  server, and see that it works.
+- [Set up with a coding agent](agent-setup.md) — hand this page to your coding
+  agent. It asks what it needs and does the setup, except the steps only you
+  can do.
 
 ## Examples
 
@@ -32,74 +33,70 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 
 ## Concepts
 
-- [Machines and workspaces](concepts/machines-and-workspaces.md) — the two ideas
-  everything else is built on.
-- [Configuration](concepts/configuration.md) — where it lives, what it holds,
-  and how the CLI finds it.
-- [Packages](concepts/packages.md) — everything a machine gets, including the
-  things every machine gets.
-- [Credentials](concepts/credentials.md) — what a workspace has to be signed in
-  to, and which part of that a machine can do for you.
-- [DNS](concepts/dns.md) — zones, records, how a provider is chosen, and why
-  `dns status` asks a different question from `dns list`.
-- [Publishing](concepts/publishing.md) — `expose` and `tunnel`, and why the
-  question is who should reach a port rather than which protocol it speaks.
-- [Agent Skills](concepts/agent-skills.md) — one canonical skill tree, harness
-  adapters, and package selection per workspace.
+- [Machines and workspaces](concepts/machines-and-workspaces.md) — the two
+  ideas everything else builds on.
+- [Configuration](concepts/configuration.md) — where your setup lives and how
+  devmachine finds it.
+- [Packages](concepts/packages.md) — what a server or workspace can get
+  installed on it.
+- [Credentials](concepts/credentials.md) — signing in to tools and services,
+  and what devmachine can do for you.
+- [DNS](concepts/dns.md) — pointing a domain at your server.
+- [Publishing](concepts/publishing.md) — `expose` and `tunnel`: showing
+  something running in a workspace to the outside world, or just to you.
+- [Agent Skills](concepts/agent-skills.md) — teaching a coding agent to use
+  devmachine.
 
 ## How it works
 
-The reasoning behind decisions that are not obvious from the outside. Read these
-when something behaves in a way that surprises you.
+The reasoning behind decisions that are not obvious from the outside. Read
+these when something behaves in a way that surprises you.
 
-- [SSH and authentication](how-it-works/ssh-and-authentication.md) — why the CLI
-  offers one key and never the whole agent.
-- [SSH host keys](how-it-works/ssh-host-keys.md) — how first trust, strict
-  verification and deliberate rotation protect every connection.
+- [SSH and authentication](how-it-works/ssh-and-authentication.md) — why the
+  CLI shares one key and never your whole agent.
+- [SSH host keys](how-it-works/ssh-host-keys.md) — how devmachine checks it is
+  talking to the right server, every time.
 - [Addresses and fallback](how-it-works/addresses-and-fallback.md) — how a
-  machine with several addresses is reached, and what is dropped silently.
+  server with more than one address is reached.
 - [Choosing a target](how-it-works/choosing-a-target.md) — why a command asks
-  instead of guessing which machine it runs against.
-- [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — what
-  fetching every recipe buys, and the one thing it costs.
+  which server, instead of guessing.
+- [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — why
+  devmachine downloads packages instead of shipping them.
 - [Why a login cannot be automated](how-it-works/why-a-login-cannot-be-automated.md)
   — the first question everybody asks.
-- [Sharing a login](how-it-works/sharing-a-login.md) — why the CLI generates the
-  copying itself, and what happens to a workspace that keeps its own account.
-- [DNS providers](how-it-works/dns-providers.md) — what each shipped provider
-  does, and the mistakes its API design invites.
-- [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you have
-  never logged into becomes one the CLI owns, and why the order matters.
+- [Sharing a login](how-it-works/sharing-a-login.md) — copying one sign-in
+  into several workspaces, and keeping one workspace's login separate.
+- [DNS providers](how-it-works/dns-providers.md) — what each built-in provider
+  does, and its rough edges.
+- [The trust bootstrap](how-it-works/trust-bootstrap.md) — how a server you
+  have never logged into becomes one devmachine can trust.
 - [Your computer as a machine](how-it-works/your-computer-as-a-machine.md) —
-  why a machine can be `self: true`, why it has no address, no `become` and no
-  `sudo` for Homebrew, and where its bundle lives.
+  using your own computer instead of a server.
 - [Versioning your configuration](how-it-works/versioning-your-configuration.md)
-  — what `devmachine setup git` commits, why the remote must be private, and
-  why the `.gitignore` comes first.
+  — keeping your setup in git safely.
 - [Why a published site lives in the configuration](how-it-works/published-sites.md)
-  — why `expose` writes to the configuration instead of the machine, and what
-  `sync` removes on its way to matching it.
-- [What sync removes](how-it-works/what-sync-removes.md) — why `sync` only
-  takes away a file it remembers writing, routes and extension files alike,
-  and never a glob over `sites.d`.
+  — why `expose` writes to your configuration, not straight to the server.
+- [What sync removes](how-it-works/what-sync-removes.md) — what `sync` cleans
+  up, and what it leaves alone.
 
 ## Reference
 
-- [Commands](reference/commands.md) — every command, its flags and its output.
-- [The package format](reference/package-format.md) — every `package.yml`
-  field, and the message behind every validation rule.
-- [The DNS provider contract](reference/dns-provider-contract.md) — how a DNS
-  provider's entrypoint is called, and what it must answer.
-- [Settings](reference/settings.md) — every variable the published packages
-  accept, generated from their own manifests.
+- [Commands](reference/commands.md) — every command, its flags and its
+  output.
+- [The package format](reference/package-format.md) — how to write a
+  `package.yml`.
+- [The DNS provider contract](reference/dns-provider-contract.md) — how to
+  write a DNS provider.
+- [Settings](reference/settings.md) — every option the built-in packages
+  accept.
 
 ## Fixing things
 
-- [Troubleshooting](troubleshooting.md) — errors you are likely to meet, and what
-  each one really means.
+- [Troubleshooting](troubleshooting.md) — errors you may see, and what to do
+  about them.
 
 ## Contributing
 
-- [Development](development.md) — building, testing against a real machine, and
-  the rules this repository holds itself to.
-- [Releasing](releasing.md) — how a version reaches Homebrew.
+- [Development](development.md) — building devmachine and testing it against
+  a real server.
+- [Releasing](releasing.md) — how a new version reaches Homebrew.
