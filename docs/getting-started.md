@@ -26,6 +26,8 @@ machine. On Linux without Homebrew, take the binary from the
 [releases page](https://github.com/adevmachine/cli/releases).
 
 A new workspace has git, the GitHub CLI, Node LTS through mise, bun and zsh.
+The machine itself gets nothing beyond the SSH hardening until you add
+packages to it.
 
 Something failed? [Troubleshooting](troubleshooting.md) says what each error
 really means.
@@ -46,9 +48,10 @@ really means.
 
 ## Extras
 
-- **See an app you run in the workspace at a URL** — a dev server or a Docker
-  container on port 3000: `devmachine expose add alice 3000 --host app.example.com`,
-  then `devmachine sync`. To reach it only from your computer, without a URL,
+- **See an app you run in the workspace at a URL** — anything listening on a
+  port, a dev server or a Docker container: add the reverse proxy once with
+  `devmachine packages add caddy`, then
+  `devmachine expose add alice 3000 --host app.example.com` and `devmachine sync`. To reach it only from your computer, without a URL,
   use `devmachine tunnel alice 3000`. See [publishing](concepts/publishing.md).
 - **Keep your configuration in git:** `devmachine setup git`. See
   [versioning your configuration](how-it-works/versioning-your-configuration.md).
