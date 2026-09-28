@@ -1,92 +1,74 @@
 # Getting started
 
-## Install
+This guide takes you from nothing to a workspace you can `ssh` into, with a
+coding agent ready inside it, and a site published on your own domain. No
+prior devmachine knowledge needed.
+
+## 1. What you need
+
+- A VPS with root SSH access, running Debian or Ubuntu. Any provider.
+- This computer, running macOS or Linux.
+- Optional: a domain name, and an account with a DNS provider devmachine has
+  a package for — Hostinger or Cloudflare both work (see
+  [DNS](concepts/dns.md)). Without a domain you can still do everything
+  except publish a site under your own hostname.
+
+## 2. Install
 
 ```
 brew install adevmachine/tap/devmachine
 ```
 
-The tap also installs `advm`, a short alias for the same binary. The full name
-is what appears in documentation and error messages; the short one is for
-typing.
+On Linux without Homebrew, download the tarball for your platform from the
+[releases page](https://github.com/adevmachine/cli/releases) and put the
+`devmachine` binary on your `PATH`.
 
-From source:
-
-```
-git clone https://github.com/adevmachine/cli.git
-cd cli && make build && ./devmachine help
-```
-
-## Get a machine
-
-Either buy a server — any provider, any distribution the CLI supports — or make
-one on this computer:
+Check it worked:
 
 ```
-devmachine machines create-local dev
+devmachine version
 ```
 
-That needs [Lima](https://lima-vm.io) (`brew install lima`), which rules out
-Windows, and the machine it makes is not reachable from the internet, so DNS,
-TLS and public hostnames do not work on it. Everything else does.
+## 3. Take over the machine
 
-It leaves the machine **exactly as a bought server arrives**: root reachable
-over SSH with a password and no key. That is deliberate — it is the same
-starting point `setup` is built for, so the path you take is the path the tests
-take.
-
-## Take it over
+Your VPS arrives with root reachable by SSH, a password, and no key. One
+command changes that:
 
 ```
 devmachine setup
 ```
 
-This is the only step that needs anything by hand, and it needs it once.
+It asks four things: where the machine is, who the administrative account is
+(usually `root`), which port, and a domain (optional, used later for
+publishing).
 
-It asks where the machine is, who the administrative account is, and which key
-to use — a new one, a file you already have, or one your SSH agent is holding.
-Then it works out the rest:
+Then it shows the server's SSH host-key fingerprint and asks you to confirm
+it. **Check this against your provider's console before you accept.** A
+fingerprint you did not compare is trust on first use, not proof the machine
+is the one you think it is.
 
-- If the key already works, it says so and moves on.
-- If it does not, it asks for the root password, installs the key, and **proves
-  it on a fresh connection** before trusting it.
-- Only once the key is proved does it turn password authentication off.
-- Finally it installs Ansible, which is the last thing done by hand.
+Next it asks how to log in: a new key it generates for you (the safe default
+if you have no opinion), a key file already on this computer, or a key your
+SSH agent holds.
 
-If the proof fails it stops and leaves password login on, so you can still get
-in. [The trust bootstrap](how-it-works/trust-bootstrap.md) explains why each of
-those steps is where it is.
+From there `setup` works on its own:
 
-The password is used once and never stored.
+- it tries the key first, and only asks for the root password if the key
+  does not already work;
+- once the key is installed, it opens a **new** connection with the key
+  alone to prove it works, before changing anything else;
+- only after that proof does it turn password login off;
+- it installs Ansible, which is the last thing it does by hand.
 
-If the configuration already exists, `devmachine setup` resumes this step: it
-uses the configured host-key pin and authentication and ensures Ansible is
-installed without rewriting the configuration or changing SSH policy.
+If the proof fails, password login stays on and you can still get in — see
+[the trust bootstrap](how-it-works/trust-bootstrap.md) for why the order
+matters. Pass `--no-harden` to install and prove the key but leave password
+login on.
 
-When a package release is pinned, setup also offers the official Agent Skills.
-They can be installed later without contacting the machine:
+You know it worked when `setup` finishes with no error and prints the
+machine it added.
 
-```bash
-devmachine skills add
-```
-
-This local installation is separate from adding the same knowledge to a
-workspace; see [Agent Skills](concepts/agent-skills.md).
-
-## Build the machine
-
-```
-devmachine doctor      # configuration, host key, connection, OS, Ansible
-devmachine sync        # fetch the recipes, send them, converge
-```
-
-`sync` prints what it would do and asks before doing it. `--check` is a dry run
-and `--yes` skips the question.
-
-A second `sync` changes nothing. That is the point of it: it describes a state
-rather than a series of steps.
-
-## Check that it works
+## 4. Check it
 
 ```
 devmachine doctor
@@ -96,32 +78,141 @@ devmachine doctor
 pass  configuration       machine "main", 1 address(es), admin root, port 22, 0 workspace(s)
 pass  connection          connected through 203.0.113.10
 pass  operating system    ubuntu
-fail  ansible             ansible-playbook is not on the machine; `devmachine setup` installs it
+pass  ansible             ansible-playbook 2.16.3
 ```
 
-Every check that could not run because an earlier one failed is reported as
-`skip`, with the reason. A wall of failures would bury the one that matters.
+Every row must say `pass`. A `fail` names what is wrong and the command that
+fixes it.
 
-`doctor` exits non-zero when anything failed, so a script or an agent can act on
-it.
+## 5. Your first workspace
 
-## Look around
+A **workspace** is one Linux account on one machine — where a person works.
+A **package** is a recipe for one thing a machine or a workspace needs, from
+a shell to a coding agent. See
+[Machines and workspaces](concepts/machines-and-workspaces.md) and
+[Packages](concepts/packages.md) for the full picture.
 
-```
-devmachine stats            what the machine is spending
-devmachine machines list    the machines and the workspaces on each
-devmachine ssh              a session on the machine
-devmachine run "uptime"     one command
-```
-
-## Machine-readable output
-
-Every command takes `--format json`, and that output is the stable contract:
+Make one, then build it:
 
 ```
-devmachine --format json doctor
-devmachine help --json        # the whole command surface
+devmachine workspaces new alice
+devmachine sync
+devmachine ssh alice
 ```
 
-stdout carries data and stderr carries diagnostics, so a pipe never mixes the
-two.
+`workspaces new` only edits your local configuration — it creates no
+account yet. `sync` reads that configuration and makes the machine match
+it: this is the step that actually creates the Linux user `alice` and
+installs its packages. `ssh alice` lands you in a shell as that user.
+
+You know it worked when the prompt shows you logged in as `alice` on the
+machine.
+
+## 6. Sign in once, share everywhere
+
+Some tools need a real login — GitHub's `gh`, for example — and nobody can
+automate a browser sign-in. devmachine gets you into the right session and
+spreads the result to every workspace that needs it:
+
+```
+devmachine login gh
+devmachine credentials push
+```
+
+`login` opens a real terminal session for that tool's own sign-in flow.
+`credentials push` copies the result to every workspace that shares it. Run
+
+```
+devmachine credentials list
+```
+
+to see what is signed in and what each missing row needs. See
+[Credentials](concepts/credentials.md) for the difference between a shared
+login and one each workspace keeps for itself.
+
+## 7. Publish something
+
+Say `alice` has a web app listening on port 3000 inside her workspace, and
+you own `example.com`. Publish it at `app.example.com`:
+
+```
+devmachine expose add alice 3000 --host app.example.com
+```
+
+Before it records anything, `expose add` asks you to confirm: anybody who
+learns `app.example.com` will be able to reach whatever is on that port.
+Answer only after you are sure that is fine — a review app or a personal
+tool is a fine answer, a database admin panel is not. See
+[Publishing](concepts/publishing.md) for what should never go through
+`expose`.
+
+It also points the hostname at your machine — writing the DNS record itself
+if you installed a provider package, or printing the record to create by
+hand if you did not.
+
+Nothing reaches the internet yet. Send it to the machine:
+
+```
+devmachine sync
+```
+
+Check the result:
+
+```
+devmachine expose list
+```
+
+`published` means the site is live. `pending` means `sync` has not run yet.
+`differs` means the machine does not match the configuration — run `sync`
+again. See [how a published site is kept](how-it-works/published-sites.md)
+and [DNS](concepts/dns.md) for what is happening behind each state.
+
+## 8. Keep it in git
+
+Your configuration — machines, workspaces, packages — is worth keeping in
+version control, so it can be reviewed and restored. Never your keys: those
+stay out on purpose.
+
+```
+devmachine setup git
+```
+
+This makes your configuration directory a git repository and, with `gh`
+installed and signed in, offers to create a **private** remote and push to
+it. See
+[versioning your configuration](how-it-works/versioning-your-configuration.md)
+for exactly what gets committed and why the remote must stay private.
+
+## 9. Teach your coding agent
+
+devmachine ships Agent Skills: operational knowledge for Claude Code, Codex,
+Pi and OpenCode, so your agent knows how this machine works instead of
+guessing.
+
+Install them on this computer:
+
+```
+devmachine skills add
+```
+
+Give a workspace the same knowledge:
+
+```
+devmachine packages add devmachine-skills --workspace alice
+devmachine sync --tags devmachine-skills
+```
+
+`skills list` shows what is installed and where. See
+[Agent Skills](concepts/agent-skills.md) for how the canonical copy and the
+per-harness links work.
+
+## 10. Where to go next
+
+- [Commands](reference/commands.md) — every command and flag, in full.
+- [Machines and workspaces](concepts/machines-and-workspaces.md),
+  [Packages](concepts/packages.md), [Credentials](concepts/credentials.md),
+  [DNS](concepts/dns.md), [Publishing](concepts/publishing.md) — the ideas
+  behind what you just did.
+- [Troubleshooting](troubleshooting.md) — when a command fails, look here
+  first. It lists the exact errors you are likely to meet and what each one
+  really means.
