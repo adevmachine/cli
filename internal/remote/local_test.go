@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -100,5 +101,19 @@ func TestLocalClientUploadRefusesAnEntryEscapingTheDirectory(t *testing.T) {
 	client := &localClient{}
 	if err := client.Upload(context.Background(), dir, bytes.NewReader(tarball)); err == nil {
 		t.Fatal("an entry outside the directory was extracted without complaint")
+	}
+}
+
+// A command that fails says why on stderr; without it the only thing a person
+// sees is "exit status 1".
+func TestLocalClientPutsStderrInTheError(t *testing.T) {
+	c := &localClient{}
+	_, err := c.Run(context.Background(), "ls /no-such-dir-here")
+	if err == nil || !strings.Contains(err.Error(), "No such file") {
+		t.Fatalf("got %v", err)
+	}
+	_, err = c.RunInput(context.Background(), "cat >/dev/null; ls /no-such-dir-here", strings.NewReader("x"))
+	if err == nil || !strings.Contains(err.Error(), "No such file") {
+		t.Fatalf("got %v", err)
 	}
 }

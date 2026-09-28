@@ -11,6 +11,7 @@ package remote
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -601,19 +602,20 @@ type localClient struct{}
 // sshClient.Run: stderr is not collected, only what the command wrote to
 // stdout.
 func (c *localClient) Run(ctx context.Context, command string) (string, error) {
-	out, err := exec.CommandContext(ctx, "/bin/bash", "-c", command).Output()
-	if err != nil {
-		return string(out), fmt.Errorf("running %q: %w", command, err)
-	}
-	return string(out), nil
+	return c.RunInput(ctx, command, nil)
 }
 
 // RunInput executes one command with stdin fed from the reader.
 func (c *localClient) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
 	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", command)
 	cmd.Stdin = stdin
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
+		if reason := strings.TrimSpace(stderr.String()); reason != "" {
+			return string(out), fmt.Errorf("running %q: %w: %s", command, err, reason)
+		}
 		return string(out), fmt.Errorf("running %q: %w", command, err)
 	}
 	return string(out), nil
