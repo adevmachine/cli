@@ -507,7 +507,7 @@ consent.
 `rm` removes one value, or with none given, every value at that name and
 type. Removing one value out of several is not atomic on every registrar, and
 the command warns before doing it. A name is always the full name (`www.example.com`,
-or the zone itself for the apex) — the CLI turns it into the label the
+or the zone itself for the apex, the root domain of your VPS) — the CLI turns it into the label the
 provider expects.
 
 ## expose

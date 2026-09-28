@@ -19,7 +19,8 @@ and a provider's own tools for that case.
 
 ## `@` is the apex
 
-The zone itself has no label. Write `@` for it, the way most registrars do:
+The apex is the root domain of your VPS: `example.com`, as opposed to
+`www.example.com` or `app.example.com`. The zone itself has no label. Write `@` for it, the way most registrars do:
 
 ```
 devmachine dns add example.com A 198.51.100.10

@@ -59,7 +59,7 @@ a lie no validator can catch, because only the entrypoint knows.
 {"name": "www", "type": "A", "value": "198.51.100.10", "ttl": 300}
 ```
 
-- `name` is a **label**, never a full name: `www`, or `@` for the apex. The
+- `name` is a **label**, never a full name: `www`, or `@` for the apex (the root domain of your VPS). The
   provider adds the zone itself.
 - `ttl` of `0` means "choose": use whatever the registrar defaults to.
 
