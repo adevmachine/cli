@@ -1,0 +1,34 @@
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_53d02ffb815871 68
+README.md
+  s_a0cbf6c120c4f8::t_2e1244241d473a 16-18
+docs/examples/an-agent-in-its-own-workspace.md
+  s_a0cbf6c120c4f8::t_ff139ce8de446e 27
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_117c7afa1392fc 32-33
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_46c560ef0311a6 55-61
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_cf0a28d9d4b3d9 80
+docs/index.md
+  s_a0cbf6c120c4f8::t_38529cb14f1327 5,8-9
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_8658c64370e383 59
+  s_a0cbf6c120c4f8::t_472be27e8b26ff 94-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2fba4ff3fa36954daa6bc995a967833218bd5d70",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
