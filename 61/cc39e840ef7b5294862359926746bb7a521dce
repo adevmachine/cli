@@ -1,0 +1,25 @@
+internal/provision/testdata/generate/site.yml
+  s_a0cbf6c120c4f8::t_bceb219cf7c2ac 154,171
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_098f614b6f776b 869-892
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_4aa9ae3e814e3d 279,281,558-561,570,586-590,602,611,620-623,665,671-672
+docs/how-it-works/published-sites.md
+  s_a0cbf6c120c4f8::t_5c557380d57e94 34-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "61cc39e840ef7b5294862359926746bb7a521dce",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
