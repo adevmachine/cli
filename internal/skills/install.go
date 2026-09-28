@@ -33,6 +33,9 @@ var supportedAgents = []Agent{AgentClaude, AgentCodex, AgentOpenCode, AgentPi}
 type Source struct {
 	ID   string
 	Root string
+	// Origin is how the source is described to the operator, such as
+	// "packages v8". Empty falls back to ID.
+	Origin string
 }
 
 // Installer owns local canonical copies, adapters and ownership records.
@@ -44,6 +47,7 @@ type Installer struct {
 // InstallResult reports filesystem changes made by one operation.
 type InstallResult struct {
 	Source  string   `json:"source"`
+	Origin  string   `json:"origin,omitempty"`
 	Skills  []string `json:"skills"`
 	Agents  []Agent  `json:"agents"`
 	Changed int      `json:"changed"`
@@ -51,7 +55,7 @@ type InstallResult struct {
 
 // Install converges all skills from source and the requested harness adapters.
 func (i Installer) Install(source Source, agents []Agent) (InstallResult, error) {
-	result := InstallResult{Source: source.ID}
+	result := InstallResult{Source: source.ID, Origin: source.Origin}
 	if i.Home == "" {
 		return result, errors.New("installing skills requires a home directory")
 	}

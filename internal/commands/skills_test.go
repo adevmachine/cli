@@ -37,6 +37,68 @@ func TestSkillsAddWithoutAPinExplainsSetupAndNeverDials(t *testing.T) {
 	}
 }
 
+func TestSkillsAddWithNoConfigurationInstallsFromTheLatestRelease(t *testing.T) {
+	dir, home := t.TempDir(), t.TempDir()
+	writeCommandFile(t, filepath.Join(packages.CacheDir(dir, "v8"), ".checksum"), "fixture\n")
+	writeSkillPackage(t, filepath.Join(packages.CacheDir(dir, "v8"), "packages"), "devmachine-skills", "use-devmachine", "Latest copy.")
+	forbidDial(t)
+	restoreLatest := stubLatestPackagesRelease(t, "v8")
+	defer restoreLatest()
+
+	out, err := executeWithHome(t, home, "--config", dir, "skills", "add", "--agent", "claude", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCommandFile(t, filepath.Join(home, ".agents", "skills", "use-devmachine", "SKILL.md"))
+	if !strings.Contains(out, "use-devmachine") || !strings.Contains(out, "packages v8") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestSkillsAddWithABrokenConfigurationStillErrors(t *testing.T) {
+	dir := configWith(t, "machines: [this is not a machine\n")
+	forbidDial(t)
+
+	_, err := execute(t, "--config", dir, "skills", "add", "--agent", "codex", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "parsing") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSkillsUpdateWithAPinnedConfigurationUsesItsRelease(t *testing.T) {
+	dir, home := skillConfig(t, "v9")
+	writeSkillPackage(t, filepath.Join(packages.CacheDir(dir, "v9"), "packages"), "devmachine-skills", "use-devmachine", "Pinned copy.")
+	forbidDial(t)
+	restoreLatest := stubLatestPackagesRelease(t, "should-not-be-used")
+	defer restoreLatest()
+
+	if _, err := executeWithHome(t, home, "--config", dir, "skills", "add", "--agent", "claude", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	writeSkillPackage(t, filepath.Join(packages.CacheDir(dir, "v9"), "packages"), "devmachine-skills", "use-devmachine", "Pinned update.")
+	out, err := executeWithHome(t, home, "--config", dir, "skills", "update", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(home, ".agents", "skills", "use-devmachine", "SKILL.md"))
+	if err != nil || !strings.Contains(string(body), "Pinned update.") {
+		t.Fatalf("update: %v\n%s", err, body)
+	}
+	if !strings.Contains(out, "packages v9") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+// stubLatestPackagesRelease points skillSource's "latest" seam at a fixed
+// version and returns the undo.
+func stubLatestPackagesRelease(t *testing.T, version string) func() {
+	t.Helper()
+	previous := latestPackagesRelease
+	latestPackagesRelease = func(context.Context) (string, error) { return version, nil }
+	return func() { latestPackagesRelease = previous }
+}
+
 func TestSkillsAddOfficialBypassesALocalOverride(t *testing.T) {
 	dir, home := skillConfig(t, "v9")
 	writeSkillPackage(t, filepath.Join(packages.CacheDir(dir, "v9"), "packages"), "devmachine-skills", "use-devmachine", "Published copy.")

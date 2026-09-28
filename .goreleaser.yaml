@@ -35,12 +35,16 @@ brews:
       owner: adevmachine
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    homepage: https://github.com/adevmachine/cli
-    description: Set up and operate a personal development VPS
+    homepage: https://adevmachine.github.io/docs/
+    description: Turn a VPS into workspaces you develop in
     license: MIT
     # advm is the short name for daily use. The full name is what appears in
     # documentation, errors and skills, so it stays the binary.
     extra_install: |
       bin.install_symlink bin/"devmachine" => "advm"
+    caveats: |
+      Teach your coding agent devmachine (Claude Code, Codex, and others):
+        devmachine skills add
+      Get started: https://adevmachine.github.io/docs/getting-started/
     test: |
       system "#{bin}/devmachine", "version"

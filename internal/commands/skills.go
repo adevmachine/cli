@@ -17,6 +17,10 @@ import (
 
 const officialSkillsPackage = "devmachine-skills"
 
+// latestPackagesRelease is the seam a test replaces so resolving "latest"
+// never reaches the network.
+var latestPackagesRelease = packages.Latest
+
 func newSkillsCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skills",
@@ -219,11 +223,24 @@ func newSkillsRemoveCmd(opts *options) *cobra.Command {
 
 func skillSource(ctx context.Context, configDir, requested string) (agentskills.Source, error) {
 	cfg, err := config.Load(configDir)
-	if err != nil {
+	missing := errors.Is(err, os.ErrNotExist)
+	if err != nil && !missing {
 		return agentskills.Source{}, err
 	}
+	if missing {
+		// No configuration yet: the official skills still install, from
+		// whatever release `setup` would pin for a new one.
+		cfg = config.Config{}
+	}
 	if requested == "" && cfg.Packages == "" {
-		return agentskills.Source{}, errors.New("no package release is pinned; run `devmachine setup` or set `packages:` before `devmachine skills add`")
+		if !missing {
+			return agentskills.Source{}, errors.New("no package release is pinned; run `devmachine setup` or set `packages:` before `devmachine skills add`")
+		}
+		version, err := latestPackagesRelease(ctx)
+		if err != nil {
+			return agentskills.Source{}, err
+		}
+		cfg.Packages = version
 	}
 	store, err := openStore(ctx, configDir, cfg.Packages)
 	if err != nil {
@@ -234,7 +251,8 @@ func skillSource(ctx context.Context, configDir, requested string) (agentskills.
 		if err != nil {
 			return agentskills.Source{}, err
 		}
-		return sourceFromFound(found, packages.SourceRelease+":"+officialSkillsPackage)
+		id := packages.SourceRelease + ":" + officialSkillsPackage
+		return sourceFromFound(found, id, "packages "+store.Version())
 	}
 	found, err := store.Get(requested)
 	if err != nil {
@@ -243,7 +261,8 @@ func skillSource(ctx context.Context, configDir, requested string) (agentskills.
 	if found.Source != packages.SourceLocal {
 		return agentskills.Source{}, fmt.Errorf("--package %s requires a local package under %s", requested, packages.LocalDir(configDir))
 	}
-	return sourceFromFound(found, packages.SourceLocal+":"+requested)
+	id := packages.SourceLocal + ":" + requested
+	return sourceFromFound(found, id, id)
 }
 
 func skillSourceID(ctx context.Context, configDir, id string) (agentskills.Source, error) {
@@ -263,11 +282,11 @@ func skillSourceID(ctx context.Context, configDir, id string) (agentskills.Sourc
 	return agentskills.Source{}, fmt.Errorf("skill source %q is not understood", id)
 }
 
-func sourceFromFound(found packages.Found, id string) (agentskills.Source, error) {
+func sourceFromFound(found packages.Found, id, origin string) (agentskills.Source, error) {
 	if found.Manifest.Skills == nil {
 		return agentskills.Source{}, fmt.Errorf("package %s does not contribute skills", found.Manifest.Name)
 	}
-	return agentskills.Source{ID: id, Root: filepath.Join(found.Manifest.Path, found.Manifest.Skills.Path)}, nil
+	return agentskills.Source{ID: id, Root: filepath.Join(found.Manifest.Path, found.Manifest.Skills.Path), Origin: origin}, nil
 }
 
 func chooseAgents(cmd *cobra.Command, home string, names []string, yes bool) ([]agentskills.Agent, error) {
@@ -336,7 +355,11 @@ func printSkillResult(cmd *cobra.Command, opts *options, verb string, result age
 	} else if result.Changed > 1 {
 		changed = fmt.Sprintf("%d filesystem changes", result.Changed)
 	}
-	cmd.Printf("%s %s from %s for %s (%s)\n", verb, strings.Join(result.Skills, ", "), result.Source, joinAgents(result.Agents), changed)
+	origin := result.Origin
+	if origin == "" {
+		origin = result.Source
+	}
+	cmd.Printf("%s %s from %s for %s (%s)\n", verb, strings.Join(result.Skills, ", "), origin, joinAgents(result.Agents), changed)
 	return nil
 }
 

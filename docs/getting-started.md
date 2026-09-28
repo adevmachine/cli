@@ -12,6 +12,9 @@ devmachine setup
 devmachine workspaces new alice && devmachine sync
 ```
 
+`devmachine skills add` teaches your coding agent devmachine, and it works
+before `setup`.
+
 Then work in it:
 
 ```

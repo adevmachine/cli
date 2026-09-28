@@ -254,7 +254,11 @@ func offerSetupSkills(ctx context.Context, dir string, in io.Reader, out io.Writ
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "installed %s from %s (%d filesystem changes)\n", strings.Join(result.Skills, ", "), result.Source, result.Changed)
+	origin := result.Origin
+	if origin == "" {
+		origin = result.Source
+	}
+	fmt.Fprintf(out, "installed %s from %s (%d filesystem changes)\n", strings.Join(result.Skills, ", "), origin, result.Changed)
 	return nil
 }
 

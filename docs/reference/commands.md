@@ -338,9 +338,11 @@ devmachine skills remove <name> [--yes]
 
 These commands manage Agent Skills on the current computer and never contact a
 configured machine. Bare `add` resolves `devmachine-skills` from the pinned
-package release even if a local package has the same name. `--package` accepts
-only a local package. Without `--agent`, interactive use detects installed
-harnesses and asks which ones to enable.
+package release even if a local package has the same name. Before `setup` has
+ever run, there is no pinned release yet, so it takes the latest published
+packages release instead — the same one `setup` would pin for a new
+configuration. `--package` accepts only a local package. Without `--agent`,
+interactive use detects installed harnesses and asks which ones to enable.
 
 `list` reports each managed source, its skills and harnesses. `update` resolves
 every recorded source from the current release pin or local package and
