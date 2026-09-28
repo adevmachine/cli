@@ -1,0 +1,213 @@
+internal/commands/dns.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10-13
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-14
+.goreleaser.yaml
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 35,38,48
+internal/commands/login_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8
+internal/dns/open.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9-11
+internal/commands/machines_trust.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10-12
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-12
+internal/commands/credentials_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-17
+internal/commands/ssh_args.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9-11
+internal/commands/workspaces_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/commands/machines_trust_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-14
+internal/packages/fetch.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 21
+internal/commands/credentials.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-11
+internal/remote/remote.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 28-29
+internal/stats/stats.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14
+internal/commands/skills_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10-12
+.golangci.yml
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 21
+internal/commands/shell_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-15
+internal/commands/sync_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-15
+internal/commands/login.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-10
+internal/commands/packages_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-12
+internal/commands/stats.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 6-7
+internal/credentials/present.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-9
+cmd/settings/main.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 17
+internal/credentials/deliver.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9-10
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 15-17
+internal/commands/packages_helpers_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14-16
+internal/commands/setup_git.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 15-16
+internal/commands/config.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 6
+internal/credentials/credentials.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/commands/sync.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9-13
+internal/commands/packages_pin_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7
+internal/commands/ssh_args_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-14
+docs/concepts/packages.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8
+internal/commands/self_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/commands/shell.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14-18
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-17
+internal/commands/tunnel_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/provision/ansible_runner.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-14
+docs/how-it-works/why-nothing-is-embedded.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 5,28
+internal/commands/packages_config.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-13
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14-17
+internal/provision/helpers_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 16-17
+internal/remote/hostkey_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 17-18
+README.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11,21,24,35,45
+internal/dns/external.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-13
+internal/repo/auto.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10
+internal/commands/aliases.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 6
+internal/commands/expose.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-17
+internal/commands/machine.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10
+docs/releasing.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 27,30,41,63-64,71,77,93,99-100,103,111
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 32-33
+internal/commands/target.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 4
+internal/credentials/deliver_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11-12
+internal/packages/lock_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11
+internal/packages/resolve.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9
+cmd/surface/main.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11
+internal/commands/workspaces.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-16
+internal/commands/secrets.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10-12
+internal/commands/skills.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-14
+internal/credentials/sharing.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7-8
+internal/remote/sshargs.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7-8
+internal/commands/dns_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-14
+internal/packages/latest.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 16-20
+internal/dns/open_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 15-17
+internal/credentials/present_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-9
+internal/remote/bootstrap.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 19-23
+internal/provision/provision.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8
+internal/remote/remote_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 23-24
+go.mod
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 1
+internal/provision/sharing.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-9
+internal/provision/sharing_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7-8
+internal/credentials/credentials_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7-8
+internal/remote/mux.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14
+internal/commands/workspaces_destroy_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10-11
+internal/commands/setup_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 16-19
+internal/commands/autocommit_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10
+internal/commands/machine_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9-11
+internal/commands/secrets_example_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9
+internal/commands/setup_git_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14
+internal/local/lima.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 26
+internal/commands/expose_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14-17
+cmd/devmachine/main.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 4
+internal/commands/doctor.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 6-8
+internal/credentials/sharing_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 8-9
+internal/packages/validate.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 14
+internal/commands/machines_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 13-14
+internal/commands/aliases_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12-14
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12,18
+internal/credentials/helpers_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 10
+internal/packages/resolve_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 9
+internal/remote/mux_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 12
+internal/commands/packages.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 7-10
+internal/commands/packages_pin.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 4-5
+internal/remote/local_test.go
+  s_a0cbf6c120c4f8::t_3ef43d6b12d2fc 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "365273f38d3c9cdf3ee8eb6875849063d1fae22b",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
