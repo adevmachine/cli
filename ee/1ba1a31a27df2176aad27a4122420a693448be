@@ -1,0 +1,19 @@
+README.md
+  s_a0cbf6c120c4f8::t_49d48136a071c6 3-4,6-7,11-13,16-18,20-23,27-34,36-38,40,43-44,47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ee1ba1a31a27df2176aad27a4122420a693448be",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
