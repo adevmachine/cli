@@ -88,6 +88,23 @@ token step, before building anything.
   left out
 - an updated formula in the tap, installing `devmachine` and `advm`
 
+## The documentation site
+
+https://adevmachine.github.io/docs/ is built by the `adevmachine/docs`
+repository from this repository's `docs/` on `main`. It rebuilds every six
+hours on its own. After pushing a change under `docs/`, or after a release,
+rebuild it now:
+
+```
+gh workflow run deploy.yml -R adevmachine/docs
+gh run watch -R adevmachine/docs $(gh run list -R adevmachine/docs --limit 1 --json databaseId -q '.[0].databaseId')
+```
+
+The skills in `adevmachine/packages` carry a copy of the reference pages. After
+a release that changed them, regenerate that copy there with
+`scripts/sync-skill-references.sh <path-to-this-release's-docs>`; the packages
+CI fails until it matches the latest release.
+
 ## Verify
 
 ```
