@@ -1,15 +1,20 @@
 # Machines and workspaces
 
-Two ideas carry everything else. A **machine** is a server the CLI can
-reach — you can have several, each with its own address, login, port, and
-key. A **workspace** is an environment on one of them: normally one Linux
-user on one machine, and what you name in a command.
+A **machine** is a server, with its own address and login. A **workspace**
+is one person's account on a machine — usually the thing you actually work
+in day to day.
+
+```
+devmachine workspaces new alice --machine main
+devmachine sync
+```
 
 ## Your computer
 
 **Your computer** is the one you run `devmachine` on — usually your
-laptop. In this manual, the VPS is never "your computer". Your computer
-can also be listed as a machine the CLI manages, with `self: true`:
+laptop. The VPS is never "your computer" in this manual. You can also
+list your computer itself as a machine, with `self: true`, so the CLI can
+manage things on it directly, with no address or SSH involved:
 
 ```yaml
 machines:
@@ -17,29 +22,18 @@ machines:
     self: true
 ```
 
-It has no `hosts`, `user`, `port`, or `key`: there's no address for the
-computer you're sitting at. `sync` just writes its files to a folder here
-and runs Ansible directly, no SSH involved. Everything else works the same
-way.
-
-This isn't the same as the Lima VM from `machines create-local`. That VM
-has its own address, its own key, its own `setup` — a machine that happens
-to live on your computer, but reached like any other. The two are kept
-apart on purpose: see
+This is different from `machines create-local`, which makes a small
+virtual machine that lives on your computer but is reached like a normal
+remote server, with its own address and key. See
 [Your computer as a machine](../how-it-works/your-computer-as-a-machine.md)
-for why.
+for when to use which.
 
-**A workspace can never run on a self machine.** A workspace is a Linux
-account reached over SSH, and a self machine has no account and no SSH
-server to reach. Add one with `devmachine machines add --self <name>`,
-set it up with `devmachine setup`, and use it for things that should run
-on your own Mac — see [commands](../reference/commands.md#machines) for
-what it refuses to do, and why.
+A workspace can't run on a self machine — a workspace is an account
+reached over SSH, and a self machine has neither an account nor SSH.
 
-## Why a workspace, and not just a user
+## Several machines, several workspaces
 
-Where a workspace runs is a property of the workspace, so you never repeat
-it in a command:
+Each workspace names the machine it runs on:
 
 ```yaml
 machines:
@@ -62,15 +56,15 @@ devmachine ssh alice     # lands on main
 devmachine ssh bob       # lands on the sandbox
 ```
 
-Neither command names an address, a port, or a key. Moving `bob` to
-another machine is one line of configuration, and nothing you type
-changes.
+Moving `bob` to another machine is one line of configuration; the command
+you type never changes. `machine:` can be left out only when you have one
+machine — with several, it's required.
 
 ## The Linux account
 
-A workspace's account is its own name: `alice` owns the Linux user
-`alice`. `user:` overrides that, for when the name is already taken on
-that machine, or two workspaces would collide:
+A workspace's account uses its own name by default: `alice` owns the user
+`alice`. Give it a different name with `user:`, for when that name is
+already taken:
 
 ```yaml
 workspaces:
@@ -79,28 +73,7 @@ workspaces:
     user: bob-dev
 ```
 
-## Leaving the machine out
-
-`machine:` is optional when you have exactly one machine — there's only
-one place a workspace could live. With several machines it's required: a
-workspace that doesn't say where it runs is an error, not a guess.
-
-## Where Ansible fits
-
-Ansible already handles several machines. What it has no idea of is a
-workspace — to Ansible, workspaces are just items in a loop, with no sense
-of which machine each belongs to. So the CLI keeps track of workspaces
-itself, and builds the machine list and settings Ansible needs from them.
-Ansible still does the actual work of setting each machine up.
-
-| Layer | Owner |
-| --- | --- |
-| workspace → machine | the CLI |
-| machine list and settings | the CLI generates them |
-| setting up each machine | Ansible |
-| sessions, stats, DNS, diagnosis | the CLI, straight over SSH |
-
-## Making one
+## Making and removing a workspace
 
 ```
 devmachine workspaces new alice
@@ -108,51 +81,28 @@ devmachine workspaces new bob --like alice
 devmachine sync
 ```
 
-`new` writes a line in `config.yml` and **touches no machine**. `sync` is
-what creates the account — stopping after `new` leaves a workspace that
-exists only on paper.
-
-A new workspace gets, unless you say otherwise, `defaults.workspace` from
-your configuration — set by `setup`, and yours to change:
-
-```yaml
-defaults:
-  workspace: [workspace, dev, zsh, mise]
-```
-
-Change that line, and every workspace made afterwards is different.
-`--like bob` copies another workspace's package list instead — nothing
-else, since a copied account name would collide and a copied machine
-would put the new workspace in the wrong place.
-
-**A workspace can't be created on a machine with no key.** Reaching it
-needs a copy of that key, and with none there's nothing to copy. Run
-`devmachine setup` first.
-
-## Removing one
+`new` only writes a line in `config.yml` — `sync` is what actually
+creates the account. A new workspace gets the packages listed in
+`defaults.workspace`, unless you pass `--packages` or `--like <name>` to
+copy another workspace's list.
 
 ```
 devmachine workspaces rm alice
 ```
 
-This removes the entry from `config.yml`. **The Linux account, its home
-folder, and its files stay on the machine**, and the command says so.
-Deleting a home folder isn't something a configuration edit should do,
-and `sync` couldn't undo it. If you want the account gone, remove it on
-the machine yourself, on purpose.
+removes the entry from `config.yml`. **The account, its files, and its
+home folder stay on the machine** — remove those yourself if you want them
+gone.
 
-## Reaching one by name
+## Reaching a workspace by name
 
 ```
 devmachine aliases --write
 mosh alice-devmachine
 ```
 
-The CLI already knows every workspace, its machine, its address, its
-port, and its key, so it can write SSH shortcuts straight from your
-configuration — no machine involved.
-
-It replaces a **marked block**, never the whole file:
+writes an SSH shortcut for every workspace into `~/.ssh/config`, inside a
+marked block it can safely rewrite without touching anything else there:
 
 ```
 # >>> devmachine — generated, do not edit
@@ -163,14 +113,7 @@ Host alice-devmachine
 # <<< devmachine
 ```
 
-Your `~/.ssh/config` holds other hosts this CLI knows nothing about — a
-work jump host, a sandbox. Rewriting the whole file would erase them.
-
-`HostKeyAlias` stays the same across every shortcut for one machine. SSH
-normally tracks a machine by its address, so the same machine at two
-addresses looks like two different ones, and switching between them
-triggers a false `Host key verification failed` warning. `HostKeyAlias`
-tracks it by name instead, so both addresses count as the same machine.
-
-A `-pub` shortcut appears only when there's a second, fallback address.
-With one address, you never see one.
+`HostKeyAlias` keeps SSH from complaining when the same machine is reached
+at two different addresses — it tells SSH the two addresses are the same
+known machine. A `-pub` shortcut appears only when there's a second,
+fallback address to use.

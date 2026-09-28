@@ -1,8 +1,11 @@
 # Configuration
 
-Your configuration is a folder of plain files that says what machines you
-have, what runs on them, and who logs in. It's yours, not the CLI's, and
-no copy of it ever lives in this repository.
+Your configuration is a folder of files that lists your machines, your
+workspaces, and what's installed where. Look at it with:
+
+```
+devmachine config show
+```
 
 ## Where it is
 
@@ -20,14 +23,11 @@ $ devmachine config path
 /Users/alice/.config/devmachine (from default)
 ```
 
-It prints the rule too, so "which configuration am I using" never needs a
-guess. Running a second, test setup next to a real one is one variable:
+Run a second, test setup next to a real one with one variable:
 
 ```
 DEVMACHINE_CONFIG=~/.config/devmachine-test devmachine doctor
 ```
-
-The two never mix.
 
 ## What it holds
 
@@ -77,24 +77,16 @@ packages: v0.0.1           # the pinned release the packages come from
 domain: example.com
 ```
 
-Defaults: `user` is `root`, `port` is `22`. Everything else is what you
-wrote. Nothing here is a secret — values live in `devmachine secrets` and
-get delivered to the machine. This file only says which packages, which
-settings, and which logins you want.
+`user` defaults to `root`, `port` to `22`. Nothing here is a secret — a
+token goes in `devmachine secrets`, never in this file.
 
 ## Settings
 
-A package declares the values it reads, each with a default. `settings:`
-overrides one, on a machine or a workspace, written `<package>.<name>`:
+A package reads its own settings, each with a default. `settings:`
+overrides one, on a machine (as shown above) or on a workspace, written
+`<package>.<name>`:
 
 ```yaml
-machines:
-  - name: main
-    packages: [base, caddy]
-    settings:
-      base.timezone: America/Sao_Paulo
-      caddy.email: someone@example.com
-
 workspaces:
   - name: alice
     packages: [workspace, dev, zsh, claude-plugins]
@@ -106,16 +98,15 @@ workspaces:
 Only the first dot is the split, so `claude-plugins.marketplace.url` is
 the package `claude-plugins` and the setting `marketplace.url`.
 
-Two settings are refused, not just ignored: one with no `<package>.`
-prefix, and one for a package the target doesn't have. That second case
-matters most — a mistyped package name would otherwise do nothing, and the
-machine would quietly not match what you wrote.
+A setting is refused, not just ignored, when it has no `<package>.`
+prefix, or names a package the target doesn't have — so a typo never
+silently does nothing.
 
 ## Credentials
 
-A package says how a login is obtained, and whether a copy of it works on
-another account (`shareable`). Whether you *want* it copied is your call,
-set per workspace:
+A package says how its login works, and whether a copy of it can be
+shared across a machine. Whether you *want* it shared is your call, set
+per workspace:
 
 ```yaml
 credentials:
@@ -128,22 +119,11 @@ workspaces:
       gh: own          # bob logs in for himself
 ```
 
-`machine` means one login, stored under `/etc/devmachine/<name>/` and
-copied into every workspace that wants it. `own` means that workspace
-signs in for itself, and nothing is ever copied over it.
-
-First match wins:
-
-| Order | Where |
-| --- | --- |
-| 1 | the workspace's `credentials:` |
-| 2 | the configuration's `credentials:` |
-| 3 | the package's own recommended setting |
-
-A package marked "not shareable" overrides all three: asking for
-`machine` on one is refused by name. See
+`machine` means one login, copied into every workspace that wants it.
+`own` means that workspace signs in for itself. See
+[Credentials](credentials.md) for how each kind works, and
 [Sharing a login](../how-it-works/sharing-a-login.md) for what the copy
-actually does.
+does.
 
 ## What is validated
 
@@ -163,14 +143,9 @@ configuration that can't work, and say what to fix:
 
 Every command that reaches a machine appends a line to
 `<config>/history.log`: when, which workspace or machine, whether it
-worked, and the command. It answers "what did that session do to my
-machine" — over plain `ssh` there's no such answer, since shell history
-stays on the machine itself.
-
-It's a record, nothing more. It stops nothing and checks nothing, and no
-command reads it back. If the file can't be written, the line is just
-dropped and the command carries on. The format is in
-[commands](../reference/commands.md#the-command-log).
+worked, and the command. It's the answer to "what did that session do to
+my machine" — a plain `ssh` session leaves no such trail here. The format
+is in [commands](../reference/commands.md#the-command-log).
 
 ## Secrets
 
@@ -184,6 +159,4 @@ devmachine secrets rm cloudflare_token
 ```
 
 With no keychain — a headless server, a locked-down container — the value
-falls back to `secrets.json`, readable by nobody else. The name is always
-recorded, even when the keychain holds the value, since a keychain can't
-be listed by name and `secrets list` would otherwise show nothing.
+falls back to `secrets.json`, readable by nobody else.

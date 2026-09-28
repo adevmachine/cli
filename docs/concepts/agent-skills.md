@@ -1,71 +1,59 @@
 # Agent Skills
 
-Agent Skills give coding agents — Claude, Codex, Pi, OpenCode — reusable
-know-how, like a shared playbook. Devmachine installs one copy and lets
-every agent read it, instead of duplicating it per tool.
+A skill is a folder of know-how your coding agent can read — Claude,
+Codex, Pi, or OpenCode. Add the official set with:
+
+```
+devmachine skills add
+```
 
 ## One shared copy
 
-On each account, Devmachine installs the full skill folders under:
-
-```text
-~/.agents/skills/<skill>/
-```
-
-Codex, Pi, and OpenCode read that shared location directly. Claude gets a
-link that points to it:
+Devmachine installs skills once, under `~/.agents/skills/<skill>/`.
+Codex, Pi, and OpenCode read that folder directly. Claude gets a link
+that points to it, so nothing is duplicated:
 
 ```text
 ~/.claude/skills/<skill> -> ../../.agents/skills/<skill>
 ```
 
-Scripts, references, and assets travel with each skill's `SKILL.md`.
-Devmachine tracks what it installed, so an update never overwrites a
-skill it doesn't own.
-
 ## Skills on your computer
 
 ```bash
-devmachine skills add
+devmachine skills add                        # the official set
 devmachine skills add --package global-skills
 devmachine skills list
 devmachine skills update
 devmachine skills remove <skill>
 ```
 
-Bare `add` installs the official `devmachine-skills` package, from the
-package release your configuration is pinned to — or, before you've run
-`devmachine setup`, the latest one. `--package` installs one of your own
-local packages instead. None of these commands touch a machine.
+`--package` installs skills from one of your own packages instead. None
+of these commands touch a machine.
 
 ## Skills in a workspace
 
-A workspace gets a skill only by selecting its package:
+A workspace gets skills only when you add the package to it, and run
+`sync`:
 
 ```bash
 devmachine packages add devmachine-skills --workspace alice
-devmachine sync --check --tags devmachine-skills
 devmachine sync --tags devmachine-skills
 ```
 
-The configuration edit is local, but both `sync` commands reach the
-machine — get approval before running either for real. `sync` installs
-the shared skill tree only in workspaces that selected the package, and
-adds the Claude link only when that workspace also has `claude-code`.
-Removing the package from `config.yml` doesn't delete files already on
-the machine.
+The Claude link is added only for a workspace that also has
+`claude-code`. Removing the package from your configuration doesn't
+delete files already on the machine.
 
-## Adding skills from a package
+## Adding skills from your own package
 
-An ordinary workspace package can add:
+A package can add:
 
 ```yaml
 skills:
   path: skills
 ```
 
-Every direct subfolder of that path must be a complete skill with a
-valid `SKILL.md`, and must stay inside the package. The package can still
-hold its own tasks, files, and everything else a normal Ansible role has
-— the CLI only handles the repeated work of copying the skill and adding
-the Claude link.
+Every folder directly inside `skills/` must be a complete skill, with
+its own `SKILL.md`. See
+[the package format](../reference/package-format.md) for the rest of
+what a package can declare.
