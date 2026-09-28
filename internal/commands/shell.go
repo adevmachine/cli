@@ -26,6 +26,11 @@ var (
 	realLookPath    = exec.LookPath
 	lookPath        = realLookPath
 	dial            = remote.Dial
+	// dialMux is what `run` uses instead of dial: it multiplexes over one
+	// system ssh connection, kept open for ControlPersist, so a program that
+	// polls `run` every few seconds does not pay for a new handshake each
+	// time.
+	dialMux = remote.DialMux
 )
 
 // execCommand runs a session-holding command such as ssh, mosh, or a tunnel.
@@ -200,7 +205,7 @@ func newRunCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, _, err := dial(cmd.Context(), tgt.machine, tgt.user)
+			client, _, err := dialMux(cmd.Context(), tgt.machine, tgt.user)
 			if err != nil {
 				return err
 			}
@@ -245,7 +250,7 @@ func runPackage(cmd *cobra.Command, opts *options, name, workspace string, args 
 	if err != nil {
 		return err
 	}
-	client, _, err := dial(cmd.Context(), tgt.machine, tgt.user)
+	client, _, err := dialMux(cmd.Context(), tgt.machine, tgt.user)
 	if err != nil {
 		return err
 	}

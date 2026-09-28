@@ -452,6 +452,11 @@ the machine's admin — how a package offers a command that has to read that
 account's own files or use its own logins, such as a per-workspace GitHub
 login. See [how a package declares an entrypoint](../concepts/packages.md).
 
+`run` keeps its SSH connection open for five minutes and reuses it across
+calls, which is what lets a program call it every few seconds — a poller does
+not pay for a new handshake each time. The connection is the system OpenSSH
+client, multiplexed, with the same pinned host key `devmachine ssh` uses.
+
 ## dns
 
 ```

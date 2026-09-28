@@ -409,3 +409,22 @@ untouched, so `destroy` can be retried.
 
 Find what is left with `devmachine run "ps -u <user>"`, stop it, then run
 `devmachine workspaces destroy <name>` again.
+
+## `run` hangs, or answers with a login from a machine that no longer exists
+
+`run` keeps its SSH connection open for five minutes and reuses it (see
+[the `run` reference](reference/commands.md#run)), through a control socket
+under `<user cache dir>/devmachine/cm`. A socket can outlive the machine it
+was talking to — the address changed, the machine was rebuilt, or it was
+deleted — and a dead master leaves the next `run` waiting on a connection
+that will never answer.
+
+Close that one master with:
+
+```
+ssh -O exit -o ControlPath=<user cache dir>/devmachine/cm/%C <user>@<address>
+```
+
+or, when the exact address is not at hand, delete the stale socket file
+directly from `<user cache dir>/devmachine/cm/`. Either clears it, and the
+next `run` opens a fresh connection.

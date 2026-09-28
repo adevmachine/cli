@@ -66,13 +66,17 @@ func (localClient) Close() error { return nil }
 
 // dialLocal makes `dial` hand out localClient for the rest of the test, with
 // the package's entrypoint resolved under configDir's local package store.
+// dialLocal stubs both dial and dialMux, since callers include `run
+// --package` (which dials through dialMux) as well as commands that still
+// use dial directly.
 func dialLocal(t *testing.T, configDir string) {
 	t.Helper()
-	orig := dial
-	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+	stub := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return localClient{root: packages.LocalDir(configDir)}, "203.0.113.10", nil
 	}
-	t.Cleanup(func() { dial = orig })
+	origDial, origDialMux := dial, dialMux
+	dial, dialMux = stub, stub
+	t.Cleanup(func() { dial, dialMux = origDial, origDialMux })
 }
 
 // dialCall is what one dial invocation was asked to reach.
@@ -87,12 +91,13 @@ type dialCall struct {
 func dialLocalCapturing(t *testing.T, configDir string) *[]dialCall {
 	t.Helper()
 	var calls []dialCall
-	orig := dial
-	dial = func(_ context.Context, m config.Machine, user string) (remote.Client, string, error) {
+	stub := func(_ context.Context, m config.Machine, user string) (remote.Client, string, error) {
 		calls = append(calls, dialCall{machine: m.Name, user: user})
 		return localClient{root: packages.LocalDir(configDir)}, "203.0.113.10", nil
 	}
-	t.Cleanup(func() { dial = orig })
+	origDial, origDialMux := dial, dialMux
+	dial, dialMux = stub, stub
+	t.Cleanup(func() { dial, dialMux = origDial, origDialMux })
 	return &calls
 }
 

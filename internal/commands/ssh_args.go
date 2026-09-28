@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/adevmachine/cli/internal/config"
@@ -13,32 +12,10 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-// strictSSHArgs is the one host-identity policy for every system SSH process.
-// The preflight validates the store first. If a caller skips it, an unreadable
-// pin produces an unusable algorithm rather than silently widening trust.
+// strictSSHArgs delegates to remote.StrictSSHArgs, the one host-identity
+// policy shared with the multiplexed client run(1) uses.
 func strictSSHArgs(m config.Machine) []string {
-	algorithms := "none"
-	if store, err := hostkeys.Open(m.KnownHostsFile); err == nil {
-		if key, err := store.Key(m.Name, m.Port); err == nil {
-			algorithms = strings.Join(hostkeys.Algorithms(key), ",")
-		}
-	}
-	args := []string{
-		"-p", strconv.Itoa(m.Port),
-		"-o", "StrictHostKeyChecking=yes",
-		"-o", "UserKnownHostsFile=" + m.KnownHostsFile,
-		"-o", "GlobalKnownHostsFile=/dev/null",
-		"-o", "HostKeyAlias=" + hostkeys.Lookup(m.Name, m.Port),
-		"-o", "UpdateHostKeys=no",
-		"-o", "CheckHostIP=no",
-		"-o", "VerifyHostKeyDNS=no",
-		"-o", "KnownHostsCommand=none",
-		"-o", "HostKeyAlgorithms=" + algorithms,
-	}
-	if m.Key != "" {
-		args = append(args, "-i", m.Key, "-o", "IdentitiesOnly=yes")
-	}
-	return args
+	return remote.StrictSSHArgs(m)
 }
 
 func strictSSHCommand(m config.Machine) string {

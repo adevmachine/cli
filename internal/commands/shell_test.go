@@ -280,13 +280,16 @@ func (f fakeRemote) Upload(context.Context, string, io.Reader) error { return ni
 func (f fakeRemote) Close() error { return nil }
 
 // dialing answers every dial with this client, and reports nothing was reached
-// for real.
+// for real. `run` dials through dialMux rather than dial, so both are stubbed.
 func dialing(t *testing.T, client remote.Client) {
 	t.Helper()
 	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return client, "203.0.113.10", nil
 	}
-	t.Cleanup(func() { dial = remote.Dial })
+	dialMux = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return client, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { dial = remote.Dial; dialMux = remote.DialMux })
 }
 
 func historyLines(t *testing.T, dir string) []string {
@@ -296,6 +299,38 @@ func historyLines(t *testing.T, dir string) []string {
 		t.Fatal(err)
 	}
 	return strings.Split(strings.TrimSpace(string(body)), "\n")
+}
+
+func TestRunDialsThroughTheMultiplexedClientNotTheProgrammaticOne(t *testing.T) {
+	dialing(t, fakeRemote{out: "ok\n"})
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("run must not dial through the programmatic client")
+	}
+	dir := configWith(t, twoMachineConfig)
+
+	out, err := execute(t, "--config", dir, "--machine", "sandbox", "run", "true")
+	if err != nil {
+		t.Fatalf("run returned %v", err)
+	}
+	if !strings.Contains(out, "ok") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestRunPackageDialsThroughTheMultiplexedClientNotTheProgrammaticOne(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `print("hello from the package")`)
+	dialLocal(t, dir)
+	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("run --package must not dial through the programmatic client")
+	}
+
+	out, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--", "zones")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "hello from the package") {
+		t.Fatalf("got %q", out)
+	}
 }
 
 func TestRunRecordsTheCommandAndTheWorkspaceItRanIn(t *testing.T) {
@@ -400,12 +435,12 @@ func TestRunPackageWithoutWorkspaceDialsAsTheMachinesAdmin(t *testing.T) {
 
 func TestRunPackageWithAnUnknownWorkspaceErrorsWithoutDialing(t *testing.T) {
 	dialed := false
-	orig := dial
-	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+	orig := dialMux
+	dialMux = func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		dialed = true
 		return nil, "", nil
 	}
-	t.Cleanup(func() { dial = orig })
+	t.Cleanup(func() { dialMux = orig })
 
 	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
 		"workspaces:\n  - name: alice\n    machine: main\n")
