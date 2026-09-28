@@ -1,0 +1,19 @@
+docs/concepts/agent-skills.md
+  s_a0cbf6c120c4f8::t_d8d35d955b84c3 26,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f4ee2ff45ab7f3aa60bb02a59d9f7418981623b6",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
