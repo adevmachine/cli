@@ -97,9 +97,7 @@ func finishTailscaleLogin(cmd *cobra.Command, opts *options, m config.Machine) e
 	}
 	defer func() { _ = client.Close() }()
 
-	byHand := fmt.Sprintf(
-		"logged in. Add this line above the public address, under %s in config.yml, to reach it that way too:\n  tailscale:<name>\n",
-		m.Name)
+	byHand := tailscaleHostsByHand(m)
 
 	out, err := client.Run(cmd.Context(), tailscaleStatusCommand)
 	if err != nil {
@@ -133,6 +131,23 @@ func finishTailscaleLogin(cmd *cobra.Command, opts *options, m config.Machine) e
 	cmd.Printf("logged in; added %s above the public address for %s. The public address stays as a fallback.\n",
 		entry, m.Name)
 	return nil
+}
+
+// tailscaleHostsByHand is what to paste into config.yml when the machine
+// could not say its tailnet name: the machine's own entry, with the new line
+// where it goes, so nobody has to work out the indentation of a list item.
+func tailscaleHostsByHand(m config.Machine) string {
+	var b strings.Builder
+	b.WriteString("To reach it over Tailscale too, add its tailnet name first under its hosts in config.yml:\n\n")
+	b.WriteString("    machines:\n")
+	fmt.Fprintf(&b, "      - name: %s\n", m.Name)
+	b.WriteString("        hosts:\n")
+	b.WriteString("          - tailscale:<name>\n")
+	for _, h := range m.Hosts {
+		fmt.Fprintf(&b, "          - %s\n", h.Address)
+	}
+	fmt.Fprintf(&b, "\n<name> is what `tailscale status` on %s lists for it.\n", m.Name)
+	return b.String()
 }
 
 // tailscaleSelfHostName reads the name the machine answers to on the

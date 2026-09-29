@@ -59,7 +59,9 @@ the two steps below.
 
    The public address stays as a fallback. When the name cannot be read —
    the package failed to install, or something else went wrong — devmachine
-   prints the exact line to add by hand instead.
+   prints this same block for your machine instead, with `- tailscale:<name>`
+   where the new line goes. `<name>` is what `tailscale status` on the server
+   lists for it.
 
 3. Install Tailscale on your own computer, from
    [tailscale.com/download](https://tailscale.com/download), and sign in to

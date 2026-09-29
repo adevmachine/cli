@@ -88,7 +88,9 @@ and it adds the `tailscale` package for you — the same as step 1 below.
 
    The public address stays as a fallback. If the name cannot be read (the
    package is not installed yet, or something else went wrong), devmachine
-   prints the exact line to add by hand instead.
+   prints this same block for your machine instead, with `- tailscale:<name>`
+   where the new line goes. `<name>` is what `tailscale status` on the server
+   lists for it.
 
 3. Install Tailscale on your computer and sign in to the same account.
 

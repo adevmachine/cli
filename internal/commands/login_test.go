@@ -245,8 +245,16 @@ func TestLoginTailscaleWithoutAReadableNameSaysHowToAddItByHand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("login returned %v", err)
 	}
-	if !strings.Contains(out, "tailscale:<name>") {
-		t.Fatalf("did not say how to add it by hand: %q", out)
+	want := "    machines:\n" +
+		"      - name: main\n" +
+		"        hosts:\n" +
+		"          - tailscale:<name>\n" +
+		"          - 203.0.113.10\n"
+	if !strings.Contains(out, want) {
+		t.Fatalf("did not print the YAML to paste, want:\n%s\ngot:\n%s", want, out)
+	}
+	if !strings.Contains(out, "tailscale status") {
+		t.Fatalf("did not say where <name> comes from: %q", out)
 	}
 
 	cfg, err := config.Load(dir)

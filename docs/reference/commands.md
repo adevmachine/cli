@@ -544,8 +544,9 @@ push`.
 for its name on the tailnet (`tailscale status --json`) and, unless the
 machine's `hosts` already has a `tailscale:` entry, adds `tailscale:<name>`
 above the public address in `config.yml`. The public address stays as a
-fallback. When the name cannot be read, it prints the exact line to add by
-hand instead. See [private networks](../concepts/private-networks.md).
+fallback. When the name cannot be read, it prints the machine's
+`hosts:` block to paste instead, with `- tailscale:<name>` first;
+`<name>` is what `tailscale status` on the machine lists for it. See [private networks](../concepts/private-networks.md).
 
 Same strict fingerprint check as every other command. See
 [SSH: logging in and knowing it is your server](../how-it-works/ssh.md).
