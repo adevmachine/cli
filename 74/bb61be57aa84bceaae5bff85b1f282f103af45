@@ -1,0 +1,26 @@
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_5b2d74097d35cd 512-531
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_16904a6a6edad5 168-175,181,201-204,206,215,217
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_d9f533790b615b 917-952
+  s_a0cbf6c120c4f8::t_63d324cffe8cac 221-228
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_56f3980360f53c 1554-1665
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "74bb61be57aa84bceaae5bff85b1f282f103af45",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
