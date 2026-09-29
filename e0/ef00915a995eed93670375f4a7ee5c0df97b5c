@@ -1,0 +1,25 @@
+docs/examples/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_7c9f1b4e54e83e 1-124
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_ad406415b22926 36-37
+docs/how-it-works/ssh-and-authentication.md
+  s_a0cbf6c120c4f8::t_a3f040636b5898 5-6,9-16
+docs/index.md
+  s_a0cbf6c120c4f8::t_d6327ca33b8c06 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e0ef00915a995eed93670375f4a7ee5c0df97b5c",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
