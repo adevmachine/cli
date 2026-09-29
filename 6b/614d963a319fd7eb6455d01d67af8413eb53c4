@@ -1,0 +1,20 @@
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_cad5af8ad251ec 46-71,95,111,127
+  s_a0cbf6c120c4f8::t_8963047ab064a4 15,176-177,180-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6b614d963a319fd7eb6455d01d67af8413eb53c4",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
