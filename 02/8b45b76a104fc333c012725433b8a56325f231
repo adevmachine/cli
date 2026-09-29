@@ -1,0 +1,45 @@
+docs/examples/wuzapi-as-your-own-package.md
+  s_a0cbf6c120c4f8::t_8e5cf94840afc7 141-146
+docs/examples/keep-sessions-running.md
+  s_a0cbf6c120c4f8::t_c166a62330b464 87-88
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_34601988bee384 28,35-39
+  s_a0cbf6c120c4f8::t_70bb8d6b3d97c4 81-86
+docs/examples/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_c76d4e7f19ef06 156-162
+  s_a0cbf6c120c4f8::t_34f22c175369e5 30,38-43
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_56babf9b5088cd 134-138
+  s_a0cbf6c120c4f8::t_6670da0c3c5364 174-175
+  s_a0cbf6c120c4f8::t_f3c87cb61959c6 183-188
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_c245350fd4eda6 51
+  s_a0cbf6c120c4f8::t_e70939b1b5561b 27-30,32
+  s_a0cbf6c120c4f8::t_9cf2b0d8946777 74-78
+docs/examples/ssh-or-mosh.md
+  s_a0cbf6c120c4f8::t_1910b1146f03a3 118-119
+docs/examples/pi-coding-agent.md
+  s_a0cbf6c120c4f8::t_255be704f5436f 83-84
+docs/examples/claude-that-never-sleeps.md
+  s_a0cbf6c120c4f8::t_04c36ca1fed475 93-94
+docs/examples/claude-24-7-in-telegram.md
+  s_a0cbf6c120c4f8::t_8912b1863abe9d 3-6,8-12,15-21,39-42,45-46,54-55,60-61,72,77-78,82,88-89,95-96,103-105,109-110,115-117,139,147-149,156-157,165-174
+docs/examples/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_95e230ff69b9ec 110-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "028b45b76a104fc333c012725433b8a56325f231",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
