@@ -1,0 +1,31 @@
+docs/examples/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 4-5
+docs/examples/hermes-agent-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 1-82
+docs/examples/openclaw-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 1-67
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 10-13
+docs/index.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 36,40
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 22-23
+  s_a0cbf6c120c4f8::t_d4000e203bb616 30-31
+  s_a0cbf6c120c4f8::t_4c6b56eca16067 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "23ebb770000a9e70befc0fff216a8da9b63076cf",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
