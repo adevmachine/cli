@@ -27,7 +27,11 @@ devmachine picks between several addresses.
 [Tailscale](https://tailscale.com) is the private network devmachine has
 built-in support for.
 
-1. Add the package and sync:
+`setup` asks about Tailscale right after the essentials, and adding the
+package is all "yes" does — the sign-in and the private address still need
+the two steps below.
+
+1. Add the package and sync, if `setup` did not already:
 
    ```
    devmachine packages add tailscale
@@ -41,15 +45,9 @@ built-in support for.
    ```
 
    This opens `tailscale up` on the server, in a real terminal — you finish
-   the sign-in in your browser.
-
-3. Install Tailscale on your own computer, from
-   [tailscale.com/download](https://tailscale.com/download), and sign in to
-   the same account.
-
-4. Tell devmachine to try the private address first. In `config.yml`, add it
-   above the public one, using the server's name in your tailnet (run
-   `tailscale status` on your computer to see it):
+   the sign-in in your browser. Once it succeeds, devmachine asks the server
+   for its own name on the tailnet and adds it to `config.yml` for you, above
+   the public address:
 
    ```yaml
    machines:
@@ -58,6 +56,14 @@ built-in support for.
          - tailscale:main
          - 203.0.113.10
    ```
+
+   The public address stays as a fallback. When the name cannot be read —
+   the package failed to install, or something else went wrong — devmachine
+   prints the exact line to add by hand instead.
+
+3. Install Tailscale on your own computer, from
+   [tailscale.com/download](https://tailscale.com/download), and sign in to
+   the same account.
 
 devmachine tries `tailscale:main` first and falls back to the public address
 if Tailscale is not running on your computer — so turning Tailscale off

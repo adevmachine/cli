@@ -1,9 +1,33 @@
 # Reaching your server
 
 After `setup`, devmachine reaches your server at its public address, with a
-key only you have. That is enough to start. This page covers two ways to do
-more: a private network, so your server is reachable even when the public
-address is not, and private access to apps you do not want on the internet.
+key only you have. That is enough to start. This page covers three ways to do
+more: SSH aliases, so a workspace is reachable by name from any terminal or
+editor; a private network, so your server is reachable even when the public
+address is not; and private access to apps you do not want on the internet.
+
+## SSH aliases
+
+`devmachine ssh acme` reaches a workspace, but only through this CLI. Tools
+that dial `ssh` themselves — a plain `ssh acme-devmachine`, `mosh
+acme-devmachine`, VS Code Remote-SSH, Zed, the macOS app — need a Host entry
+in `~/.ssh/config`.
+
+`setup` and `machines add` ask once whether to write and maintain those
+entries. Say yes, and the CLI keeps a marked block in `~/.ssh/config` up to
+date automatically, every time a workspace or a machine changes: after
+`workspaces new`, `rm`, `destroy`, `edit --machine`, `machines add`, `rm`,
+and at the end of `sync`. Everything outside the block, written by hand or by
+something else, is left alone.
+
+Said no at the time, or set up before this existed? Turn it on:
+
+```
+devmachine aliases --write
+```
+
+`devmachine doctor` and `devmachine machine doctor` both warn when the block
+is missing or stale, with the same fix.
 
 ## The public address
 
@@ -24,7 +48,10 @@ private network of your own, called a tailnet. Your server gets a private
 address that only your devices can reach. It keeps working when the public
 address has trouble, and on a network that blocks SSH.
 
-1. Add Tailscale to the server:
+`setup` offers this too, right after it asks about the essentials: say yes,
+and it adds the `tailscale` package for you — the same as step 1 below.
+
+1. Add Tailscale to the server, if `setup` did not already:
 
    ```
    devmachine packages add tailscale
@@ -38,11 +65,9 @@ address has trouble, and on a network that blocks SSH.
    devmachine login tailscale
    ```
 
-3. Install Tailscale on your computer and sign in to the same account.
-
-4. Tell devmachine to try the private address first. In `config.yml`, add
-   one line above the public address, with the server's name in your tailnet
-   (`tailscale status` on your computer lists it):
+   Once you are signed in, devmachine asks the server for its name on the
+   tailnet and adds it to `config.yml` for you — one line above the public
+   address:
 
    ```yaml
    machines:
@@ -51,6 +76,12 @@ address has trouble, and on a network that blocks SSH.
          - tailscale:main
          - 203.0.113.10
    ```
+
+   The public address stays as a fallback. If the name cannot be read (the
+   package is not installed yet, or something else went wrong), devmachine
+   prints the exact line to add by hand instead.
+
+3. Install Tailscale on your computer and sign in to the same account.
 
 devmachine tries the addresses in order and uses the first that answers. If
 Tailscale is off on your computer, it skips that line and uses the public

@@ -26,6 +26,11 @@ Then work in your new workspace:
 devmachine ssh acme
 ```
 
+`setup` also asks whether to write SSH host entries for you. Say yes, and
+`ssh acme-devmachine` and `mosh acme-devmachine` work from any terminal,
+editor or app that dials `ssh` directly — VS Code Remote-SSH, Zed, the macOS
+app. See [reaching your server](concepts/reaching-your-server.md).
+
 ## What each command does
 
 `setup` asks for your server's address. It shows a code called the

@@ -30,6 +30,12 @@ turns password logins off, and picks the `essentials` package for the
 machine (`--no-essentials` skips it). See
 [how setup locks the server](../how-it-works/trust-bootstrap.md).
 
+Once the machine answers, it asks whether to write SSH host entries to
+`~/.ssh/config` — say yes, and `ssh acme-devmachine` works from any terminal
+or editor from here on, kept up to date automatically. It also asks about
+Tailscale, a private address that keeps working when the public one does
+not; see [reaching your server](../concepts/reaching-your-server.md).
+
 ### 3. Teach your agent the CLI
 
 ```
@@ -59,6 +65,10 @@ devmachine ssh acme
 
 You land inside tmux, so what you start keeps running after you close the
 terminal. See [keep your sessions running](keep-sessions-running.md).
+
+Said yes to SSH aliases? `ssh acme-devmachine` and `mosh acme-devmachine`
+reach the same workspace, from any terminal, editor or app that dials `ssh`
+directly.
 
 ## With your agent
 

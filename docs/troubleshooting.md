@@ -1,5 +1,22 @@
 # Troubleshooting
 
+## `ssh <workspace>-devmachine`: "Could not resolve hostname"
+
+**What it means:** That name only exists as a Host entry in
+`~/.ssh/config`, and it is missing — either you said no when `setup` asked
+about it, or it was set up before that question existed.
+
+**What to do:**
+
+```
+devmachine aliases --write
+```
+
+Say yes when it asks. `devmachine ssh <workspace>` and `mosh <workspace>`
+still work either way — only the plain `ssh`/`mosh` form, and tools that dial
+`ssh` themselves (VS Code Remote-SSH, Zed, the macOS app), need the alias.
+See [SSH aliases](concepts/reaching-your-server.md#ssh-aliases).
+
 ## "several machines are configured: say which one with --machine"
 
 **What it means:** You have more than one server configured, and this command

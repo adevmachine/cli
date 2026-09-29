@@ -58,10 +58,17 @@ for the server, the address, the login (`root`) and port (`22`), and a domain
 key of its own, is right when unsure — and shows the fingerprint to check
 against the provider's dashboard.
 
+Once the machine answers, it asks two more questions: whether to write SSH
+host entries so `ssh <workspace>-devmachine` and `mosh` work from any
+terminal — **say yes**, that is what makes the workspace reachable outside
+this CLI too, including from an editor like VS Code Remote-SSH — and whether
+to reach the machine over Tailscale as well, which is the person's call.
+
 Once they answer, `setup` sets up a key, checks it works, turns off password
 logins, and locks in the latest set of packages.
 
-When they say it finished, run `devmachine doctor`. Every line should pass.
+When they say it finished, run `devmachine doctor`. Every line should pass or
+warn; fix a warning about SSH aliases with `devmachine aliases --write`.
 
 ## 4. Create the workspace
 
@@ -87,8 +94,10 @@ that uses GitHub.
 
 ## 6. Hand it back
 
-Tell them to enter the workspace with `devmachine ssh <name>`. If they asked
-for a coding agent, they run `claude` there once to sign in.
+Tell them to enter the workspace with `devmachine ssh <name>` — or, if they
+said yes to SSH aliases, `ssh <name>-devmachine` works the same way from any
+terminal or editor. If they asked for a coding agent, they run `claude`
+there once to sign in.
 
 Offer what they may want next, each in one short line:
 [examples](examples/index.md) — a site with its own domain and HTTPS, a

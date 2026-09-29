@@ -15,7 +15,7 @@ one document — read this instead of parsing help text.
 ## setup
 
 ```
-devmachine setup [--force] [--no-harden] [--no-essentials]
+devmachine setup [--force] [--no-harden] [--no-essentials] [--no-aliases] [--yes]
 ```
 
 Connects to your server for the first time and gets it ready to use.
@@ -43,6 +43,15 @@ time](../how-it-works/trust-bootstrap.md) for why the order matters.
 Works on **Debian and Ubuntu** only; elsewhere it names your distro and
 stops. The password is used once and written nowhere.
 
+Once the machine answers, it asks two more questions: whether to write SSH
+host entries to `~/.ssh/config` (default yes — `ssh <workspace>-devmachine`
+and `mosh` then work from any terminal, and the CLI keeps the entries up to
+date on its own from then on; see [SSH
+aliases](../concepts/reaching-your-server.md#ssh-aliases)), and whether to
+reach the machine over Tailscale too (default no — adds the `tailscale`
+package; `devmachine login tailscale` finishes the job, see [private
+networks](../concepts/private-networks.md)).
+
 With no `config.yml` yet, it also writes `AGENTS.md` if none exists, telling
 a coding agent how to work in this folder — it never overwrites one already
 there.
@@ -52,6 +61,8 @@ there.
 | `--force` | discard the existing configuration and start over |
 | `--no-harden` | leave password login on; the key is still installed and proved |
 | `--no-essentials` | start the machine with no packages, instead of `essentials` |
+| `--no-aliases` | do not ask about SSH host entries, and do not write them |
+| `--yes` | answer yes to the SSH host entries question, without asking |
 
 Run again with a configuration in place, and it just makes sure Ansible
 is installed — it never rewrites `config.yml`, a key, or SSH settings.
@@ -94,14 +105,22 @@ devmachine doctor [--machine m]
 
 Checks whether a machine is healthy and reports what is wrong.
 
-Five checks in order: configuration, SSH fingerprint, login, operating
-system, Ansible installed. A broken fingerprint stops the rest. Then one
-check per needed credential (`credential: <key>`) and per installed DNS
-provider (`dns: <provider>`). Exits non-zero if anything failed.
+Six checks in order: configuration, SSH fingerprint, login, operating
+system, Ansible installed, SSH aliases. A broken fingerprint stops the
+rest. Then one check per needed credential (`credential: <key>`) and per
+installed DNS provider (`dns: <provider>`). Exits non-zero if anything
+failed.
+
+The SSH aliases check passes when `~/.ssh/config`'s managed block exists
+and matches what `devmachine aliases` would write today; otherwise it
+**warns**, never fails, with the fix `devmachine aliases --write`. It is
+skipped on a self machine — there is no address to write a Host entry
+for.
 
 No credential or DNS provider needed is not a failure. A check that could
 not run reports `skip` and why — "I cannot tell" is not "it is not
-there".
+there". A `warn` is the same idea for something worth fixing that does not
+mean the machine is broken.
 
 ## config
 
@@ -117,7 +136,7 @@ as it prints, so it is the quickest way to find what is wrong.
 
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
-devmachine machines add [--no-harden] [--no-essentials]   set up another server and record it
+devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines trust [name] [--check] [--replace] [--yes]   check or update its SSH fingerprint
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
@@ -135,11 +154,16 @@ on your own computer. **Your computer is never picked by default** — a
 command with no `--machine` still acts on the server, even with a self
 machine also configured.
 
-`add` sets up another server, same as [setup](#setup). `add --self
-<name>` instead names the computer devmachine runs on: no address, port
-or key. Refuses if a self machine already exists, or the name is taken.
+`add` sets up another server, same as [setup](#setup) — including the SSH
+aliases and Tailscale questions. `add --self <name>` instead names the
+computer devmachine runs on: no address, port or key, and neither question
+is asked. Refuses if a self machine already exists, or the name is taken.
 See [your computer as a machine](../how-it-works/your-computer-as-a-machine.md)
 for how this differs from `machines create-local`.
+
+Adding or removing a machine, like adding or removing a workspace, refreshes
+`~/.ssh/config`'s managed block when `ssh_aliases: true` is set — see
+[SSH aliases](../concepts/reaching-your-server.md#ssh-aliases).
 
 A self machine has no `hosts`, `user`, `port` or `key`, and no workspace
 can live on one. Any command needing a real SSH address — `ssh`, `mosh`,
@@ -204,6 +228,10 @@ creates the account on the new machine; the old one keeps everything.
 
 **`rm` leaves the Linux account, home and files on the machine** — remove
 those by hand if you want them gone.
+
+`new`, `rm`, `destroy` and `edit --machine` all refresh `~/.ssh/config`'s
+managed block afterwards, when `ssh_aliases: true` is set, and say so when
+it changed. See [SSH aliases](../concepts/reaching-your-server.md#ssh-aliases).
 
 **`destroy` deletes for real**: the account, its home, its Caddy routes,
 and its `config.yml` entry. Asks you to retype the name first (or
@@ -470,6 +498,13 @@ spreads it to workspaces using that package. A `kind: secret` credential
 is refused — use `devmachine secrets set`, then `devmachine credentials
 push`.
 
+`login tailscale` does one thing more: once signed in, it asks the machine
+for its name on the tailnet (`tailscale status --json`) and, unless the
+machine's `hosts` already has a `tailscale:` entry, adds `tailscale:<name>`
+above the public address in `config.yml`. The public address stays as a
+fallback. When the name cannot be read, it prints the exact line to add by
+hand instead. See [private networks](../concepts/private-networks.md).
+
 Same strict fingerprint check as every other command. See
 [SSH: logging in and knowing it is your server](../how-it-works/ssh.md).
 
@@ -548,7 +583,10 @@ logins — run after `devmachine login` instead of a full sync.
 stdout is the result; the plan and machine output go to stderr.
 
 On success, `<config>/packages.lock` records what was applied, at which
-release and checksum, for the machine synced.
+release and checksum, for the machine synced. It also refreshes
+`~/.ssh/config`'s managed block, when `ssh_aliases: true` is set, and
+prints how to reach each workspace on that machine: `devmachine ssh <ws>`
+always, and `ssh <ws>-devmachine` when aliases are on.
 
 ## version, help
 

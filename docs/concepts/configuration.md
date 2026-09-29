@@ -76,10 +76,18 @@ credentials:
 
 packages: v0.0.1           # the pinned release the packages come from
 domain: example.com
+ssh_aliases: true          # keep ~/.ssh/config's devmachine block up to date
 ```
 
 `user` defaults to `root`, `port` to `22`. Nothing here is a secret — a
 token goes in `devmachine secrets`, never in this file.
+
+`ssh_aliases` records the answer to the question `setup` and `machines add`
+ask about writing SSH host entries. Left out, nothing is written
+automatically — the behaviour every configuration had before this field
+existed. `devmachine aliases --write` sets it to `true` the first time it
+runs interactively and you say yes. See
+[reaching your server](reaching-your-server.md#ssh-aliases).
 
 ## Settings
 
