@@ -76,31 +76,58 @@
       check_mode: false
       tags: [dev, credentials]
 
-    - name: the directories the shared gh login lands in
-      file:
-        path: "{{ devmachine_shared.path }}"
-        state: directory
-        owner: "{{ devmachine_shared.user }}"
-        group: "{{ devmachine_shared.user }}"
-        mode: "0700"
-      loop:
-        - {user: "alice", path: "~alice/.config"}
-        - {user: "alice", path: "~alice/.config/gh"}
-      loop_control:
-        loop_var: devmachine_shared
-      when: devmachine_shared_gh.stat.exists
-      tags: [dev, credentials]
-
     - name: the shared gh login, for the workspaces that want it
-      copy:
-        src: "/etc/devmachine/gh/hosts.yml"
-        dest: "{{ devmachine_shared.path }}"
-        remote_src: true
-        owner: "{{ devmachine_shared.user }}"
-        group: "{{ devmachine_shared.user }}"
-        mode: "0600"
+      shell: |
+        set -eu
+        user={{ devmachine_shared.user | quote }}
+        rel={{ devmachine_shared.path | quote }}
+        runuser -u "$user" -- /bin/sh -c '
+        set -eu
+        umask 077
+        rel=$1
+        user=$(id -un)
+        home=$(getent passwd "$user" | cut -d: -f6)
+        outside() {
+          echo "~/$rel reaches outside the home of $user through a symbolic link, so the shared login was not copied there" >&2
+          exit 1
+        }
+        cd "$home"
+        real_home=$(pwd -P)
+        dir=$(dirname "$rel")
+        probe=$dir
+        while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+          probe=$(dirname "$probe")
+        done
+        if ! real_dir=$(cd -P "$probe" 2>/dev/null && pwd -P); then
+          echo "~/$rel: ~/$probe is not a directory" >&2
+          exit 1
+        fi
+        case "$real_dir/" in
+        "$real_home"/*) ;;
+        *) outside ;;
+        esac
+        if [ -L "$rel" ]; then
+          outside
+        fi
+        mkdir -p "$dir"
+        if [ "$dir" != . ]; then
+          chmod 0700 "$dir"
+        fi
+        tmp=$(mktemp "$dir/.devmachine.XXXXXX")
+        cat > "$tmp"
+        mode=$(stat -c %a "$rel" 2>/dev/null || stat -f %Lp "$rel" 2>/dev/null || true)
+        if [ -f "$rel" ] && [ "$mode" = 600 ] && cmp -s "$tmp" "$rel"; then
+          rm -f "$tmp"
+          exit 0
+        fi
+        chmod 0600 "$tmp"
+        mv -f "$tmp" "$rel"
+        echo changed
+        ' devmachine-share "$rel" < '/etc/devmachine/gh/hosts.yml'
+      register: devmachine_shared_gh_copy
+      changed_when: "'changed' in devmachine_shared_gh_copy.stdout"
       loop:
-        - {user: "alice", path: "~alice/.config/gh/hosts.yml"}
+        - {user: "alice", path: ".config/gh/hosts.yml"}
       loop_control:
         loop_var: devmachine_shared
       when: devmachine_shared_gh.stat.exists

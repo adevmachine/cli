@@ -73,7 +73,7 @@ func TestGenerateSkipsAWorkspaceThatOptedOutOfASharedLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	copies := sharedTasks(t, files["site.yml"], "copy")
+	copies := sharedTasks(t, files["site.yml"], "shell")
 	if len(copies) != 1 {
 		t.Fatalf("got %d tasks copying the shared login, want 1:\n%s", len(copies), files["site.yml"])
 	}
@@ -83,9 +83,6 @@ func TestGenerateSkipsAWorkspaceThatOptedOutOfASharedLogin(t *testing.T) {
 	if len(users) != 1 || users[0] != "alice" {
 		t.Fatalf("the shared login reached %#v:\n%s", users, files["site.yml"])
 	}
-	if strings.Contains(string(files["site.yml"]), "~bob/.config/gh") {
-		t.Fatalf("bob is named on the way to the shared login:\n%s", files["site.yml"])
-	}
 }
 
 func TestGenerateCopiesASharedLoginToEveryWorkspaceThatWantsIt(t *testing.T) {
@@ -94,7 +91,7 @@ func TestGenerateCopiesASharedLoginToEveryWorkspaceThatWantsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	copies := sharedTasks(t, files["site.yml"], "copy")
+	copies := sharedTasks(t, files["site.yml"], "shell")
 	if len(copies) != 1 {
 		t.Fatalf("got %d tasks, want 1:\n%s", len(copies), files["site.yml"])
 	}
@@ -102,51 +99,52 @@ func TestGenerateCopiesASharedLoginToEveryWorkspaceThatWantsIt(t *testing.T) {
 	if len(users) != 2 || users[0] != "alice" || users[1] != "bob" {
 		t.Fatalf("got %#v", users)
 	}
+	for _, entry := range copies[0]["loop"].([]any) {
+		if got := asString(entry.(map[string]any)["path"]); got != ".config/gh/hosts.yml" {
+			t.Fatalf("the path inside the home is %q", got)
+		}
+	}
 
-	options := copies[0]["copy"].(map[string]any)
-	if options["src"] != "/etc/devmachine/gh/hosts.yml" {
-		t.Fatalf("the master copy is %q", options["src"])
-	}
-	if options["remote_src"] != true {
-		t.Fatalf("the copy is between two places on the machine: %#v", options)
-	}
-	if options["mode"] != "0600" {
-		t.Fatalf("a login is readable by its owner alone, got %v", options["mode"])
-	}
-	if options["owner"] != "{{ devmachine_shared.user }}" || options["group"] != "{{ devmachine_shared.user }}" {
-		t.Fatalf("got owner %v group %v", options["owner"], options["group"])
+	script := asString(copies[0]["shell"])
+	if !strings.Contains(script, "< '/etc/devmachine/gh/hosts.yml'") {
+		t.Fatalf("the master copy is not what the copy reads:\n%s", script)
 	}
 }
 
-func TestGenerateOwnsEveryDirectoryOnTheWayToASharedLogin(t *testing.T) {
-	files, err := Generate(planSharing(t, "bob"))
+func TestGenerateNeverLetsRootWriteIntoAWorkspaceHome(t *testing.T) {
+	files, err := Generate(planSharing(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	directories := sharedTasks(t, files["site.yml"], "file")
-	if len(directories) != 1 {
-		t.Fatalf("got %d tasks making the directories, want 1:\n%s", len(directories), files["site.yml"])
+	// A workspace owns its home and can put a link anywhere in it. Root's
+	// file or copy module would follow that link out of the home.
+	for _, module := range []string{"file", "copy"} {
+		if found := sharedTasks(t, files["site.yml"], module); len(found) != 0 {
+			t.Fatalf("a %s task runs as root inside a workspace home: %#v", module, found)
+		}
 	}
+	copies := sharedTasks(t, files["site.yml"], "shell")
+	if len(copies) != 1 {
+		t.Fatalf("got %d tasks, want 1:\n%s", len(copies), files["site.yml"])
+	}
+	if script := asString(copies[0]["shell"]); !strings.Contains(script, `runuser -u "$user" --`) {
+		t.Fatalf("the copy does not run as the workspace account:\n%s", script)
+	}
+	if copies[0]["changed_when"] == nil {
+		t.Fatalf("a copy that changed nothing has to say so: %#v", copies[0])
+	}
+}
 
-	entries, ok := directories[0]["loop"].([]any)
-	if !ok {
-		t.Fatalf("the task has no loop: %#v", directories[0])
+func TestSharedHomePathRefusesAPathOutsideTheHome(t *testing.T) {
+	for _, storedAt := range []string{"/var/lib/tool/state", "~/../other/state", "~/"} {
+		if _, err := sharedHomePath(storedAt); err == nil {
+			t.Fatalf("%q was accepted", storedAt)
+		}
 	}
-	// Root making ~/.config on the way would leave a root-owned directory in
-	// a workspace's home, and that workspace's own tools would start failing
-	// for a reason nobody would connect to this. Every level is named.
-	var paths []string
-	for _, entry := range entries {
-		paths = append(paths, asString(entry.(map[string]any)["path"]))
-	}
-	if len(paths) != 2 || paths[0] != "~alice/.config" || paths[1] != "~alice/.config/gh" {
-		t.Fatalf("got %#v", paths)
-	}
-
-	options := directories[0]["file"].(map[string]any)
-	if options["owner"] != "{{ devmachine_shared.user }}" || options["state"] != "directory" {
-		t.Fatalf("got %#v", options)
+	got, err := sharedHomePath("~/.config/gh/hosts.yml")
+	if err != nil || got != ".config/gh/hosts.yml" {
+		t.Fatalf("got %q, %v", got, err)
 	}
 }
 
@@ -169,11 +167,9 @@ func TestGenerateWaitsForTheLoginBeforeCopyingIt(t *testing.T) {
 		t.Fatalf("got %d tasks looking for the master copy, want 1:\n%s", looked, files["site.yml"])
 	}
 
-	for _, module := range []string{"copy", "file"} {
-		for _, task := range sharedTasks(t, files["site.yml"], module) {
-			if condition, ok := task["when"].(string); !ok || !strings.Contains(condition, "stat.exists") {
-				t.Fatalf("a %s task runs whether or not the login is there: %#v", module, task)
-			}
+	for _, task := range sharedTasks(t, files["site.yml"], "shell") {
+		if condition, ok := task["when"].(string); !ok || !strings.Contains(condition, "stat.exists") {
+			t.Fatalf("the copy runs whether or not the login is there: %#v", task)
 		}
 	}
 }

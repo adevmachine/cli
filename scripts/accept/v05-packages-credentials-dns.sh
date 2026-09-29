@@ -195,6 +195,33 @@ contains "$OWNER" "600 alice" "and alice owns hers, 0600" || true
 capture_sync v05-sync4
 recap_idempotent "$SYNC_RECAP" "workspace and git-key do not fight over the key"
 
+"$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+  'printf untouched > /etc/devmachine-accept-victim && chmod 0644 /etc/devmachine-accept-victim && runuser -u bob -- ln -sfn /etc/devmachine-accept-victim /home/bob/.ssh/id_ed25519' \
+  || die "could not plant bob's link"
+PLANTED_OUTPUT=$("$DEVMACHINE_ACCEPT_BIN" sync --yes 2>&1)
+PLANTED_STATUS=$?
+printf '%s\n' "$PLANTED_OUTPUT" > "$ACCEPT_RUN_DIR/v05-sync-planted.full.log"
+if [ "$PLANTED_STATUS" -ne 0 ]; then
+  pass "sync fails when a shared login's path is a link out of the home"
+else
+  fail "sync fails when a shared login's path is a link out of the home" || true
+fi
+contains "$PLANTED_OUTPUT" "reaches outside the home of bob through a symbolic link" \
+  "and says which account's link it refused" || true
+VICTIM=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+  'stat -c "%a %U" /etc/devmachine-accept-victim && cat /etc/devmachine-accept-victim' 2>&1)
+equals "$VICTIM" "644 root
+untouched" "the linked file keeps its mode, owner and content" || true
+
+"$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+  'runuser -u bob -- rm /home/bob/.ssh/id_ed25519 && rm /etc/devmachine-accept-victim' \
+  || die "could not remove bob's link"
+capture_sync v05-sync-unplanted
+require_converged_recap "$SYNC_RECAP" "sync after removing the link"
+KEY_COUNT=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+  'md5sum /home/alice/.ssh/id_ed25519 /home/bob/.ssh/id_ed25519 | awk "{print \$1}" | sort -u | wc -l' 2>&1)
+equals "$KEY_COUNT" "1" "with the link gone, bob gets the shared key again" || true
+
 "$DEVMACHINE_ACCEPT_BIN" workspaces edit bob --share git-key=own --yes || die "could not let bob own git-key"
 "$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- 'echo bobs-own > /home/bob/.ssh/id_ed25519' \
   || die "could not set bob's key fixture"
@@ -214,4 +241,4 @@ require_converged_recap "$SYNC_RECAP" "sync after adding hostinger"
 HELP=$("$DEVMACHINE_ACCEPT_BIN" packages help hostinger 2>&1)
 contains "$HELP" "zones" "the provider says what it accepts" || true
 
-scenario_done 17 "v0.5"
+scenario_done 21 "v0.5"

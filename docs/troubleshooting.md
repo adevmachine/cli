@@ -221,6 +221,25 @@ directory or file. If nobody in the workspace made it,
 treat it as a warning about what runs in that workspace. A link that stays
 inside the home is followed as usual.
 
+## `sync` says a path "reaches outside the home of <account> through a symbolic link, so the shared login was not copied there"
+
+**What it means:** A login shared across workspaces (such as `gh` or
+`git-key`) lands at its `stored_at` path in each workspace's home. In the
+named account's home, one directory on that path, or the file itself, is a
+symbolic link that points outside the home. The copy runs as that
+account, never as root, so the link could never have let it write a file
+the account could not already write. But a login copied to some other place
+would be lost or leaked, so `sync` stops at that account instead. Nothing is
+written there, and nothing outside the home changes.
+
+**What to do:** Look at the path in that workspace (`ls -la` each directory
+on the way, then the file). Replace the link with a real directory or file,
+or remove it, and run `sync` again. If you want that workspace to keep a
+login of its own, opt it out with `devmachine workspaces edit <name>
+--share <login>=own`. If nobody in the workspace made the link, treat it as
+a warning about what runs in that workspace. A link that stays inside the
+home is followed as usual.
+
 ## A workspace secret was pushed, but the app never sees it
 
 **What it means:** `devmachine credentials push` writes the value into

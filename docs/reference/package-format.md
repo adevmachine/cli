@@ -158,6 +158,9 @@ not. Leave it out and it defaults to `false`. A credential recommending
 `scope: machine` must say `shareable: true`, since `scope: machine`
 means "one login, copied into every workspace" — recommending both
 without it asks for something the package itself says cannot work.
+A login that is shared needs a `stored_at` that starts with `~/`: each
+copy lands in a workspace's own home, and `sync` refuses any other path.
+See [Sharing a login](../how-it-works/sharing-a-login.md).
 
 Only `manual` can be `shareable`. A `secret` or `file` is delivered
 fresh to each place that needs it, never copied, so `shareable` on

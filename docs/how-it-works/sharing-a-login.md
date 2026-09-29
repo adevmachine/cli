@@ -13,21 +13,46 @@ copy task, written again and slightly differently each time.
 
 ## What runs
 
-For each login that resolves to `machine` scope, `sync` generates three
+For each login that resolves to `machine` scope, `sync` generates two
 tasks:
 
 1. Look for the master copy under `/etc/devmachine/<name>/`.
-2. Create every directory on the way to `stored_at`, owned by the
-   account.
-3. Copy the master there, owned by the account, mode `0600`.
+2. For each workspace that wants it, copy the master to `stored_at`, with
+   mode `0600`, making the directories on the way.
 
-All three skip when the master is not there — running `sync` before
-anybody has run `devmachine login` is normal, and the next run picks the
-session up.
+Both skip when the master is not there. Running `sync` before anybody has
+run `devmachine login` is normal, and the next run picks the session up.
 
-Every directory is named, not just the last one: Ansible's own `mkdir -p`
-style would make `~/.config` root-owned, breaking the workspace's own
-tools for no obvious reason.
+`stored_at` has to start with `~/`. The copy lands in each workspace's own
+home, so a path anywhere else has nowhere to go, and `sync` refuses it.
+
+## Why the copy runs as the workspace, not as root
+
+The rest of `sync` runs as root, and root could copy the file and then
+give it to the account. The copy does not do that, because the workspace
+account owns its home. It can replace `~/.ssh` or `~/.config/gh/hosts.yml`
+with a link to `/etc` or `/etc/shadow`. Root would follow that link, and
+write, `chmod` or `chown` a file outside the home.
+
+So root only opens the master, which is its own file, and hands the bytes
+to a shell that runs as the account (`runuser -u <account>`). That shell
+makes the directories, writes a temporary file, and renames it into place.
+It has only the account's own rights. A link can then reach only what the
+account could already write, and there is no gap between a check and a
+write for the account to slip a link into.
+
+Before it writes, the shell also resolves the path. When a directory on
+the way, or the file itself, is a link out of the home, it stops with
+"reaches outside the home of <account> through a symbolic link". That
+check is there for the message, not for the safety: see
+[Troubleshooting](../troubleshooting.md).
+
+Because the account makes the directories, they belong to it. The
+directory that holds the login is set to `0700`; the others keep the mode
+they had.
+
+A copy that is already in place, with the same content and mode `0600`,
+is left alone, and `sync` reports no change for it.
 
 ## The one that matters: opting out
 

@@ -2,7 +2,6 @@ package provision
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/credentials"
@@ -45,39 +44,21 @@ func sharingTasks(plan packages.MachinePlan) (string, error) {
 		out.WriteString("      check_mode: false\n")
 		fmt.Fprintf(&out, "      tags: %s\n\n", tags)
 
-		fmt.Fprintf(&out, "    - name: the directories the shared %s login lands in\n", s.Name)
-		out.WriteString("      file:\n" +
-			"        path: \"{{ " + sharedLoopVar + ".path }}\"\n" +
-			"        state: directory\n" +
-			"        owner: \"{{ " + sharedLoopVar + ".user }}\"\n" +
-			"        group: \"{{ " + sharedLoopVar + ".user }}\"\n" +
-			"        mode: \"0700\"\n")
-		out.WriteString("      loop:\n")
-		for _, account := range s.Into {
-			// Every level, not just the last. Ansible's `file` creates the
-			// parents it needs the way mkdir -p does — with the default owner
-			// — so root would leave root-owned directories in a workspace's
-			// home, and that workspace's own tools would start failing for a
-			// reason nobody would connect to this.
-			for _, dir := range accountDirs(account.LinuxUser, s.StoredAt) {
-				fmt.Fprintf(&out, "        - {user: %q, path: %q}\n", account.LinuxUser, dir)
-			}
+		rel, err := sharedHomePath(s.StoredAt)
+		if err != nil {
+			return "", fmt.Errorf("sharing the %s login: %w", s.Name, err)
 		}
-		out.WriteString(loopControl())
-		fmt.Fprintf(&out, "      when: %s.stat.exists\n", register)
-		fmt.Fprintf(&out, "      tags: %s\n\n", tags)
 
 		fmt.Fprintf(&out, "    - name: the shared %s login, for the workspaces that want it\n", s.Name)
-		fmt.Fprintf(&out, "      copy:\n        src: %q\n", s.From)
-		out.WriteString("        dest: \"{{ " + sharedLoopVar + ".path }}\"\n" +
-			"        remote_src: true\n" +
-			"        owner: \"{{ " + sharedLoopVar + ".user }}\"\n" +
-			"        group: \"{{ " + sharedLoopVar + ".user }}\"\n" +
-			"        mode: \"0600\"\n")
+		out.WriteString("      shell: |\n")
+		for _, line := range strings.Split(strings.TrimSuffix(sharedCopyCommand(s.From), "\n"), "\n") {
+			out.WriteString("        " + line + "\n")
+		}
+		fmt.Fprintf(&out, "      register: %s_copy\n", register)
+		fmt.Fprintf(&out, "      changed_when: \"'changed' in %s_copy.stdout\"\n", register)
 		out.WriteString("      loop:\n")
 		for _, account := range s.Into {
-			fmt.Fprintf(&out, "        - {user: %q, path: %q}\n",
-				account.LinuxUser, accountPath(account.LinuxUser, s.StoredAt))
+			fmt.Fprintf(&out, "        - {user: %q, path: %q}\n", account.LinuxUser, rel)
 		}
 		out.WriteString(loopControl())
 		fmt.Fprintf(&out, "      when: %s.stat.exists\n", register)
@@ -90,42 +71,80 @@ func loopControl() string {
 	return "      loop_control:\n        loop_var: " + sharedLoopVar + "\n"
 }
 
-// accountPath turns a package's `~/...` into one account's copy of it.
-//
-// `~alice` rather than a home worked out here: the machine is the only thing
-// that knows where an account's home really is, and Ansible expands a named
-// home on the machine.
-func accountPath(user, storedAt string) string {
-	if rest, found := strings.CutPrefix(storedAt, "~/"); found {
-		return "~" + user + "/" + rest
-	}
-	return storedAt
-}
-
-// accountDirs lists the directories one account needs on the way to its copy,
-// outermost first.
-//
-// The home itself is never among them: it belongs to the package that made the
-// account, and it is 0750 rather than 0700 so that the CLI can reach it.
-func accountDirs(user, storedAt string) []string {
-	root := "~" + user + "/"
+// sharedHomePath turns a package's `~/...` into the same path relative to
+// any account's home. A shared login lands in each workspace's own home, so a
+// `stored_at` anywhere else has nowhere to go.
+func sharedHomePath(storedAt string) (string, error) {
 	rest, inHome := strings.CutPrefix(storedAt, "~/")
 	if !inHome {
-		root, rest = "/", strings.TrimPrefix(storedAt, "/")
+		return "", fmt.Errorf("`stored_at` %q is not under ~/, so there is no copy of it for each workspace", storedAt)
 	}
-
-	dir := path.Dir(rest)
-	if dir == "." || dir == "/" {
-		return nil
-	}
-
-	parts := strings.Split(dir, "/")
-	out := make([]string, 0, len(parts))
-	for i := range parts {
-		out = append(out, root+strings.Join(parts[:i+1], "/"))
-	}
-	return out
+	return credentials.SafeWorkspacePath(rest)
 }
+
+// sharedCopyCommand copies the master at from into one account's home.
+//
+// Root only opens the master, which is its own. Everything inside the home —
+// the directories, the file, the rename — runs as the account, because the
+// account can put a link anywhere in its home: followed by root, that link
+// would aim a root write, chmod or chown at any file on the machine. As the
+// account, a link can only reach what the account could already write. The
+// check before it is for the message, not the safety.
+func sharedCopyCommand(from string) string {
+	return "set -eu\n" +
+		"user={{ " + sharedLoopVar + ".user | quote }}\n" +
+		"rel={{ " + sharedLoopVar + ".path | quote }}\n" +
+		"runuser -u \"$user\" -- /bin/sh -c '\n" +
+		sharedCopyScript +
+		"' devmachine-share \"$rel\" < " + shellQuote(from) + "\n"
+}
+
+// sharedCopyScript runs as the workspace account, with the path relative to
+// its home as $1 and the master on stdin. It is wrapped in single quotes and
+// goes through Ansible's templating, so it holds no single quote, and no
+// brace followed by a brace, a percent sign or a hash.
+const sharedCopyScript = `set -eu
+umask 077
+rel=$1
+user=$(id -un)
+home=$(getent passwd "$user" | cut -d: -f6)
+outside() {
+  echo "~/$rel reaches outside the home of $user through a symbolic link, so the shared login was not copied there" >&2
+  exit 1
+}
+cd "$home"
+real_home=$(pwd -P)
+dir=$(dirname "$rel")
+probe=$dir
+while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+  probe=$(dirname "$probe")
+done
+if ! real_dir=$(cd -P "$probe" 2>/dev/null && pwd -P); then
+  echo "~/$rel: ~/$probe is not a directory" >&2
+  exit 1
+fi
+case "$real_dir/" in
+"$real_home"/*) ;;
+*) outside ;;
+esac
+if [ -L "$rel" ]; then
+  outside
+fi
+mkdir -p "$dir"
+if [ "$dir" != . ]; then
+  chmod 0700 "$dir"
+fi
+tmp=$(mktemp "$dir/.devmachine.XXXXXX")
+cat > "$tmp"
+mode=$(stat -c %a "$rel" 2>/dev/null || stat -f %Lp "$rel" 2>/dev/null || true)
+if [ -f "$rel" ] && [ "$mode" = 600 ] && cmp -s "$tmp" "$rel"; then
+  rm -f "$tmp"
+  exit 0
+fi
+chmod 0600 "$tmp"
+mv -f "$tmp" "$rel"
+echo changed
+`
 
 // ansibleName turns a credential's name into something a register accepts.
 func ansibleName(name string) string {
