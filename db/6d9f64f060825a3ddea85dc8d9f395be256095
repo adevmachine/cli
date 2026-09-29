@@ -1,0 +1,53 @@
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_6b841bf72093d9 76-83
+internal/commands/workspaces_test.go
+  s_a0cbf6c120c4f8::t_d61a7b93b59706 584-592
+internal/packages/store.go
+  s_a0cbf6c120c4f8::t_a5bf1a83c97c6b 104-116
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_a28c4ffe2ae23e 175
+internal/commands/packages_config.go
+  s_a0cbf6c120c4f8::t_290c73dc5c3333 117-128,142-146
+internal/packages/resolve_test.go
+  s_a0cbf6c120c4f8::t_bc08ca958a9985 313-333
+internal/packages/resolve.go
+  s_a0cbf6c120c4f8::t_8545b44b8e3b06 208-209,218-219,222
+  s_a0cbf6c120c4f8::t_a5bf1a83c97c6b 207,220-221
+  s_a0cbf6c120c4f8::t_2121d0c0d0c11e 223
+internal/commands/packages_test.go
+  s_a0cbf6c120c4f8::t_55faef11876d7f 435-443
+internal/commands/workspaces.go
+  s_a0cbf6c120c4f8::t_290c73dc5c3333 581-585
+docs/concepts/configuration.md
+  s_a0cbf6c120c4f8::t_6b841bf72093d9 60,64,70,92
+docs/examples/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 4-5
+docs/examples/hermes-agent-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 1-82
+docs/examples/openclaw-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 1-67
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 10-13
+docs/index.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 36,40
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_25cd2afbca8950 22-23
+  s_a0cbf6c120c4f8::t_d4000e203bb616 30-31
+  s_a0cbf6c120c4f8::t_4c6b56eca16067 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "db6d9f64f060825a3ddea85dc8d9f395be256095",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
