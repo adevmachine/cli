@@ -5,7 +5,7 @@ why; here it is only the commands.
 
 **Whatever you start keeps running.** Every login to a workspace opens inside
 a tmux session. Start an app or an agent, close the terminal, and it keeps
-running on the server. `devmachine ssh alice` puts you back in the same
+running on the server. `devmachine ssh acme` puts you back in the same
 session. Only a reboot stops it.
 
 - [Your first devmachine, explained](your-first-devmachine.md) — the first
@@ -49,3 +49,5 @@ session. Only a reboot stops it.
   workspace for an open source gem, from fork to running tests.
 - [Your own Tailscale with Headscale](headscale.md) — a private network with
   a control server you host yourself.
+- [One set of skills for every workspace](shared-skills-for-every-workspace.md)
+  — write an agent skill once, and every workspace gets it on the next sync.

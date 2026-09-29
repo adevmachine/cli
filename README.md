@@ -11,8 +11,8 @@ Linux computer.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice && devmachine sync
-devmachine ssh alice
+devmachine workspaces new acme && devmachine sync
+devmachine ssh acme
 ```
 
 `setup` connects to the server and locks it down: it checks who you are

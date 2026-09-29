@@ -236,14 +236,14 @@ Real copy: `~/.agents/skills/<name>`. Claude's is a link:
 devmachine aliases [--write] [--path p] [--check] [--yes]
 ```
 
-Prints one SSH `Host` entry per workspace, so `ssh alice-devmachine` and
-`mosh alice-devmachine` work from an ordinary terminal.
+Prints one SSH `Host` entry per workspace, so `ssh acme-devmachine` and
+`mosh acme-devmachine` work from an ordinary terminal.
 
 ```
 # >>> devmachine — generated, do not edit
-Host alice-devmachine
+Host acme-devmachine
     HostName 100.64.0.5
-    User alice
+    User acme
     Port 22
     IdentityFile /home/you/.config/devmachine/keys/main
     IdentitiesOnly yes
@@ -466,8 +466,8 @@ spreads it to workspaces using that package. A `kind: secret` credential
 is refused — use `devmachine secrets set`, then `devmachine credentials
 push`.
 
-Same strict fingerprint check as every other command. See [SSH host
-keys](../how-it-works/ssh-host-keys.md).
+Same strict fingerprint check as every other command. See
+[SSH: logging in and knowing it is your server](../how-it-works/ssh.md).
 
 ## credentials
 
@@ -559,7 +559,7 @@ devmachine help [command] [--json]
 `0600`:
 
 ```
-2026-09-18T12:00:00Z  workspace alice   ok      "docker ps"
+2026-09-18T12:00:00Z  workspace acme   ok      "docker ps"
 2026-09-18T12:01:00Z  machine main      failed  "sync --tags caddy"
 ```
 

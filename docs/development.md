@@ -89,7 +89,7 @@ documentation, fixtures.
 
 **No real infrastructure or personal data, ever.** No real machine names,
 hostnames, IPs, domains, emails or tokens — not in code, tests, fixtures, docs
-or commit messages. Fixtures use `alice` and `bob`, `example.com`, and the
+or commit messages. Fixtures use `acme` and `bob`, `example.com`, and the
 documentation IP ranges `203.0.113.x` and `198.51.100.7`.
 
 `scripts/check-no-real-data.sh` enforces this against a pattern list kept

@@ -20,7 +20,7 @@ First match wins:
 
 ```
 $ devmachine config path
-/Users/alice/.config/devmachine (from default)
+/Users/you/.config/devmachine (from default)
 ```
 
 Run a second, test setup next to a real one with one variable:
@@ -56,7 +56,7 @@ machines:
       caddy.email: someone@example.com
 
 workspaces:
-  - name: alice
+  - name: acme
     machine: main
     packages: [dev, zsh, mise]
   - name: bob
@@ -89,7 +89,7 @@ overrides one, on a machine (as shown above) or on a workspace, written
 
 ```yaml
 workspaces:
-  - name: alice
+  - name: acme
     packages: [dev, zsh, claude-plugins]
     settings:
       claude-plugins.marketplace: example.com/their-plugins
@@ -114,7 +114,7 @@ credentials:
   gh: machine          # the default for this setup
 
 workspaces:
-  - name: alice
+  - name: acme
   - name: bob
     credentials:
       gh: own          # bob logs in for himself

@@ -13,7 +13,7 @@ same for any long task.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -26,9 +26,9 @@ does.
 ### 1. Add Claude Code and sign in
 
 ```
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 devmachine sync
-devmachine login claude --workspace alice
+devmachine login claude --workspace acme
 ```
 
 `login` opens a real terminal so you can finish the sign-in yourself — see
@@ -37,7 +37,7 @@ devmachine login claude --workspace alice
 ### 2. Start a session
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 claude
 ```
 
@@ -57,12 +57,12 @@ drops, but tmux, and Claude Code inside it, keep running on the server.
 ### 5. Come back
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 You land back in the same tmux session, with Claude Code still running and
 the task further along, or done. On a flaky connection, use
-`devmachine mosh alice` instead — mosh survives a dropped or roaming
+`devmachine mosh acme` instead — mosh survives a dropped or roaming
 connection where SSH just breaks.
 
 ## tmux basics that matter here
@@ -74,7 +74,7 @@ connection where SSH just breaks.
 - **Reattach by hand:** `tmux attach -t main`, if you ever end up outside the
   session `devmachine ssh` would normally put you in.
 - **A second connection gets its own session.** Open a second
-  `devmachine ssh alice` while the first is still attached, and you get a new
+  `devmachine ssh acme` while the first is still attached, and you get a new
   tmux session, not a shared view of the first one — so two terminals never
   fight over the same screen.
 
@@ -88,17 +88,17 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-Add Claude Code to my devmachine workspace alice, sign me in, and start a
+Add Claude Code to my devmachine workspace acme, sign me in, and start a
 session there.
 ```
 
-The agent runs `packages add claude-code --workspace alice` and `sync`, hands
-you `devmachine login claude --workspace alice` to sign in yourself, then
-opens `devmachine ssh alice` and starts `claude`. From there, you close the
+The agent runs `packages add claude-code --workspace acme` and `sync`, hands
+you `devmachine login claude --workspace acme` to sign in yourself, then
+opens `devmachine ssh acme` and starts `claude`. From there, you close the
 terminal and come back the same way as above.
 
 **Check it:** close your terminal mid-task, wait a minute, then
-`devmachine ssh alice` — the same tmux session is there, and the task has
+`devmachine ssh acme` — the same tmux session is there, and the task has
 kept moving.
 
 Source: [Claude Code](https://code.claude.com),

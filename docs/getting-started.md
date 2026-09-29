@@ -11,7 +11,7 @@ Three commands:
 ```
 brew install mydevmachine/tap/devmachine
 devmachine setup
-devmachine workspaces new alice && devmachine sync
+devmachine workspaces new acme && devmachine sync
 ```
 
 On Linux without Homebrew, get the binary from the
@@ -23,7 +23,7 @@ can run it before `setup`, too.
 Then work in your new workspace:
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 ## What each command does
@@ -39,7 +39,7 @@ HTTPS. Docker is not in it; add it with `devmachine packages add docker` when
 you need it. Want a bare server instead? Run `devmachine setup
 --no-essentials`.
 
-`workspaces new alice` creates a workspace called alice. `sync` builds it
+`workspaces new acme` creates a workspace called acme. `sync` builds it
 all on the server.
 
 **Set up before the essentials existed?** Add them to the server you already
@@ -65,12 +65,12 @@ really means.
 
 ## Set it up to develop
 
-- **A coding agent:** `devmachine packages add claude-code --workspace alice`,
+- **A coding agent:** `devmachine packages add claude-code --workspace acme`,
   then `devmachine sync`.
 - **GitHub, signed in once for every workspace:** `devmachine login gh`, then
   `devmachine sync`. See [credentials](concepts/credentials.md).
 - **Docker:** `devmachine packages add docker`, then let the workspace use it
-  with `devmachine workspaces edit alice --set workspace.groups=[docker]`,
+  with `devmachine workspaces edit acme --set workspace.groups=[docker]`,
   then `devmachine sync`.
 - **Anything else:** `devmachine packages list` shows what is available.
   [Packages](concepts/packages.md) says how to add one or write your own.
@@ -82,9 +82,9 @@ really means.
 - **Show an app at a URL** — anything listening on a port, a dev server or a
   Docker container. Add a reverse proxy once with
   `devmachine packages add caddy`, then
-  `devmachine expose add alice 3000 --host app.example.com` and
+  `devmachine expose add acme 3000 --host app.example.com` and
   `devmachine sync`. To reach it only from your own computer, with no public
-  URL, use `devmachine tunnel alice 3000` instead. See
+  URL, use `devmachine tunnel acme 3000` instead. See
   [publishing](concepts/publishing.md).
 - **Keep your configuration in git:** `devmachine setup git`. See
   [versioning your configuration](how-it-works/versioning-your-configuration.md).

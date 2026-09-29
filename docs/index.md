@@ -7,7 +7,7 @@ Three commands turn a server nobody has logged into into one that is yours:
 ```
 devmachine setup      connect to the server, lock it down, get it ready
 devmachine sync       apply your packages to the server
-devmachine workspaces new alice && devmachine sync
+devmachine workspaces new acme && devmachine sync
 ```
 
 No server yet? `devmachine machines create-local dev` makes one on your own
@@ -50,6 +50,7 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 - [Point your domain with Cloudflare](examples/cloudflare-dns.md)
 - [Contribute to a Ruby on Rails project](examples/ruby-on-rails.md)
 - [Your own Tailscale with Headscale](examples/headscale.md)
+- [One set of skills for every workspace](examples/shared-skills-for-every-workspace.md)
 
 ## Concepts
 
@@ -76,9 +77,8 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 The reasoning behind decisions that are not obvious from the outside. Read
 these when something behaves in a way that surprises you.
 
-- [SSH and authentication](how-it-works/ssh-and-authentication.md) — why the
-  CLI shares one key and never your whole agent.
-- [SSH host keys](how-it-works/ssh-host-keys.md) — how devmachine checks it is
+- [SSH: logging in and knowing it is your server](how-it-works/ssh.md) — why
+  the CLI shares one key and never your whole agent, and how it checks it is
   talking to the right server, every time.
 - [Addresses and fallback](how-it-works/addresses-and-fallback.md) — how a
   server with more than one address is reached.

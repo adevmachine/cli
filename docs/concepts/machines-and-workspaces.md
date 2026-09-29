@@ -5,7 +5,7 @@ is one person's account on a machine — usually the thing you actually work
 in day to day.
 
 ```
-devmachine workspaces new alice --machine main
+devmachine workspaces new acme --machine main
 devmachine sync
 ```
 
@@ -45,14 +45,14 @@ machines:
     key: /keys/sandbox
 
 workspaces:
-  - name: alice
+  - name: acme
     machine: main
   - name: bob
     machine: sandbox
 ```
 
 ```
-devmachine ssh alice     # lands on main
+devmachine ssh acme     # lands on main
 devmachine ssh bob       # lands on the sandbox
 ```
 
@@ -62,8 +62,8 @@ machine — with several, it's required.
 
 ## The Linux account
 
-A workspace's account uses its own name by default: `alice` owns the user
-`alice`. Give it a different name with `user:`, for when that name is
+A workspace's account uses its own name by default: `acme` owns the user
+`acme`. Give it a different name with `user:`, for when that name is
 already taken:
 
 ```yaml
@@ -84,8 +84,8 @@ workspace instead. Its settings, such as `workspace.groups` and
 ## Making and removing a workspace
 
 ```
-devmachine workspaces new alice
-devmachine workspaces new bob --like alice
+devmachine workspaces new acme
+devmachine workspaces new bob --like acme
 devmachine sync
 ```
 
@@ -95,7 +95,7 @@ creates the account. A new workspace gets the packages listed in
 copy another workspace's list.
 
 ```
-devmachine workspaces rm alice
+devmachine workspaces rm acme
 ```
 
 removes the entry from `config.yml`. **The account, its files, and its
@@ -106,7 +106,7 @@ gone.
 
 ```
 devmachine aliases --write
-mosh alice-devmachine
+mosh acme-devmachine
 ```
 
 writes an SSH shortcut for every workspace into `~/.ssh/config`, inside a
@@ -114,9 +114,9 @@ marked block it can safely rewrite without touching anything else there:
 
 ```
 # >>> devmachine — generated, do not edit
-Host alice-devmachine
+Host acme-devmachine
     HostName 100.64.0.5
-    User alice
+    User acme
     HostKeyAlias main-devmachine
 # <<< devmachine
 ```

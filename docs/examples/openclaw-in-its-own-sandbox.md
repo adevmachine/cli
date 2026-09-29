@@ -32,7 +32,7 @@ curl -fsSL https://openclaw.ai/install.sh | bash
 ```
 
 The installer sets up Node itself if the account has none. A workspace is
-its own account, so this never touches `alice` or any other workspace — see
+its own account, so this never touches `acme` or any other workspace — see
 [machines and workspaces](../concepts/machines-and-workspaces.md).
 
 ### 2. Keep it running

@@ -56,7 +56,7 @@ on an existing machine and they resume, without asking. Set the field by
 hand in `config.yml` instead: `key: <path>` for a file, or
 `agent_key: <public key line>` (`ssh-add -L` lists what your agent holds,
 in that format) for one from the agent. Full explanation:
-[SSH and authentication](how-it-works/ssh-and-authentication.md).
+[SSH: logging in and knowing it is your server](how-it-works/ssh.md).
 
 ## "the SSH agent does not hold the key … that this machine logs in with"
 
@@ -135,7 +135,7 @@ is the name a setting has to match.
 **What it means:** `devmachine ssh` with no argument logs you in as the
 server's **root** account, not a workspace.
 
-**What to do:** Name the workspace: `devmachine ssh alice`.
+**What to do:** Name the workspace: `devmachine ssh acme`.
 
 ## Changes to config.yml appear to be ignored
 
@@ -268,7 +268,7 @@ own sign-in per person). You tried to add this one in the wrong place.
 **What to do:** Use the command the error shows, for example:
 
 ```
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 ```
 
 ## "package X extends caddy.sites.d, but caddy is not installed on machine main"

@@ -28,7 +28,7 @@ does.
 ### 1. Write the package
 
 ```
-devmachine packages new wuzapi --scope workspace --into "$(devmachine config path)/packages"
+devmachine packages new wuzapi --scope workspace --into ~/.config/devmachine/packages
 ```
 
 This writes a skeleton that already passes `packages validate` at
@@ -121,7 +121,7 @@ devmachine_wuzapi_image_tag: latest
 ### 2. Check it
 
 ```
-devmachine packages validate "$(devmachine config path)/packages/wuzapi"
+devmachine packages validate ~/.config/devmachine/packages/wuzapi
 ```
 
 This reports every problem at once, so fix everything it names before

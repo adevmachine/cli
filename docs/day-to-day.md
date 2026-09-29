@@ -18,10 +18,10 @@ folder. See [agent skills](concepts/agent-skills.md).
 The CLI always finds your configuration, whatever folder a session was
 opened in. So from a session in your project you can ask:
 
-- "Publish port 3000 of the alice workspace at app.example.com."
-- "Add Docker to alice and sync."
+- "Publish port 3000 of the acme workspace at app.example.com."
+- "Add Docker to acme and sync."
 - "Why did the last sync fail?"
-- "Open a tunnel to port 5432 on alice."
+- "Open a tunnel to port 5432 on acme."
 
 There is no need to switch folders or open another session.
 
@@ -31,7 +31,7 @@ Your configuration is a folder on your computer. Find it with:
 
 ```
 $ devmachine config path
-/Users/alice/.config/devmachine (from default)
+/Users/you/.config/devmachine (from default)
 ```
 
 Open a coding agent there when the configuration itself is the work:

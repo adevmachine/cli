@@ -38,7 +38,7 @@ credentials:
   gh: machine
 
 workspaces:
-  - name: alice
+  - name: acme
   - name: bob
     credentials:
       gh: own
@@ -46,7 +46,7 @@ workspaces:
 
 The copy overwrites `stored_at`. A shared login copied into bob's home
 would replace the account he logged in with, with nothing saying why —
-so the generated loop carries alice and nobody else, and bob's name
+so the generated loop carries acme and nobody else, and bob's name
 never appears near it.
 
 ## What beats what

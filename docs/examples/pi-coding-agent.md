@@ -14,7 +14,7 @@ laptop, and keeps working after you close the terminal.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -30,7 +30,7 @@ docs say, inside the workspace's account.
 ### 1. Open the workspace
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 You land inside tmux. Anything you start here keeps running after you close
@@ -63,7 +63,7 @@ pi
 ```
 
 Pi reads any `AGENTS.md` in the project for instructions, the same way other
-agents do. Close the terminal any time — `devmachine ssh alice` brings you
+agents do. Close the terminal any time — `devmachine ssh acme` brings you
 back to the same tmux session, with Pi still running.
 
 ## Teach Pi the devmachine CLI
@@ -84,11 +84,11 @@ Open a session on your own computer (`devmachine skills add --agent pi`, or
 the plain `devmachine skills add`, taught it the CLI) and say:
 
 ```text
-SSH into my devmachine workspace alice and install the Pi coding agent
+SSH into my devmachine workspace acme and install the Pi coding agent
 there with npm, following pi.dev's own instructions.
 ```
 
-The agent runs `devmachine ssh alice`, then the npm install command, inside
+The agent runs `devmachine ssh acme`, then the npm install command, inside
 the workspace's tmux session. Signing in with `/login` is yours to do — that
 is your own account.
 

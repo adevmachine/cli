@@ -10,7 +10,7 @@ command Claude Code already ships with. For a version that reconnects itself
 after a crash or a reboot with no command to type, see the note at the
 bottom.
 
-**You need:** workspace `alice` with `claude-code` installed — see
+**You need:** workspace `acme` with `claude-code` installed — see
 [Getting started](../getting-started.md). A Claude Pro, Max, Team, or
 Enterprise plan; Remote Control does not work with an API key.
 
@@ -20,7 +20,7 @@ Enterprise plan; Remote Control does not work with an API key.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -33,14 +33,14 @@ does.
 ### 1. Add Claude Code
 
 ```
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 devmachine sync
 ```
 
 ### 2. Sign in, once
 
 ```
-devmachine login claude --workspace alice
+devmachine login claude --workspace acme
 ```
 
 This opens a real terminal so you can finish the sign-in yourself — see
@@ -50,7 +50,7 @@ claude.ai sign-in, not an API key.
 ### 3. Start a session
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 claude
 ```
 
@@ -94,13 +94,13 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-Add Claude Code to my devmachine workspace alice, sign me in, and start a
+Add Claude Code to my devmachine workspace acme, sign me in, and start a
 session there so I can turn on Remote Control.
 ```
 
-The agent runs `packages add claude-code --workspace alice` and `sync`,
-hands you `devmachine login claude --workspace alice` to sign in yourself,
-then opens `devmachine ssh alice` and starts `claude`. Typing `/rc` and
+The agent runs `packages add claude-code --workspace acme` and `sync`,
+hands you `devmachine login claude --workspace acme` to sign in yourself,
+then opens `devmachine ssh acme` and starts `claude`. Typing `/rc` and
 accepting the confirmation is yours to do — that decision is not one an
 agent should make for you.
 

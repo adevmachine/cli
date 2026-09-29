@@ -5,8 +5,8 @@ internet, `tunnel` reaches it only from your computer. Neither is the
 default — you pick based on who should reach it.
 
 ```
-devmachine expose add alice 3000 --host app.example.com
-devmachine tunnel alice 5432
+devmachine expose add acme 3000 --host app.example.com
+devmachine tunnel acme 5432
 ```
 
 ## Which one to use

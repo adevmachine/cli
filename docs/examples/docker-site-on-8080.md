@@ -15,7 +15,7 @@ to.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -41,7 +41,7 @@ your machine's name next to it.
 ### 2. Put the workspace in the docker group
 
 ```
-devmachine workspaces edit alice --set workspace.groups=[docker]
+devmachine workspaces edit acme --set workspace.groups=[docker]
 devmachine sync
 ```
 
@@ -52,7 +52,7 @@ this is a deliberate step, not the default —
 ### 3. Run the container
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 docker run -d --name site -p 127.0.0.1:8080:80 nginx:alpine
 ```
 
@@ -64,7 +64,7 @@ and the port itself is never open to the internet.
 Back on your own computer:
 
 ```
-devmachine expose add alice 8080 --host site.example.com --publish
+devmachine expose add acme 8080 --host site.example.com --publish
 devmachine sync
 ```
 
@@ -74,13 +74,13 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-Run nginx in a Docker container on my devmachine workspace alice,
+Run nginx in a Docker container on my devmachine workspace acme,
 publishing on 127.0.0.1:8080, and expose it at site.example.com.
 ```
 
 If your machine is missing from the config, or you have more than one, the
 agent asks which one to use. It adds `docker` (and `caddy` too, if `setup`
-ran with `--no-essentials`), puts `alice` in the `docker` group, starts the
+ran with `--no-essentials`), puts `acme` in the `docker` group, starts the
 container over SSH, then runs `expose add` and `sync`. You still approve
 `sync` when it asks, and putting a workspace in the `docker` group is worth
 reading before you say yes — it is a lot of trust for one container.

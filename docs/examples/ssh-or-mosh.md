@@ -13,7 +13,7 @@ setting mosh needs before it works.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -99,7 +99,7 @@ devmachine machine setup
 ### 2. Connect with ssh
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 Always works, and needs nothing extra.
@@ -107,7 +107,7 @@ Always works, and needs nothing extra.
 ### 3. Connect with mosh
 
 ```
-devmachine mosh alice
+devmachine mosh acme
 ```
 
 Needs `firewall.mosh_interface` set on the machine, as shown above. Both
@@ -128,10 +128,10 @@ runs `devmachine sync --check` first, then asks before applying it. Signing
 the server into Tailscale (`devmachine login tailscale`) is a browser step
 that's yours to do.
 
-**Check it:** run `devmachine ssh alice` and `devmachine mosh alice` from
+**Check it:** run `devmachine ssh acme` and `devmachine mosh acme` from
 two different terminals — both land in the same tmux session, so anything
 you see in one shows up in the other.
 
 Source: [docs/reference/commands.md — ssh, mosh](../reference/commands.md),
-[docs/how-it-works/ssh-and-authentication.md](../how-it-works/ssh-and-authentication.md),
+[docs/how-it-works/ssh.md](../how-it-works/ssh.md),
 [docs/concepts/reaching-your-server.md](../concepts/reaching-your-server.md)

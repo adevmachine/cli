@@ -19,7 +19,7 @@ machines:
 Or without opening the file:
 
 ```
-devmachine workspaces edit alice --set zsh.tmux_config=false
+devmachine workspaces edit acme --set zsh.tmux_config=false
 ```
 
 A setting for a package the target does not install is refused. A typo in a

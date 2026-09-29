@@ -8,12 +8,12 @@ written never came back.
 So the record moved. A route is a field of the workspace that owns it:
 
     workspaces:
-      - name: alice
+      - name: acme
         routes:
           - {host: app.example.com, port: 8080}
 
 `expose add` writes that line. `sync` renders one file per workspace,
-`alice-routes.caddy`, into the `sites.d` folder the `caddy` package
+`acme-routes.caddy`, into the `sites.d` folder the `caddy` package
 provides, and reloads Caddy when the file changed. `expose rm` deletes
 the line, and the next `sync` deletes the block. There is one
 direction — configuration to machine — devmachine never reads the machine

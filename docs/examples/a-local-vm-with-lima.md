@@ -17,7 +17,7 @@ brew install mydevmachine/tap/devmachine
 devmachine machines create-local sandbox
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice --machine sandbox
+devmachine workspaces new acme --machine sandbox
 devmachine sync
 ```
 
@@ -43,9 +43,9 @@ Everything else is the same as on a real server — see
 ### 1. Use it like a VPS
 
 ```
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 devmachine sync --machine sandbox
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 `--machine sandbox` is needed only when you have more than one machine.
@@ -58,7 +58,7 @@ HTTPS certificates and `expose` do not work there — see
 you run in the VM, use a tunnel instead of a URL:
 
 ```
-devmachine tunnel alice 3000
+devmachine tunnel acme 3000
 ```
 
 ### 3. Stop it, start it, throw it away
@@ -71,7 +71,7 @@ devmachine machines delete-local sandbox
 
 `delete-local` destroys the VM and everything in it. Then take it out of
 your configuration: first its workspaces with `devmachine workspaces rm
-alice`, then the machine with `devmachine machines rm sandbox` — it refuses
+acme`, then the machine with `devmachine machines rm sandbox` — it refuses
 while a workspace still points at it.
 
 ## With your agent
@@ -81,7 +81,7 @@ CLI) and say:
 
 ```text
 Create a local devmachine VM called sandbox and set it up as a machine,
-then create a workspace alice on it with claude-code.
+then create a workspace acme on it with claude-code.
 ```
 
 The agent runs `machines create-local`, then `setup` or `machines add`. You

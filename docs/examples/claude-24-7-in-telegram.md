@@ -11,7 +11,7 @@ preview** ([code.claude.com/docs/en/channels](https://code.claude.com/docs/en/ch
 the `--channels` flag isn't even listed in `claude --help` yet, and its
 exact form may still change.
 
-**You need:** workspace `alice` with `claude-code` installed — see
+**You need:** workspace `acme` with `claude-code` installed — see
 [getting started](../getting-started.md). A Claude account signed in at
 [claude.ai](https://claude.ai), on a Pro, Max, Team, or Enterprise plan, or a
 Console API key (channels don't work on Bedrock, Google's Agent Platform, or
@@ -26,7 +26,7 @@ organization, an Owner must turn channels on first, at
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -38,14 +38,14 @@ does.
 
 Two places matter below: **your computer**, where you run `devmachine`
 commands, and **inside the workspace**, where Claude Code itself runs, which
-you reach with `devmachine ssh alice`.
+you reach with `devmachine ssh acme`.
 
 ### 1. Add Claude Code
 
 On your computer:
 
 ```
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 devmachine sync
 ```
 
@@ -54,7 +54,7 @@ devmachine sync
 On your computer:
 
 ```
-devmachine login claude --workspace alice
+devmachine login claude --workspace acme
 ```
 
 This opens a real terminal so you finish the sign-in yourself, against your
@@ -64,7 +64,7 @@ This opens a real terminal so you finish the sign-in yourself, against your
 ### 3. Open the workspace and start Claude Code
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 claude
 ```
 
@@ -138,7 +138,7 @@ Without this, anyone who finds your bot's username could message it.
 The session has to stay open for messages to arrive — closing it stops the
 channel. Every workspace login already opens inside tmux, so once you close
 your laptop, `claude --channels ...` and the Telegram plugin both keep
-running on the server. `devmachine ssh alice` brings you back to the same
+running on the server. `devmachine ssh acme` brings you back to the same
 session, still connected.
 
 ### When Claude needs your permission
@@ -157,13 +157,13 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-Add Claude Code to my devmachine workspace alice, sign me in, and start a
+Add Claude Code to my devmachine workspace acme, sign me in, and start a
 session there so I can set up the Telegram channel.
 ```
 
-The agent runs `packages add claude-code --workspace alice` and `sync`,
-hands you `devmachine login claude --workspace alice` to sign in yourself in
-the terminal it opens, then runs `devmachine ssh alice` and starts `claude`.
+The agent runs `packages add claude-code --workspace acme` and `sync`,
+hands you `devmachine login claude --workspace acme` to sign in yourself in
+the terminal it opens, then runs `devmachine ssh acme` and starts `claude`.
 From there, you stay in the driver's seat for everything Telegram-specific:
 create the bot in BotFather yourself, and when the agent runs
 `/plugin install telegram@claude-plugins-official`, you paste the bot token

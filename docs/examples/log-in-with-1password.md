@@ -19,7 +19,7 @@ keys.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -92,7 +92,7 @@ only thing you use this key for — it already offers only the one key.
 ### 5. Use it
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 1Password asks you to approve, and the session opens. `devmachine ssh` and

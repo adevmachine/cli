@@ -73,7 +73,7 @@ by you, not by anyone who guesses a URL. Open a tunnel instead of publishing
 them:
 
 ```
-devmachine tunnel alice 3000
+devmachine tunnel acme 3000
 ```
 
 The app answers at `localhost:3000` on your computer until you press

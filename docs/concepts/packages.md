@@ -27,7 +27,7 @@ as you want.
 
 ```
 devmachine packages add docker --machine main
-devmachine packages add claude-code --workspace alice
+devmachine packages add claude-code --workspace acme
 ```
 
 Adding the wrong kind to the wrong target is refused, and says why.
@@ -38,7 +38,7 @@ A package reads its own settings, each with a default. Change one on a
 workspace with:
 
 ```
-devmachine workspaces edit alice --set caddy.email=you@example.com
+devmachine workspaces edit acme --set caddy.email=you@example.com
 ```
 
 An empty value, `--set caddy.email=`, removes the override. On a machine,

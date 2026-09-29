@@ -1,7 +1,7 @@
 # Your first devmachine, explained
 
 The first commands, one at a time: what each asks and what it does. At the
-end you have a workspace called `alice` on your server.
+end you have a workspace called `acme` on your server.
 
 **You need:** a Debian or Ubuntu VPS you can reach as root over SSH, and a
 Mac or Linux computer.
@@ -41,20 +41,20 @@ Any new Claude Code or Codex session can now run devmachine for you.
 ### 4. Create the workspace
 
 ```
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
-`workspaces new` adds `alice` to your configuration. `sync` builds it on the
+`workspaces new` adds `acme` to your configuration. `sync` builds it on the
 server, together with the essentials `setup` chose for the machine (base
-tools, git, a firewall and Caddy): `alice` is its own account, with git, the
+tools, git, a firewall and Caddy): `acme` is its own account, with git, the
 GitHub CLI, Node, bun and zsh. It shows the plan and asks before changing
 anything.
 
 ### 5. Open it
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 ```
 
 You land inside tmux, so what you start keeps running after you close the
@@ -65,12 +65,12 @@ terminal. See [keep your sessions running](keep-sessions-running.md).
 Install the CLI (step 1), then say to Claude Code or Codex on your computer:
 
 ```text
-Set up devmachine for me with a workspace called alice:
+Set up devmachine for me with a workspace called acme:
 read https://mydevmachine.sh/agent-setup.md and follow it.
 ```
 
 It asks for what it needs, one question at a time. You still check the
 fingerprint in `devmachine setup`, and you approve the `sync`.
 
-**Check it:** `devmachine doctor` passes, and `devmachine ssh alice` opens a
+**Check it:** `devmachine doctor` passes, and `devmachine ssh acme` opens a
 shell on the server.

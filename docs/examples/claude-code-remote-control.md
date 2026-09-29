@@ -13,7 +13,7 @@ over SSH — for a session waiting for you with no SSH step at all, see
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
-devmachine workspaces new alice
+devmachine workspaces new acme
 devmachine sync
 ```
 
@@ -26,18 +26,18 @@ does.
 ### 1. Add Claude Code, with Remote Control on by default
 
 ```
-devmachine packages add claude-code --workspace alice
-devmachine workspaces edit alice --set claude-code.remote_control_at_startup=true
+devmachine packages add claude-code --workspace acme
+devmachine workspaces edit acme --set claude-code.remote_control_at_startup=true
 devmachine sync
 ```
 
 `remote_control_at_startup` connects every session to Remote Control as it
 opens, instead of waiting for somebody to type `/rc`.
 
-### 2. Log in as alice, once
+### 2. Log in as acme, once
 
 ```
-devmachine login claude --workspace alice
+devmachine login claude --workspace acme
 ```
 
 This opens a real terminal, so a person is there to finish the sign-in — see
@@ -46,7 +46,7 @@ This opens a real terminal, so a person is there to finish the sign-in — see
 ### 3. Start a session
 
 ```
-devmachine ssh alice
+devmachine ssh acme
 claude
 ```
 
@@ -68,12 +68,12 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-Install Claude Code on my devmachine workspace alice with Remote Control
+Install Claude Code on my devmachine workspace acme with Remote Control
 on by default.
 ```
 
 The agent adds the package and sets `remote_control_at_startup`, then runs
-`sync`. Two steps stay yours: `devmachine login claude --workspace alice`
+`sync`. Two steps stay yours: `devmachine login claude --workspace acme`
 opens a real terminal for you to finish the sign-in, and scanning the QR
 code on the phone.
 
