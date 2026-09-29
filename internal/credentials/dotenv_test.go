@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -137,22 +138,7 @@ func TestPushWorkspaceEnvWritesIntoTheDefaultFile(t *testing.T) {
 }
 
 func TestPushWorkspaceEnvMergesWithWhatWasAlreadyThere(t *testing.T) {
-	readCommand := `set -eu
-user='alice'
-rel='` + DefaultEnvFile + `'
-home=$(getent passwd "$user" | cut -d: -f6)
-if [ -z "$home" ]; then
-	echo "there is no account named $user on this machine" >&2
-	exit 1
-fi
-full="$home/$rel"
-if [ -f "$full" ]; then
-	printf 'EXISTS\n'
-	cat "$full"
-else
-	printf 'MISSING\n'
-fi
-`
+	readCommand := fmt.Sprintf(dotenvReadScript, shellQuote("alice"), shellQuote(DefaultEnvFile))
 	c := &recordingClient{output: map[string]string{
 		readCommand: "EXISTS\nOTHER=kept\n",
 	}}
@@ -198,22 +184,7 @@ func TestPushWorkspaceEnvRefusesAnEmptyValue(t *testing.T) {
 }
 
 func TestRemoveWorkspaceEnvDropsOnlyTheNamedLine(t *testing.T) {
-	readCommand := `set -eu
-user='alice'
-rel='` + DefaultEnvFile + `'
-home=$(getent passwd "$user" | cut -d: -f6)
-if [ -z "$home" ]; then
-	echo "there is no account named $user on this machine" >&2
-	exit 1
-fi
-full="$home/$rel"
-if [ -f "$full" ]; then
-	printf 'EXISTS\n'
-	cat "$full"
-else
-	printf 'MISSING\n'
-fi
-`
+	readCommand := fmt.Sprintf(dotenvReadScript, shellQuote("alice"), shellQuote(DefaultEnvFile))
 	c := &recordingClient{output: map[string]string{
 		readCommand: "EXISTS\nAPI_KEY='secret'\nOTHER=kept\n",
 	}}

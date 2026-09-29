@@ -499,7 +499,9 @@ By default it lands in `~/.devmachine/env` — see
 <path>` delivers into that dotenv file instead, relative to the
 workspace's home: the existing `<NAME>=` line is replaced, or a new one
 appended, and everything else in the file is left exactly as it was. A
-path that would reach outside the workspace's home is refused. The
+path that would reach outside the workspace's home is refused — here
+for `../` or an absolute path, and on the machine for a symbolic link
+that leads out of it. The
 first time it edits a file that already existed, it keeps a copy at
 `<path>.devmachine.bak`. See [credentials: your app's own
 secrets](../concepts/credentials.md#your-apps-own-secrets).

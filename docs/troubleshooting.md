@@ -202,6 +202,22 @@ directory.
 `.env`. There is no way to deliver a workspace secret outside that
 workspace's own home.
 
+## `credentials push` says a path "reaches outside the workspace's home through a symbolic link"
+
+**What it means:** The `--env-file` path looked fine on your computer, but
+on the machine one of its directories — or the file itself, or its
+`.devmachine.bak` — is a symbolic link that points outside the workspace's
+home. The push runs as the machine's admin, and the workspace's own
+account can create links anywhere in its home, so following one would let
+that account aim a root write at any file on the machine. The push stops
+before it reads or writes anything.
+
+**What to do:** Look at the path on the machine (`ls -la` each directory
+on the way). If the link is yours and meant, point `--env-file` at the
+real file inside the home instead. If nobody in the workspace made it,
+treat it as a warning about what runs in that workspace. A link that stays
+inside the home is followed as usual.
+
 ## A workspace secret was pushed, but the app never sees it
 
 **What it means:** `devmachine credentials push` writes the value into

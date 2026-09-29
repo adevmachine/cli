@@ -103,27 +103,56 @@ func joinDotenvLines(lines []string) []byte {
 	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
-// readDotenv reads rel, relative to user's home on the machine c reaches,
-// returning its content and whether it existed at all — an absent file and
-// an empty one are not the same thing for a caller deciding whether to keep
-// a backup.
-func readDotenv(ctx context.Context, c remote.Client, user, rel string) (content []byte, existed bool, err error) {
-	script := fmt.Sprintf(`set -eu
-user=%s
-rel=%s
-home=$(getent passwd "$user" | cut -d: -f6)
+// dotenvLocateScript sets $home and $full for $user and $rel, and refuses a
+// path that leaves the home through a symbolic link. These scripts run as the
+// machine's admin, and any directory or file under the home is the workspace
+// account's to replace with a link: followed blindly, that link would point a
+// root read, write, chmod or chown at any file on the machine.
+const dotenvLocateScript = `home=$(getent passwd "$user" | cut -d: -f6)
 if [ -z "$home" ]; then
 	echo "there is no account named $user on this machine" >&2
 	exit 1
 fi
 full="$home/$rel"
-if [ -f "$full" ]; then
+outside() {
+	echo "$rel reaches outside the workspace's home through a symbolic link" >&2
+	exit 1
+}
+real_home=$(cd -P "$home" && pwd -P)
+probe=$(dirname "$full")
+while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+	probe=$(dirname "$probe")
+done
+if ! real_dir=$(cd -P "$probe" 2>/dev/null && pwd -P); then
+	echo "$rel: $probe is not a directory" >&2
+	exit 1
+fi
+case "$real_dir/" in
+"$real_home"/*) ;;
+*) outside ;;
+esac
+if [ -L "$full" ] || [ -L "$full` + backupSuffix + `" ]; then
+	outside
+fi
+`
+
+const dotenvReadScript = `set -eu
+user=%s
+rel=%s
+` + dotenvLocateScript + `if [ -f "$full" ]; then
 	printf 'EXISTS\n'
 	cat "$full"
 else
 	printf 'MISSING\n'
 fi
-`, shellQuote(user), shellQuote(rel))
+`
+
+// readDotenv reads rel, relative to user's home on the machine c reaches,
+// returning its content and whether it existed at all — an absent file and
+// an empty one are not the same thing for a caller deciding whether to keep
+// a backup.
+func readDotenv(ctx context.Context, c remote.Client, user, rel string) (content []byte, existed bool, err error) {
+	script := fmt.Sprintf(dotenvReadScript, shellQuote(user), shellQuote(rel))
 
 	out, err := c.Run(ctx, script)
 	if err != nil {
@@ -150,13 +179,7 @@ umask 077
 user=%[1]s
 rel=%[2]s
 backup=%[3]s
-home=$(getent passwd "$user" | cut -d: -f6)
-if [ -z "$home" ]; then
-	echo "there is no account named $user on this machine" >&2
-	exit 1
-fi
-full="$home/$rel"
-dir=$(dirname "$full")
+` + dotenvLocateScript + `dir=$(dirname "$full")
 make_dirs() {
 	if [ -d "$1" ]; then
 		return
@@ -177,8 +200,7 @@ mode=0600
 if [ -e "$full" ]; then
 	mode=$(stat -c %%a "$full" 2>/dev/null || stat -f %%Lp "$full")
 fi
-tmp="$dir/.devmachine.$$"
-: > "$tmp"
+tmp=$(mktemp "$dir/.devmachine.XXXXXX")
 chmod "$mode" "$tmp"
 chown "$user" "$tmp"
 cat > "$tmp"
