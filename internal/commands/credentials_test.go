@@ -262,8 +262,12 @@ var _ remote.Client = (*recordingRemote)(nil)
 func (r *recordingRemote) wrote() bool { return len(r.delivered) > 0 }
 
 // isWrite says whether a command delivers a value. The write script is the
-// only one that ends by copying standard input into a file.
-func isWrite(command string) bool { return strings.Contains(command, `cat > "$path"`) }
+// only one that ends by copying standard input into a file — a machine or
+// workspace credential's into `$path`, a workspace's own dotenv secret into a
+// temporary file it then renames into place.
+func isWrite(command string) bool {
+	return strings.Contains(command, `cat > "$path"`) || strings.Contains(command, `cat > "$tmp"`)
+}
 
 // configWithTwoSecrets is one workspace asking for two secrets and a login, so
 // a push has something to deliver, something to skip and something to name.

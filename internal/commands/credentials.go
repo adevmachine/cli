@@ -49,6 +49,7 @@ func newCredentialsCmd(opts *options) *cobra.Command {
 // they are reported against.
 type declared struct {
 	dir     string
+	cfg     config.Config
 	machine config.Machine
 	wanted  []credentials.Declared
 }
@@ -76,7 +77,45 @@ func credentialsOnMachine(ctx context.Context, opts *options) (declared, error) 
 	if err != nil {
 		return declared{}, err
 	}
-	return declared{dir: dir, machine: machine, wanted: credentials.Wanted(plan)}, nil
+	return declared{dir: dir, cfg: cfg, machine: machine, wanted: credentials.Wanted(plan)}, nil
+}
+
+// workspaceTargetsOnMachine is every workspace secret target whose workspace
+// lives on machine — the ones this machine's push has anything to say about.
+func workspaceTargetsOnMachine(dir string, cfg config.Config, machine string) ([]secrets.Target, error) {
+	all, err := secrets.Targets(dir)
+	if err != nil {
+		return nil, err
+	}
+	on := map[string]bool{}
+	for _, w := range cfg.WorkspacesOn(machine) {
+		on[w.Name] = true
+	}
+	var out []secrets.Target
+	for _, t := range all {
+		if on[t.Workspace] {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
+// linuxUsersOn maps every workspace on machine to the account it owns.
+func linuxUsersOn(cfg config.Config, machine string) map[string]string {
+	out := map[string]string{}
+	for _, w := range cfg.WorkspacesOn(machine) {
+		out[w.Name] = w.LinuxUser()
+	}
+	return out
+}
+
+// workspaceSecretTargetPath is what a report and `secrets list` show: the
+// default file when nothing more specific was asked for.
+func workspaceSecretTargetPath(t secrets.Target) string {
+	if t.EnvFile == "" {
+		return credentials.DefaultEnvFile
+	}
+	return t.EnvFile
 }
 
 // storedNames is the set of secrets the operator has already stored. Names
@@ -218,6 +257,9 @@ type pushJSON struct {
 	Skipped   []skippedJSON `json:"skipped"`
 	// NoValue names the credentials nobody stored a value for.
 	NoValue []string `json:"no_value,omitempty"`
+	// RemovedFromFile names the workspace secrets removed from their
+	// delivery file, by `secrets rm --from-file`.
+	RemovedFromFile []string `json:"removed_from_file,omitempty"`
 }
 
 type skippedJSON struct {
@@ -253,6 +295,13 @@ func newCredentialsPushCmd(opts *options) *cobra.Command {
 	return c
 }
 
+// wsDeliverable is one workspace secret a push would either write or remove.
+type wsDeliverable struct {
+	t      secrets.Target
+	user   string
+	remove bool
+}
+
 func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	found, err := credentialsOnMachine(cmd.Context(), opts)
 	if err != nil {
@@ -262,7 +311,11 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	if err != nil {
 		return err
 	}
-	if len(found.wanted) == 0 {
+	wsTargets, err := workspaceTargetsOnMachine(found.dir, found.cfg, found.machine.Name)
+	if err != nil {
+		return err
+	}
+	if len(found.wanted) == 0 && len(wsTargets) == 0 {
 		return reportPush(cmd, opts, pushJSON{Machine: found.machine.Name, Check: check})
 	}
 
@@ -272,9 +325,12 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	}
 	defer client.Close()
 
-	present, err := credentials.Present(cmd.Context(), client, found.wanted)
-	if err != nil {
-		return err
+	present := map[string]bool{}
+	if len(found.wanted) > 0 {
+		present, err = credentials.Present(cmd.Context(), client, found.wanted)
+		if err != nil {
+			return err
+		}
 	}
 
 	report := pushJSON{Machine: found.machine.Name, Check: check}
@@ -300,6 +356,19 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 		}
 	}
 
+	users := linuxUsersOn(found.cfg, found.machine.Name)
+	var wsWork []wsDeliverable
+	for _, t := range wsTargets {
+		switch {
+		case t.PendingRemoval:
+			wsWork = append(wsWork, wsDeliverable{t: t, user: users[t.Workspace], remove: true})
+		case !stored[t.Key()]:
+			report.NoValue = append(report.NoValue, t.Key())
+		default:
+			wsWork = append(wsWork, wsDeliverable{t: t, user: users[t.Workspace]})
+		}
+	}
+
 	notes := cmd.OutOrStdout()
 	if opts.format == formatJSON {
 		notes = cmd.ErrOrStderr()
@@ -307,9 +376,17 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	for _, w := range work {
 		fmt.Fprintf(notes, "%s -> %s\n", credentials.Key(w.d), credentials.Destination(w.d))
 	}
+	for _, w := range wsWork {
+		if w.remove {
+			fmt.Fprintf(notes, "%s: remove from %s\n", w.t.Key(), workspaceSecretTargetPath(w.t))
+			continue
+		}
+		fmt.Fprintf(notes, "%s -> %s\n", w.t.Key(), workspaceSecretTargetPath(w.t))
+	}
 
-	if !check && len(work) > 0 && !yes {
-		ok, err := confirm(cmd.InOrStdin(), notes, fmt.Sprintf("Deliver %d value(s) to %s?", len(work), found.machine.Name))
+	total := len(work) + len(wsWork)
+	if !check && total > 0 && !yes {
+		ok, err := confirm(cmd.InOrStdin(), notes, fmt.Sprintf("Deliver %d value(s) to %s?", total, found.machine.Name))
 		if err != nil {
 			return err
 		}
@@ -329,6 +406,35 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 			}
 		}
 		report.Delivered = append(report.Delivered, credentials.Key(w.d))
+	}
+
+	for _, w := range wsWork {
+		rel := w.t.EnvFile
+		if rel == "" {
+			rel = credentials.DefaultEnvFile
+		}
+		if w.remove {
+			if !check {
+				if err := credentials.RemoveWorkspaceEnv(cmd.Context(), client, w.user, rel, w.t.Name, w.t.EnvFile != ""); err != nil {
+					return err
+				}
+				if err := secrets.RemoveTarget(found.dir, w.t.Workspace, w.t.Name); err != nil {
+					return err
+				}
+			}
+			report.RemovedFromFile = append(report.RemovedFromFile, w.t.Key())
+			continue
+		}
+		if !check {
+			value, err := secrets.Get(found.dir, w.t.Key())
+			if err != nil {
+				return err
+			}
+			if err := credentials.PushWorkspaceEnv(cmd.Context(), client, w.user, rel, w.t.Name, value, w.t.EnvFile != ""); err != nil {
+				return err
+			}
+		}
+		report.Delivered = append(report.Delivered, w.t.Key())
 	}
 	record(opts, target{machine: found.machine}, pushCommandLine(check), true)
 
@@ -368,7 +474,14 @@ func reportPush(cmd *cobra.Command, opts *options, report pushJSON) error {
 	for _, key := range report.NoValue {
 		fmt.Fprintf(out, "no value stored for %s: run `devmachine secrets set %s`\n", key, nameOf(key))
 	}
-	if len(report.Delivered) == 0 && len(report.NoValue) == 0 {
+	removeVerb := "removed"
+	if report.Check {
+		removeVerb = "would remove"
+	}
+	for _, key := range report.RemovedFromFile {
+		fmt.Fprintf(out, "%s %s from its file\n", removeVerb, key)
+	}
+	if len(report.Delivered) == 0 && len(report.NoValue) == 0 && len(report.RemovedFromFile) == 0 {
 		fmt.Fprintln(out, "nothing to deliver")
 	}
 	return nil
