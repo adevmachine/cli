@@ -35,3 +35,9 @@ session. Only a reboot stops it.
   written once as a package, running on two machines.
 - [Log in with your 1Password SSH key](log-in-with-1password.md) — keep the
   key in your vault, and approve each use with Touch ID.
+- [Pi as your coding agent](pi-coding-agent.md) — install Pi in a workspace
+  and use it for everyday work.
+- [SSH or mosh?](ssh-or-mosh.md) — which one to use, and what to install
+  where.
+- [Claude 24/7 in Telegram](claude-24-7-in-telegram.md) — message Claude
+  Code from Telegram, while it runs on your server around the clock.
