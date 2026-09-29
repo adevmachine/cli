@@ -1551,3 +1551,115 @@ func TestMachineWithTwoServersStillAsks(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestSSHAliasesRoundTripsThroughLoad(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nssh_aliases: true\n")
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SSHAliases {
+		t.Fatal("ssh_aliases: true was not read")
+	}
+}
+
+func TestSSHAliasesDefaultsToFalseWhenAbsent(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSHAliases {
+		t.Fatal("a configuration without the key should behave as if it were false")
+	}
+}
+
+func TestSetSSHAliasesWritesTheKeyAndKeepsComments(t *testing.T) {
+	dir := configDirWith(t, "# my machine\nmachines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if err := SetSSHAliases(dir, true); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# my machine") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SSHAliases {
+		t.Fatal("ssh_aliases was not set")
+	}
+}
+
+func TestSetSSHAliasesFalseRemovesTheKey(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\nssh_aliases: true\n")
+
+	if err := SetSSHAliases(dir, false); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "ssh_aliases") {
+		t.Fatalf("ssh_aliases: false should be written as nothing:\n%s", body)
+	}
+}
+
+func TestSetMachineHostsPrependsAndKeepsComments(t *testing.T) {
+	dir := configDirWith(t, "# my machine\nmachines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if err := SetMachineHosts(dir, "main", []string{"tailscale:main", "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "# my machine") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Hosts) != 2 || m.Hosts[0].Address != "tailscale:main" || m.Hosts[1].Address != "203.0.113.10" {
+		t.Fatalf("hosts = %#v", m.Hosts)
+	}
+}
+
+func TestSetMachineHostsRefusesToEmptyTheList(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	err := SetMachineHosts(dir, "main", nil)
+	if err == nil {
+		t.Fatal("it wrote a machine with no address")
+	}
+}
+
+func TestSetMachineHostsRefusesAnUnknownMachine(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	err := SetMachineHosts(dir, "sandbox", []string{"198.51.100.7"})
+	if err == nil {
+		t.Fatal("it silently did nothing")
+	}
+	if !strings.Contains(err.Error(), "sandbox") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+}

@@ -509,6 +509,26 @@ func TestWriteKeepsABlankLineBeforeWhatFollowsTheBlock(t *testing.T) {
 	}
 }
 
+func TestWriteChangedReportsWhetherTheFileMoved(t *testing.T) {
+	path := fileWith(t, Begin+"\nHost old-devmachine\n"+End+"\n")
+
+	changed, err := WriteChanged(path, "Host old-devmachine\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Fatal("writing the same block reported a change")
+	}
+
+	changed, err = WriteChanged(path, "Host new-devmachine\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Fatal("writing a different block did not report a change")
+	}
+}
+
 func TestListSkipsAWorkspaceOnASelfMachine(t *testing.T) {
 	cfg := config.Config{
 		Machines: []config.Machine{

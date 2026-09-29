@@ -165,12 +165,20 @@ func Render(cfg config.Config) (string, error) {
 // host, a sandbox, a client's bastion. Rewriting the whole file deletes them,
 // and nothing brings them back.
 func Write(path, block string) error {
+	_, err := WriteChanged(path, block)
+	return err
+}
+
+// WriteChanged is Write, reporting whether the file's content actually
+// changed. Automatic refreshes — after a workspace or a machine changes —
+// only have something worth printing when it did.
+func WriteChanged(path, block string) (bool, error) {
 	body, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		body = nil
 	case err != nil:
-		return fmt.Errorf("reading %s: %w", path, err)
+		return false, fmt.Errorf("reading %s: %w", path, err)
 	}
 
 	managed := Begin + "\n" + strings.TrimRight(block, "\n") + "\n" + End + "\n"
@@ -190,8 +198,12 @@ func Write(path, block string) error {
 		out += "\n" + user + "\n"
 	}
 
+	if out == current {
+		return false, nil
+	}
+
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("creating %s: %w", filepath.Dir(path), err)
+		return false, fmt.Errorf("creating %s: %w", filepath.Dir(path), err)
 	}
 	// ssh refuses to read a configuration other people can write, so a file
 	// this makes starts at 0600 and one that exists keeps what it had.
@@ -200,9 +212,9 @@ func Write(path, block string) error {
 		mode = info.Mode().Perm()
 	}
 	if err := os.WriteFile(path, []byte(out), mode); err != nil {
-		return fmt.Errorf("writing %s: %w", path, err)
+		return false, fmt.Errorf("writing %s: %w", path, err)
 	}
-	return nil
+	return true, nil
 }
 
 func quoteSSHConfig(value string) string {

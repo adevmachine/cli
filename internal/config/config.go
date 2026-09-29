@@ -218,6 +218,14 @@ type Config struct {
 	// about a tool, the second is a preference, and preferences belong to
 	// whoever has them.
 	Credentials map[string]string `yaml:"credentials,omitempty"`
+	// SSHAliases records whether the CLI keeps ~/.ssh/config's managed block
+	// up to date on its own, every time the set of workspaces changes.
+	//
+	// Left out, a configuration behaves the way every configuration did
+	// before this field existed: nothing is written unless `devmachine
+	// aliases --write` is run by hand. The operator answers once, during
+	// setup or `machines add`, and the answer is never asked again.
+	SSHAliases bool `yaml:"ssh_aliases,omitempty"`
 }
 
 // CredentialsFor is the operator's answer about each credential for one
@@ -904,6 +912,42 @@ func modeOf(path string) os.FileMode {
 		return info.Mode().Perm()
 	}
 	return 0o600
+}
+
+// SetSSHAliases records the operator's answer about keeping the SSH aliases
+// file up to date automatically. It edits the document in place, so the
+// person's own formatting and comments survive.
+func SetSSHAliases(dir string, value bool) error {
+	return editDocument(dir, func(root *yaml.Node) error {
+		setField(root, "ssh_aliases", boolNode(value))
+		return nil
+	})
+}
+
+// SetMachineHosts writes a machine's `hosts` list back onto its entry, in the
+// order given.
+//
+// It is how `devmachine login tailscale` can prepend a private address
+// without disturbing anything else `machines add` or a person wrote into the
+// file.
+func SetMachineHosts(dir, name string, addresses []string) error {
+	if len(addresses) == 0 {
+		return fmt.Errorf("machine %q would be left with no address: refusing to write an empty `hosts`", name)
+	}
+	return editDocument(dir, func(root *yaml.Node) error {
+		machines := field(root, "machines")
+		if machines == nil || machines.Kind != yaml.SequenceNode {
+			return fmt.Errorf("`machines` has no entry named %q", name)
+		}
+		for _, entry := range machines.Content {
+			if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != name {
+				continue
+			}
+			setField(entry, "hosts", sequenceNode(addresses))
+			return nil
+		}
+		return fmt.Errorf("`machines` has no entry named %q", name)
+	})
 }
 
 // AddWorkspace appends a workspace to config.yml.
