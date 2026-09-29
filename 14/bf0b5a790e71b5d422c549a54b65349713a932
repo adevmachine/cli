@@ -1,0 +1,29 @@
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_a27b1471d527d1 38-43
+docs/examples/claude-24-7-in-telegram.md
+  s_a0cbf6c120c4f8::t_86c9b777ed7c79 129-138
+  s_a0cbf6c120c4f8::t_25647e9bc11ddf 1-128,139-160
+docs/examples/pi-coding-agent.md
+  s_a0cbf6c120c4f8::t_5392294839ae64 1-96
+  s_a0cbf6c120c4f8::t_4640b50ae660a7 97
+docs/index.md
+  s_a0cbf6c120c4f8::t_57dae77fe13c0d 44-46
+docs/examples/ssh-or-mosh.md
+  s_a0cbf6c120c4f8::t_17516b563d9f85 1-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "14bf0b5a790e71b5d422c549a54b65349713a932",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
