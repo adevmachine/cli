@@ -1,0 +1,91 @@
+docs/concepts/publishing.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 8-9
+docs/examples/keep-sessions-running.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 16,29,31,40,60,65,77,91,95-97,101
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 8,48,55,65-66,87-88,98,109,117,119
+docs/development.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 92
+docs/reference/settings.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 22
+docs/examples/shared-skills-for-every-workspace.md
+  s_a0cbf6c120c4f8::t_e11a865304cd29 1-179
+docs/how-it-works/sharing-a-login.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 41,49
+docs/examples/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 8-9,17,38,45,53,62-63,67-68
+docs/examples/claude-24-7-in-telegram.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 14,29,41,48,57,67,141,160,164-166
+docs/index.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 10
+  s_a0cbf6c120c4f8::t_b9808e8e6257aa 80-81
+  s_a0cbf6c120c4f8::t_dde4e765ed94b5 53
+docs/examples/ssh-or-mosh.md
+  s_a0cbf6c120c4f8::t_e638b7e7f88301 136
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 16,102,110,131
+README.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 14-15
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_396f0578d1daeb 52-53
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 8
+docs/examples/claude-that-never-sleeps.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 13,23,36,43,53,97,101-103
+docs/day-to-day.md
+  s_a0cbf6c120c4f8::t_e75121e94b7e5a 34
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 21-22,24
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 14,26,42,68,73,85,87
+docs/concepts/reaching-your-server.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 76
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_0c2d91ae800772 469-470
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 239-240,244,246,562
+docs/examples/wuzapi-as-your-own-package.md
+  s_a0cbf6c120c4f8::t_9e51ef4928bc99 31,124
+docs/examples/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 16,29-30,37,40,49,71,76
+docs/examples/a-local-vm-with-lima.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 20,46,48,61,74,84
+docs/how-it-works/ssh.md
+  s_a0cbf6c120c4f8::t_47b50a6805deee 1-118
+docs/examples/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 4,44,48,50,57,68,75
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 18,44,55,67,77,83
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 138,271
+  s_a0cbf6c120c4f8::t_030081b1901641 59
+docs/examples/pi-coding-agent.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 17,33,66,87,91
+docs/concepts/agent-skills.md
+  s_a0cbf6c120c4f8::t_26c53865506af7 3-11,17-19,34,40-41,49-50,57
+docs/how-it-works/published-sites.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 11,16
+docs/examples/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 22,95
+docs/concepts/packages.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 30,41
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 17,35,41,56,70,80
+docs/concepts/configuration.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 59,92,117
+  s_a0cbf6c120c4f8::t_e75121e94b7e5a 23
+docs/examples/openclaw-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_633b0976db3ee9 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2ef561fd9f67ff7074e556007ecc765db1848a42",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
