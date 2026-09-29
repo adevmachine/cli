@@ -1,0 +1,21 @@
+docs/index.md
+  s_a0cbf6c120c4f8::t_ada3a5c12ef95a 23-24
+docs/day-to-day.md
+  s_a0cbf6c120c4f8::t_02363acb54ef49 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c8f2c7dda22dee2610e4f0bfa7e8ad616d7086a0",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
