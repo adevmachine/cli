@@ -1,0 +1,95 @@
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_8b2a2e8395be0d 216-218
+docs/concepts/configuration.md
+  s_a0cbf6c120c4f8::t_43cd729cf8e766 52
+  s_a0cbf6c120c4f8::t_6d6f54c79a0ba9 37
+docs/examples/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_0e39db3eb76daa 68-70
+  s_a0cbf6c120c4f8::t_74bbf6f7e3348b 54,56-67,71-77,89-90
+  s_a0cbf6c120c4f8::t_489f714133726f 26
+  s_a0cbf6c120c4f8::t_e9315c68fa814f 109
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_5fba5affecdb77 407-430
+internal/remote/remote.go
+  s_a0cbf6c120c4f8::t_9f062e3ba4dbc7 209,499-535
+  s_a0cbf6c120c4f8::t_d92346febe860b 240
+  s_a0cbf6c120c4f8::t_884e109721c289 179-182,192-193,200-208
+  s_a0cbf6c120c4f8::t_3f3486c869ca43 210
+internal/commands/root_test.go
+  s_a0cbf6c120c4f8::t_f42c78166ec756 143-144,154
+  s_a0cbf6c120c4f8::t_8555305c051096 142,145-153,155-158
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_fa0faf249376c5 26-28
+  s_a0cbf6c120c4f8::t_197b40beab45ef 129-132
+  s_a0cbf6c120c4f8::t_e897e07473bb49 273-277
+internal/commands/ssh_args_test.go
+  s_a0cbf6c120c4f8::t_8842b803060a64 72-95
+internal/keys/keys.go
+  s_a0cbf6c120c4f8::t_5f14f0db59b4ed 71-98
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_040ab622ee0099 45-47
+  s_a0cbf6c120c4f8::t_4dcffa130c0df0 86-89,92
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_e04dfca02fbe29 702-725
+  s_a0cbf6c120c4f8::t_9bf633a82b33b0 123-148
+  s_a0cbf6c120c4f8::t_e56aaeaf24b8a4 316-360
+internal/commands/setup_test.go
+  s_a0cbf6c120c4f8::t_b18926182ec0b2 440-442,445-446,451-458
+internal/remote/remote_test.go
+  s_a0cbf6c120c4f8::t_591c816a1cccca 26
+  s_a0cbf6c120c4f8::t_bae201c3f91e29 735
+  s_a0cbf6c120c4f8::t_cb1ac42281bfa9 492-586
+  s_a0cbf6c120c4f8::t_c533c360dcc839 730-734,736-778
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_ee4c5f66d91ca5 417-426
+  s_a0cbf6c120c4f8::t_50df6708691eca 513-514
+  s_a0cbf6c120c4f8::t_efcd9fd9349fbd 29-30
+  s_a0cbf6c120c4f8::t_34c1c6273c4ff7 880
+  s_a0cbf6c120c4f8::t_e1df3ec05a95cb 113-120,129-133
+  s_a0cbf6c120c4f8::t_819bf171d638e7 273-275
+internal/remote/sshargs.go
+  s_a0cbf6c120c4f8::t_595b95d41260b5 35-36,38-42
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_2be25602f6f62b 170-172
+  s_a0cbf6c120c4f8::t_2130b1b4c9bda4 417,429-446
+  s_a0cbf6c120c4f8::t_4dedf42d69de7a 687-692
+  s_a0cbf6c120c4f8::t_746b7b7d36fcc0 667-669
+  s_a0cbf6c120c4f8::t_38b140759d8ebe 447-448
+internal/keys/keys_test.go
+  s_a0cbf6c120c4f8::t_1bb74e22c74ded 187-246
+internal/commands/machines_test.go
+  s_a0cbf6c120c4f8::t_488338fdbfcb24 13
+  s_a0cbf6c120c4f8::t_6c8ffb5bdd7998 96-123
+internal/commands/config.go
+  s_a0cbf6c120c4f8::t_1707060c0302c9 127
+  s_a0cbf6c120c4f8::t_0f49e930aca2f8 95
+  s_a0cbf6c120c4f8::t_d2a2d66a8e6db2 68-70
+internal/commands/workspaces_test.go
+  s_a0cbf6c120c4f8::t_07656c0dc10e18 13-20
+  s_a0cbf6c120c4f8::t_29f7443dd0bcfa 104-131
+docs/how-it-works/ssh-and-authentication.md
+  s_a0cbf6c120c4f8::t_0c20e8536e0096 13-22,26-29
+  s_a0cbf6c120c4f8::t_41d1850eb54734 23-25
+internal/commands/workspaces.go
+  s_a0cbf6c120c4f8::t_613517c7e48e0e 5,19
+  s_a0cbf6c120c4f8::t_73b2efa4c10479 328-348
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_44ebf393caff96 53-59,76-78
+  s_a0cbf6c120c4f8::t_2ed94759e36b11 44-52,61,63-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "da1494d8c0cc62aa2e1d5a0f2add27255fb0412d",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
