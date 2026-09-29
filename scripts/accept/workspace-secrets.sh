@@ -30,6 +30,7 @@ cleanup_secrets() {
   for name in $SECRET_NAMES; do
     "$DEVMACHINE_ACCEPT_BIN" secrets rm "$name" --workspace acme >/dev/null 2>&1 || true
   done
+  "$DEVMACHINE_ACCEPT_BIN" secrets rm robot >/dev/null 2>&1 || true
   destroy_accept_vm "$VM" || true
   rm -rf "$SCENARIO_DIR"
   if [ "$ACCEPT_OWNS_RUN_DIR" -eq 1 ]; then
@@ -172,4 +173,44 @@ NEW_ONE='appended'" "the next credentials push removes the line and keeps the re
 AFTER_LIST=$("$DEVMACHINE_ACCEPT_BIN" secrets list --workspace acme 2>&1)
 refutes "$AFTER_LIST" "APP_TOKEN" "and the name is gone from the list" || true
 
-scenario_done 22 "workspace secrets"
+"$DEVMACHINE_ACCEPT_BIN" secrets set API_KEY moved --workspace acme --env-file app/.env \
+  >"$SCENARIO_LOG_DIR/set-move.log" 2>&1 || die "could not move API_KEY"
+"$DEVMACHINE_ACCEPT_BIN" credentials push --yes >"$SCENARIO_LOG_DIR/push-move.log" 2>&1 \
+  || die "credentials push after the move failed; see $SCENARIO_LOG_DIR/push-move.log"
+DEFAULT_AFTER=$(on_vm 'cat /home/acme/.devmachine/env')
+refutes "$DEFAULT_AFTER" "API_KEY=" "moving API_KEY to app/.env takes it out of ~/.devmachine/env" || true
+MOVED=$(on_vm 'cat /home/acme/app/.env')
+contains "$MOVED" "API_KEY='moved'" "and puts it in app/.env" || true
+
+mkdir -p "$DEVMACHINE_CONFIG/packages/robot/tasks"
+printf -- '- name: nothing to install\n  ansible.builtin.debug:\n    msg: robot\n' \
+  > "$DEVMACHINE_CONFIG/packages/robot/tasks/main.yml"
+printf 'format: 1\nname: robot\nscope: workspace\nsummary: A package that only asks for a token.\n%s\n' \
+  'credentials:
+  - name: robot
+    kind: secret
+    scope: workspace
+    env: ROBOT_TOKEN' > "$DEVMACHINE_CONFIG/packages/robot/package.yml"
+"$DEVMACHINE_ACCEPT_BIN" packages add robot --workspace acme --yes \
+  >"$SCENARIO_LOG_DIR/add-robot.log" 2>&1 || die "could not add robot to acme"
+"$DEVMACHINE_ACCEPT_BIN" secrets set robot robot-token \
+  >"$SCENARIO_LOG_DIR/set-robot.log" 2>&1 || die "could not store robot"
+
+on_vm "su - acme -c 'ln -s /tmp ~/.devmachine/robot'" >"$SCENARIO_LOG_DIR/robot-symlink.log" \
+  || die "could not plant the credential symlink fixture"
+TMP_BEFORE=$(on_vm 'stat -c "%a %U" /tmp')
+ROBOT_PUSH=$("$DEVMACHINE_ACCEPT_BIN" credentials push --yes 2>&1)
+printf '%s\n' "$ROBOT_PUSH" > "$SCENARIO_LOG_DIR/push-robot-symlink.log"
+contains "$ROBOT_PUSH" "outside the workspace's home" "a package credential behind a symlink out of the home is refused" || true
+TMP_AFTER=$(on_vm 'stat -c "%a %U" /tmp; test ! -e /tmp/env && echo absent')
+equals "$TMP_AFTER" "$TMP_BEFORE
+absent" "and root wrote and chowned nothing outside the home" || true
+
+on_vm "su - acme -c 'rm ~/.devmachine/robot'" >/dev/null || die "could not drop the symlink fixture"
+"$DEVMACHINE_ACCEPT_BIN" credentials push --yes >"$SCENARIO_LOG_DIR/push-robot.log" 2>&1 \
+  || die "credentials push for robot failed; see $SCENARIO_LOG_DIR/push-robot.log"
+ROBOT_MODE=$(on_vm 'stat -c "%a %U" /home/acme/.devmachine/robot /home/acme/.devmachine/robot/env')
+equals "$ROBOT_MODE" "700 acme
+600 acme" "with the link gone the credential lands in the home, owned by acme" || true
+
+scenario_done 27 "workspace secrets"
