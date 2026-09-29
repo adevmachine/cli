@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/credentials"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
@@ -722,6 +723,98 @@ func TestDoctorOnASelfMachineRunsNoSSHChecks(t *testing.T) {
 	}
 	if got := find(t, checks, CheckBundle); got.Status != StatusPass {
 		t.Fatalf("got %#v", got)
+	}
+}
+
+// aliasesEnvironment builds a machine plus workspace configuration and a
+// throwaway $HOME, so the check can read and write ~/.ssh/config without
+// ever touching the real one.
+func aliasesEnvironment(t *testing.T) (dir string, sshConfig string) {
+	t.Helper()
+	dir = configDir(t, machineWith+"workspaces:\n  - name: alice\n")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sshConfig = filepath.Join(home, ".ssh", "config")
+	return dir, sshConfig
+}
+
+func fullMachineClient() fakeClient {
+	return fakeClient{out: map[string]string{
+		osReleaseCommand: "ID=ubuntu\n",
+		ansibleCommand:   "/usr/bin/ansible-playbook\n",
+	}}
+}
+
+func TestSSHAliasesCheckWarnsWhenNeverWritten(t *testing.T) {
+	dir, _ := aliasesEnvironment(t)
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	got := find(t, checks, CheckSSHAliases)
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "aliases --write") {
+		t.Fatalf("got %#v", got)
+	}
+	// A warning is not a failure: the rest of the machine still works.
+	if !OK(checks) {
+		t.Fatal("a missing alias block failed the whole run")
+	}
+}
+
+func TestSSHAliasesCheckPassesWhenTheBlockMatches(t *testing.T) {
+	dir, sshConfig := aliasesEnvironment(t)
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := aliases.Render(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := aliases.Write(sshConfig, block); err != nil {
+		t.Fatal(err)
+	}
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckWarnsWhenStale(t *testing.T) {
+	dir, sshConfig := aliasesEnvironment(t)
+
+	if err := aliases.Write(sshConfig, "Host stale-devmachine\n    HostName 203.0.113.99\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	got := find(t, checks, CheckSSHAliases)
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "stale") {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckPassesWithNoWorkspace(t *testing.T) {
+	dir := configDir(t, machineWith)
+	t.Setenv("HOME", t.TempDir())
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckIsSkippedOnASelfMachine(t *testing.T) {
+	checks := Run(context.Background(), selfDir(t), "", dialling(selfClient("Darwin")), nil)
+
+	for _, c := range checks {
+		if c.Name == CheckSSHAliases {
+			t.Fatalf("a self machine reported an ssh aliases check: %#v", c)
+		}
 	}
 }
 

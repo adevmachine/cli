@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/credentials"
 	"github.com/mydevmachine/devmachine/internal/dns"
@@ -26,6 +28,9 @@ const (
 	// StatusSkip means the check could not run because an earlier one failed.
 	// It is not a pass and not a failure: reporting it as either would lie.
 	StatusSkip = "skip"
+	// StatusWarn means something is worth fixing but nothing is broken: the
+	// machine still works the way every check after it proves.
+	StatusWarn = "warn"
 )
 
 // The checks, in the order they run.
@@ -35,6 +40,10 @@ const (
 	CheckConnection      = "connection"
 	CheckOperatingSystem = "operating system"
 	CheckAnsible         = "ansible"
+	// CheckSSHAliases is skipped entirely for a self machine: there is no
+	// address for the computer you are standing on, so no Host entry is
+	// ever written for it.
+	CheckSSHAliases = "ssh aliases"
 	// CheckBundle is only reported for a self machine: whether the directory
 	// the bundle is written to exists and can be written.
 	CheckBundle = "bundle"
@@ -145,8 +154,51 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 		Detail: fmt.Sprintf("connected through %s", address),
 	})
 	checks = append(checks, remoteChecks(ctx, client)...)
+	checks = append(checks, sshAliasesCheck(cfg))
 	checks = append(checks, credentialChecks(ctx, client, wanted)...)
 	return append(checks, dnsChecks(ctx, dir, m.Name, baseOf(m), client)...)
+}
+
+// sshAliasesCheck reports whether ~/.ssh/config's managed block exists and
+// still matches what `devmachine aliases` would write for the configuration
+// today.
+//
+// It is a warning, never a failure: a stale or missing block means `ssh
+// <workspace>-devmachine` does not work from another terminal, not that the
+// machine itself is broken.
+func sshAliasesCheck(cfg config.Config) Check {
+	if len(cfg.Workspaces) == 0 {
+		return Check{Name: CheckSSHAliases, Status: StatusPass, Detail: "no workspace configured"}
+	}
+
+	want, err := aliases.Render(cfg)
+	if err != nil {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
+	}
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
+	}
+
+	fix := "run `devmachine aliases --write`"
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: "not written yet: " + fix}
+	}
+
+	current := string(body)
+	start := strings.Index(current, aliases.Begin)
+	stop := strings.LastIndex(current, aliases.End)
+	if start < 0 || stop <= start {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: "not written yet: " + fix}
+	}
+
+	existing := current[start+len(aliases.Begin) : stop]
+	if strings.TrimSpace(existing) != strings.TrimSpace(want) {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn,
+			Detail: "stale: a workspace changed since the last `devmachine aliases --write`"}
+	}
+	return Check{Name: CheckSSHAliases, Status: StatusPass}
 }
 
 // selfChecks is doctor's whole surface for a self machine: no SSH checks —
@@ -234,7 +286,7 @@ func loadAndValidate(dir string) (config.Config, error) {
 // remembering to — including one credential's, which only this run knows the
 // name of.
 func order(wanted []credentials.Declared) []string {
-	out := []string{CheckConfiguration, CheckHostKey, CheckConnection, CheckOperatingSystem, CheckAnsible}
+	out := []string{CheckConfiguration, CheckHostKey, CheckConnection, CheckOperatingSystem, CheckAnsible, CheckSSHAliases}
 	for _, d := range wanted {
 		out = append(out, CredentialCheck(d))
 	}
