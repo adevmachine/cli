@@ -20,6 +20,8 @@ computer, while you wait for a real one.
 - [Set up with a coding agent](agent-setup.md) — hand this page to your coding
   agent. It asks what it needs and does the setup, except the steps only you
   can do.
+- [Day to day](day-to-day.md) — ask your agent from any session, and when to
+  open one in the configuration folder instead.
 
 ## Examples
 
