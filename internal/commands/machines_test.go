@@ -229,3 +229,21 @@ func TestMachinesRmIsNotDeleteLocal(t *testing.T) {
 		t.Fatalf("delete-local's help does not point at the harmless one: %q", out)
 	}
 }
+
+func TestMachinesAddGivesTheNewMachineTheEssentials(t *testing.T) {
+	dir := writeConfigDir(t, "packages: v14\nmachines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	stubReleaseHas(t, true)
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if out, err := executeWithInput(t, "sandbox\n198.51.100.7\nroot\n22\n1\n",
+		"--config", dir, "machines", "add"); err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Machines[1].Packages, []string{"essentials"}) {
+		t.Fatalf("new machine packages are %#v", cfg.Machines[1].Packages)
+	}
+}

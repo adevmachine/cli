@@ -96,6 +96,8 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 			return runMachinesAdd(cmd.Context(), dir, cmd.InOrStdin(), cmd.OutOrStdout(), s)
 		},
 	}
+	c.Flags().BoolVar(&s.noEssentials, "no-essentials", false,
+		"start the machine with no packages, instead of the essentials")
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"leave password login on (the key is still installed and proved)")
 	c.Flags().StringVar(&selfName, "self", "",
@@ -212,6 +214,7 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 		return err
 	}
 	m.Key = key.Path
+	m.Packages = startingPackages(ctx, dir, current.Packages, opts.noEssentials, out)
 
 	if err := config.AddMachine(dir, m); err != nil {
 		return err

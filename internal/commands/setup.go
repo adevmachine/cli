@@ -10,12 +10,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
+	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/remote"
 	agentskills "github.com/mydevmachine/devmachine/internal/skills"
 	"github.com/spf13/cobra"
@@ -55,9 +57,38 @@ func streamLocalCommand(ctx context.Context, out io.Writer, name string, args ..
 
 // setupOptions are the flags the flow reads.
 type setupOptions struct {
-	force    bool
-	noHarden bool
-	machine  string
+	force        bool
+	noHarden     bool
+	noEssentials bool
+	machine      string
+}
+
+// essentials is the package a new machine starts with: base tools, git, a
+// firewall, SSH hardening and Caddy. Nearly everyone wants them, so the choice
+// is to leave them out, not to remember to add them.
+const essentials = "essentials"
+
+// releaseHasPackage answers whether a package release carries a package. A
+// machine only gets essentials from a release that has it: an older pin would
+// make the first sync fail on a name it has never heard of.
+var releaseHasPackage = func(ctx context.Context, dir, release, name string) bool {
+	store, err := packages.Open(ctx, dir, release)
+	if err != nil {
+		return false
+	}
+	return store.Has(name)
+}
+
+// startingPackages is what a new machine is written with.
+func startingPackages(ctx context.Context, dir, release string, noEssentials bool, out io.Writer) []string {
+	if noEssentials || release == "" {
+		return nil
+	}
+	if !releaseHasPackage(ctx, dir, release, essentials) {
+		fmt.Fprintf(out, "packages %s has no %s package, so the machine starts with none.\n", release, essentials)
+		return nil
+	}
+	return []string{essentials}
 }
 
 func newSetupCmd(opts *options) *cobra.Command {
@@ -87,6 +118,8 @@ func newSetupCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&s.force, "force", false, "overwrite a configuration that already exists")
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"during a new takeover, leave password login on (the key is still installed and proved)")
+	c.Flags().BoolVar(&s.noEssentials, "no-essentials", false,
+		"start the machine with no packages, instead of the essentials")
 	c.AddCommand(newSetupGitCmd(opts))
 	return c
 }
@@ -142,9 +175,11 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		release = ""
 	}
 
+	entry := machineEntry(m)
+	entry.Packages = startingPackages(ctx, dir, release, opts.noEssentials, out)
 	if err := writeConfig(dir, path, configFile{
 		Packages: release,
-		Machines: []machineFile{machineEntry(m)},
+		Machines: []machineFile{entry},
 		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
 		Domain:   domain,
 	}); err != nil {
@@ -159,18 +194,23 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		return err
 	}
 
-	fmt.Fprint(out, nextAfterSetup)
+	fmt.Fprint(out, nextAfterSetup(entry.Packages))
 	return nil
 }
 
-// nextAfterSetup is printed once the machine is reachable. The machine has no
-// packages yet, and most people want the same few, so the first step names them.
-const nextAfterSetup = `
+// nextAfterSetup is printed once the machine is reachable.
+func nextAfterSetup(machinePackages []string) string {
+	note := "The machine starts with no packages: `devmachine packages add essentials` gives it base tools, git, a firewall and Caddy.\n"
+	if slices.Contains(machinePackages, essentials) {
+		note = "The machine starts with the essentials: base tools, git, a firewall and Caddy.\n" +
+			"To start bare instead, remove `essentials` from config.yml, or run setup with --no-essentials.\n"
+	}
+	return "\n" + note + `
 Next:
-  devmachine packages add essentials   base tools, git, a firewall and Caddy
-  devmachine workspaces new alice      your first workspace (any name)
-  devmachine sync                      build it all on the server
+  devmachine workspaces new alice   your first workspace (any name)
+  devmachine sync                   build it all on the server
 `
+}
 
 // prepareExisting resumes setup without taking ownership a second time. The
 // configuration already says which key and host identity to trust, so this
@@ -620,11 +660,12 @@ type defaultsFile struct {
 }
 
 type machineFile struct {
-	Name  string   `yaml:"name"`
-	Hosts []string `yaml:"hosts"`
-	User  string   `yaml:"user"`
-	Port  int      `yaml:"port"`
-	Key   string   `yaml:"key,omitempty"`
+	Name     string   `yaml:"name"`
+	Hosts    []string `yaml:"hosts"`
+	User     string   `yaml:"user"`
+	Port     int      `yaml:"port"`
+	Key      string   `yaml:"key,omitempty"`
+	Packages []string `yaml:"packages,omitempty"`
 }
 
 type workspaceFile struct {

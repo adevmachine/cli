@@ -26,7 +26,8 @@ devmachine setup
 It asks for the server's address and login, then shows its **fingerprint**.
 Check it against your provider's dashboard before you say yes: that is how
 you know it is your server. Then it installs a key, proves the key works,
-and turns password logins off. See
+turns password logins off, and picks the `essentials` package for the
+machine (`--no-essentials` skips it). See
 [how setup locks the server](../how-it-works/trust-bootstrap.md).
 
 ### 3. Teach your agent the CLI
@@ -37,18 +38,18 @@ devmachine skills add
 
 Any new Claude Code or Codex session can now run devmachine for you.
 
-### 4. Add the essentials and a workspace
+### 4. Create the workspace
 
 ```
-devmachine packages add essentials
 devmachine workspaces new alice
 devmachine sync
 ```
 
-`essentials` gives the server base tools, git, a firewall and Caddy.
-`workspaces new` adds `alice` to your configuration. `sync` builds both on the
-server: `alice` is its own account, with git, the GitHub CLI, Node, bun and
-zsh. It shows the plan and asks before changing anything.
+`workspaces new` adds `alice` to your configuration. `sync` builds it on the
+server, together with the essentials `setup` chose for the machine (base
+tools, git, a firewall and Caddy): `alice` is its own account, with git, the
+GitHub CLI, Node, bun and zsh. It shows the plan and asks before changing
+anything.
 
 ### 5. Open it
 

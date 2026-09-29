@@ -6,12 +6,11 @@ own account on the server, called a workspace, with its own tools and logins.
 You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
 Linux computer.
 
-Four commands:
+Three commands:
 
 ```
 brew install mydevmachine/tap/devmachine
 devmachine setup
-devmachine packages add essentials
 devmachine workspaces new alice && devmachine sync
 ```
 
@@ -34,13 +33,26 @@ fingerprint: check it matches the one in your provider's dashboard, so you
 know you are talking to your own server. Then it sets up a key and turns off
 password logins, so only you can get in.
 
-`packages add essentials` gives the server what almost everyone wants:
-base tools, git, a firewall, SSH with passwords kept off, and Caddy to
-publish sites with HTTPS. Docker is not in it; add it with `devmachine
-packages add docker` when you need it.
+`setup` also gives the server the `essentials` package: base tools, git, a
+firewall, SSH with passwords kept off, and Caddy to publish sites with
+HTTPS. Docker is not in it; add it with `devmachine packages add docker` when
+you need it. Want a bare server instead? Run `devmachine setup
+--no-essentials`.
 
 `workspaces new alice` creates a workspace called alice. `sync` builds it
 all on the server.
+
+**Set up before the essentials existed?** Add them to the server you already
+have, nothing to rebuild. What is already installed stays as it is:
+
+```
+devmachine packages pin
+devmachine packages add essentials
+devmachine sync
+```
+
+`packages pin` moves you to the latest set of packages, the first one with
+`essentials` in it.
 
 A new workspace comes with git, the GitHub CLI, Node LTS (through mise), bun,
 and zsh with Oh My Zsh. Every SSH login lands in a tmux session, so a dropped

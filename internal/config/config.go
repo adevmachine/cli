@@ -847,6 +847,9 @@ func machineNode(m Machine) *yaml.Node {
 	setField(node, "user", stringNode(m.User))
 	setField(node, "port", intNode(m.Port))
 	setField(node, "key", stringNode(m.Key))
+	if len(m.Packages) > 0 {
+		setField(node, "packages", sequenceNode(m.Packages))
+	}
 	return node
 }
 

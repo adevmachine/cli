@@ -784,15 +784,60 @@ func TestSetupWithoutTheLatestReleaseSaysHowToPin(t *testing.T) {
 	}
 }
 
-func TestSetupEndsBySuggestingTheEssentials(t *testing.T) {
-	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+func stubReleaseHas(t *testing.T, has bool) {
+	t.Helper()
+	previous := releaseHasPackage
+	releaseHasPackage = func(context.Context, string, string, string) bool { return has }
+	t.Cleanup(func() { releaseHasPackage = previous })
+}
 
-	out, err := runSetupIn(t, t.TempDir(),
-		answers("main", "203.0.113.10", "root", "22", "example.com", "1"), setupOptions{})
+func machinePackagesAfterSetup(t *testing.T, o setupOptions) ([]string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	out, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "example.com", "1"), o)
 	if err != nil {
 		t.Fatalf("runSetup returned %v", err)
 	}
-	if !strings.Contains(out, "devmachine packages add essentials") {
-		t.Fatalf("setup does not suggest the essentials: %q", out)
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg.Machines[0].Packages, out
+}
+
+func TestSetupGivesTheMachineTheEssentials(t *testing.T) {
+	defer stubLatestPackagesRelease(t, "v14")()
+	stubReleaseHas(t, true)
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	got, out := machinePackagesAfterSetup(t, setupOptions{})
+	if !slices.Equal(got, []string{"essentials"}) {
+		t.Fatalf("machine packages are %#v, want [essentials]", got)
+	}
+	if !strings.Contains(out, "--no-essentials") {
+		t.Fatalf("setup does not say how to go without them: %q", out)
+	}
+}
+
+func TestSetupWithNoEssentialsLeavesTheMachineBare(t *testing.T) {
+	defer stubLatestPackagesRelease(t, "v14")()
+	stubReleaseHas(t, true)
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	got, _ := machinePackagesAfterSetup(t, setupOptions{noEssentials: true})
+	if len(got) != 0 {
+		t.Fatalf("machine packages are %#v, want none", got)
+	}
+}
+
+func TestSetupSkipsEssentialsAReleaseDoesNotHave(t *testing.T) {
+	defer stubLatestPackagesRelease(t, "v13")()
+	stubReleaseHas(t, false)
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	got, _ := machinePackagesAfterSetup(t, setupOptions{})
+	if len(got) != 0 {
+		t.Fatalf("machine packages are %#v, want none: v13 has no essentials", got)
 	}
 }

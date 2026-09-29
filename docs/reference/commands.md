@@ -15,7 +15,7 @@ one document — read this instead of parsing help text.
 ## setup
 
 ```
-devmachine setup [--force] [--no-harden]
+devmachine setup [--force] [--no-harden] [--no-essentials]
 ```
 
 Connects to your server for the first time and gets it ready to use.
@@ -31,7 +31,10 @@ your provider's dashboard. Say no and nothing is sent or changed.
 Then it gets the server ready, in order: try the key; if that fails, ask
 for the password (never shown on screen); install the key; open a **new
 connection using only the key** to prove it works; turn password login
-off; install Ansible. If the proof step fails, nothing is locked down and
+off; install Ansible. The new machine is written with the `essentials`
+package (base, git, firewall, ssh_hardening and caddy), so the first `sync`
+installs them; `--no-essentials` leaves it with none. Only a pinned package
+release that has `essentials` gets it — an older one starts empty and says so. If the proof step fails, nothing is locked down and
 the error says where to look. See [setting up a server for the first
 time](../how-it-works/trust-bootstrap.md) for why the order matters.
 
@@ -42,6 +45,7 @@ stops. The password is used once and written nowhere.
 | --- | --- |
 | `--force` | discard the existing configuration and start over |
 | `--no-harden` | leave password login on; the key is still installed and proved |
+| `--no-essentials` | start the machine with no packages, instead of `essentials` |
 
 Run again with a configuration in place, and it just makes sure Ansible
 is installed — it never rewrites `config.yml`, a key, or SSH settings.
@@ -107,7 +111,7 @@ as it prints, so it is the quickest way to find what is wrong.
 
 ```
 devmachine machines list                  each machine, its addresses, port and workspaces
-devmachine machines add [--no-harden]     set up another server and record it
+devmachine machines add [--no-harden] [--no-essentials]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines trust [name] [--check] [--replace] [--yes]   check or update its SSH fingerprint
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
