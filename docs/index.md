@@ -22,6 +22,8 @@ computer, while you wait for a real one.
   can do.
 - [Day to day](day-to-day.md) — ask your agent from any session, and when to
   open one in the configuration folder instead.
+- [Upgrade](upgrade.md) — keep the CLI, the packages and the skills up to
+  date.
 
 ## Examples
 
@@ -44,6 +46,10 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 - [Pi as your coding agent](examples/pi-coding-agent.md)
 - [SSH or mosh?](examples/ssh-or-mosh.md)
 - [Claude 24/7 in Telegram](examples/claude-24-7-in-telegram.md)
+- [Logins and secrets](examples/logins-and-secrets.md)
+- [Point your domain with Cloudflare](examples/cloudflare-dns.md)
+- [Contribute to a Ruby on Rails project](examples/ruby-on-rails.md)
+- [Your own Tailscale with Headscale](examples/headscale.md)
 
 ## Concepts
 
@@ -60,6 +66,8 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
   something running in a workspace to the outside world, or just to you.
 - [Reaching your server](concepts/reaching-your-server.md) — the public address,
   a private network with Tailscale, and private access to your apps.
+- [Tailscale and other private networks](concepts/private-networks.md) —
+  reach your server privately, and how the options compare.
 - [Agent Skills](concepts/agent-skills.md) — teaching a coding agent to use
   devmachine.
 

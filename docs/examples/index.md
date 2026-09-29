@@ -41,3 +41,11 @@ session. Only a reboot stops it.
   where.
 - [Claude 24/7 in Telegram](claude-24-7-in-telegram.md) — message Claude
   Code from Telegram, while it runs on your server around the clock.
+- [Logins and secrets](logins-and-secrets.md) — see what is missing, sign in,
+  and hand over tokens with `credentials`, `login` and `secrets`.
+- [Point your domain with Cloudflare](cloudflare-dns.md) — a scoped API token,
+  and devmachine points your names for you.
+- [Contribute to a Ruby on Rails project](ruby-on-rails.md) — a Rails
+  workspace for an open source gem, from fork to running tests.
+- [Your own Tailscale with Headscale](headscale.md) — a private network with
+  a control server you host yourself.
