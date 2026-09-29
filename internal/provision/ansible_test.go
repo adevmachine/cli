@@ -1,9 +1,11 @@
 package provision
 
 import (
+	"errors"
 	"flag"
 	"maps"
 	"os"
+	osuser "os/user"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -801,6 +803,49 @@ func planSelf(t *testing.T, machinePackages []string) packages.MachinePlan {
 		t.Fatal(err)
 	}
 	return plan
+}
+
+// TestGenerateAtPinsAnsibleUserForASelfMachine covers the bug this fixes:
+// Ansible's local connection plugin asks the shell who is logged in, and some
+// shells leave LOGNAME set to root with USER empty — sending it looking for
+// /var/root instead of the real home directory. Pinning ansible_user in the
+// inventory is what makes it resolve to the real operator regardless.
+func TestGenerateAtPinsAnsibleUserForASelfMachine(t *testing.T) {
+	was := currentUser
+	currentUser = func() (*osuser.User, error) { return &osuser.User{Username: "alice"}, nil }
+	t.Cleanup(func() { currentUser = was })
+
+	plan := planSelf(t, []string{"base"})
+	files, err := GenerateAt(plan, "/Users/alice/.local/share/devmachine/bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory := string(files["inventory.ini"])
+	if !strings.Contains(inventory, "devmachine ansible_connection=local ansible_user=alice") {
+		t.Fatalf("got:\n%s", inventory)
+	}
+}
+
+// TestGenerateWritesALocalInventory already covers a non-self machine's
+// inventory having no ansible_user: there is nobody local to pin it to.
+func TestGenerateAtNonSelfMachineHasNoAnsibleUser(t *testing.T) {
+	files, err := Generate(planWith(t, "main", []string{"base"}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files["inventory.ini"]), "ansible_user") {
+		t.Fatalf("a non-self machine pinned ansible_user:\n%s", files["inventory.ini"])
+	}
+}
+
+func TestGenerateAtFailsWhenTheCurrentUserCannotBeFound(t *testing.T) {
+	was := currentUser
+	currentUser = func() (*osuser.User, error) { return nil, errors.New("no such user") }
+	t.Cleanup(func() { currentUser = was })
+
+	if _, err := GenerateAt(planSelf(t, []string{"base"}), "/Users/alice/.local/share/devmachine/bundle"); err == nil {
+		t.Fatal("expected an error when the current user cannot be found")
+	}
 }
 
 func TestGenerateAtWritesTheBaseIntoAnsibleCfgAndThePlaybookCommand(t *testing.T) {

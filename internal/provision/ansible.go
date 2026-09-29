@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	osuser "os/user"
 	"path"
 	"path/filepath"
 	"slices"
@@ -76,9 +77,13 @@ func GenerateAt(plan packages.MachinePlan, base string) (map[string][]byte, erro
 	if err != nil {
 		return nil, err
 	}
+	inv, err := inventory(plan.Machine)
+	if err != nil {
+		return nil, err
+	}
 	files := map[string][]byte{
 		"ansible.cfg":              []byte(ansibleCfg(base)),
-		"inventory.ini":            []byte(inventory()),
+		"inventory.ini":            []byte(inv),
 		"host_vars/devmachine.yml": vars,
 		"site.yml":                 []byte(site),
 	}
@@ -111,9 +116,42 @@ stdout_callback = default
 // work, and Ansible warns about it on every run: "Found both group and host
 // with same name". An ungrouped host is already in `all`, and `hosts:
 // devmachine` matches it by name.
-func inventory() string {
-	return header + fmt.Sprintf("%s ansible_connection=local\n", inventoryHost)
+//
+// For a self machine, it also pins ansible_user to the OS user devmachine
+// itself runs as. Without it, Ansible's local connection plugin falls back to
+// asking the shell who is logged in — and some shells leave LOGNAME set to
+// root with USER empty, which sends it looking for /var/root instead of the
+// real home directory ("ESTABLISH LOCAL CONNECTION FOR USER: root").
+func inventory(m config.Machine) (string, error) {
+	line := fmt.Sprintf("%s ansible_connection=local", inventoryHost)
+	if m.Self {
+		name, _, err := selfIdentity()
+		if err != nil {
+			return "", err
+		}
+		line += " ansible_user=" + name
+	}
+	return header + line + "\n", nil
 }
+
+// selfIdentity is the OS user devmachine itself runs as, and that user's home
+// directory — read from the operating system, not from USER/LOGNAME, which a
+// self machine cannot trust (see inventory).
+func selfIdentity() (username, home string, err error) {
+	u, err := currentUser()
+	if err != nil {
+		return "", "", fmt.Errorf("finding the current user: %w", err)
+	}
+	home, err = os.UserHomeDir()
+	if err != nil {
+		return "", "", fmt.Errorf("finding the home directory: %w", err)
+	}
+	return u.Username, home, nil
+}
+
+// currentUser is a seam: a test can supply a fake without changing the real
+// account devmachine's own tests run as.
+var currentUser = osuser.Current
 
 // hostVars is what a recipe reads instead of the CLI's own configuration.
 //

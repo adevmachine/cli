@@ -61,7 +61,10 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	var seen bytes.Buffer
 	watched := io.MultiWriter(&seen, out)
 
-	command := playbookCommand(opts, base)
+	command, err := playbookCommand(opts, base, plan.Machine.Self)
+	if err != nil {
+		return Result{}, err
+	}
 	runErr := a.Client.Stream(ctx, command, watched, watched)
 	result := readRecap(seen.String())
 
@@ -91,7 +94,7 @@ func roleDirs(plan packages.MachinePlan) map[string]string {
 	return dirs
 }
 
-func playbookCommand(opts Options, base string) string {
+func playbookCommand(opts Options, base string, self bool) (string, error) {
 	// Ansible searches a playbook-adjacent directory named roles before the
 	// configured roles_path. Running a copied playbook from a fresh directory
 	// keeps base/roles from silently beating base/roles.local.
@@ -105,7 +108,33 @@ func playbookCommand(opts Options, base string) string {
 	if len(opts.Tags) > 0 {
 		command += " --tags " + strings.Join(opts.Tags, ",")
 	}
-	return command
+	if self {
+		exported, err := selfEnvExport()
+		if err != nil {
+			return "", err
+		}
+		command = exported + " && " + command
+	}
+	return command, nil
+}
+
+// selfEnvExport exports USER, LOGNAME and HOME the way a self machine's own
+// login shell would, ahead of the ansible-playbook run. The exec.Command that
+// eventually runs this inherits devmachine's own environment, which is not
+// always right — see inventory's comment on ansible_user.
+func selfEnvExport() (string, error) {
+	name, home, err := selfIdentity()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("export USER=%s LOGNAME=%s HOME=%s", shellQuote(name), shellQuote(name), shellQuote(home)), nil
+}
+
+// shellQuote wraps a value so the remote shell takes it as one word, matching
+// remote.shellQuote: that one is not exported, and this package has no reason
+// to import remote just for it.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // recapLine matches the play recap, which is the only line that opens with a

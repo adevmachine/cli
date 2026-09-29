@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	osuser "os/user"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -315,6 +316,43 @@ func TestApplyUsesTheSelfBaseForASelfMachine(t *testing.T) {
 	}
 	if !strings.Contains(c.commands[len(c.commands)-1], want) {
 		t.Fatalf("the playbook command does not use %s: %q", want, c.commands[len(c.commands)-1])
+	}
+}
+
+// TestApplyExportsTheRealUserForASelfMachine is the other half of the
+// ansible_user fix: even with it pinned in the inventory, HOME still comes
+// from the shell devmachine runs the playbook in, and that shell inherits
+// devmachine's own environment. Exporting it explicitly is what keeps a
+// wrong LOGNAME from reaching the run at all.
+func TestApplyExportsTheRealUserForASelfMachine(t *testing.T) {
+	was := currentUser
+	currentUser = func() (*osuser.User, error) { return &osuser.User{Username: "alice"}, nil }
+	t.Cleanup(func() { currentUser = was })
+	t.Setenv("HOME", "/Users/alice")
+
+	c := &fakeClient{output: okRecap}
+	a := &Ansible{Client: c}
+
+	if _, err := a.Apply(context.Background(), planSelf(t, []string{"base"}), Options{Out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	command := c.commands[len(c.commands)-1]
+	if !strings.HasPrefix(command, "export USER='alice' LOGNAME='alice' HOME='/Users/alice' && ") {
+		t.Fatalf("got %q", command)
+	}
+}
+
+func TestApplyDoesNotExportAnythingForANonSelfMachine(t *testing.T) {
+	c := &fakeClient{output: okRecap}
+	a := &Ansible{Client: c}
+
+	if _, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil),
+		Options{Out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	command := c.commands[len(c.commands)-1]
+	if strings.Contains(command, "export USER") {
+		t.Fatalf("a non-self machine exported a user: %q", command)
 	}
 }
 
