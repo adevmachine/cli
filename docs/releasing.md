@@ -1,26 +1,92 @@
 # Releasing
 
-A release is a tag. Everything else is automatic.
+## Releasing everything, in order
+
+A release touches four repositories. Do them in this order.
+
+### 1. CLI (this repo)
+
+Before tagging: `main` clean and pushed, CI green, then run the two gates
+that need a real machine:
 
 ```
-git tag vX.Y.Z
-git push --tags
-gh run watch          # follow the release workflow
-```
-
-Before tagging: `main` clean and pushed, CI green, `make test-vps` green
-against the disposable Lima machine, and the local CLI acceptance gate green:
-
-```
+make test-vps
 make accept
 ```
 
-After those pre-tag gates, keep the release order: release the CLI first, wait
-for packages CI, then release packages. Do not release packages ahead of the
-CLI it is intended to accompany.
+`make test-vps` starts a throwaway Lima VM named `fakevps` and runs the full
+test suite against it. `make accept` runs the CLI acceptance suite. Both must
+be green.
 
-GoReleaser then builds the binaries, publishes them and updates the Homebrew
-formula.
+Two things that trip people up here:
+
+- An acceptance scenario that rewrites `config.yml` as text must run
+  `setup --no-essentials`. Without it, `setup` adds packages to the file
+  first, and the text rewrite no longer matches what is there.
+- Tests never touch a developer's real git config. They set the
+  `GIT_CONFIG_GLOBAL` environment variable to point at a throwaway file
+  instead, so a local commit-signing setup can't leak into a test run.
+
+Once both gates are green, tag and push:
+
+```
+git tag -s vX.Y.Z -m vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The release workflow builds the binaries with GoReleaser and updates the
+Homebrew formula (see "What a release produces" below). Users get the new
+version with:
+
+```
+brew update && brew upgrade mydevmachine/tap/devmachine
+```
+
+### 2. Packages (`~/dev/packages`)
+
+The packages repo bundles a copy of the CLI's docs, under
+`packages/devmachine-skills/skills/*/references`. Its CI compares that copy
+against the docs in the **latest CLI release tag**, so sync it right after
+any CLI release that changed docs:
+
+```
+cd ~/dev/packages
+T=$(mktemp -d)
+git -C ../devmachine-cli archive vX.Y.Z docs | tar -x -C $T
+scripts/sync-skill-references.sh $T/docs
+```
+
+Commit and push, wait for packages CI to go green, then tag the packages
+repo as its own release step. That process is documented in that repo; it
+isn't repeated here.
+
+### 3. Site (`~/dev/docs`, publishes mydevmachine.sh)
+
+The site rebuilds on its own on push to its `main`, and on a schedule every
+6 hours. After CLI docs change on this repo's `main`, trigger a rebuild by
+hand instead of waiting:
+
+```
+gh workflow run deploy.yml -R mydevmachine/docs
+```
+
+A deploy that starts within seconds of the triggering push can still race
+and pick up the previous commit. After it finishes, check that the new or
+changed page returns HTTP 200 with the new content, and rerun the workflow
+if it doesn't.
+
+The site footer shows the latest CLI tag and the latest packages tag, read
+at build time, so it reflects steps 1 and 2 only once this step runs.
+
+### 4. Users update
+
+```
+brew upgrade
+devmachine packages pin
+devmachine skills update
+devmachine sync --check
+devmachine sync
+```
 
 ## The credential in place today
 
@@ -87,23 +153,6 @@ token step, before building anything.
 - release notes from the commit subjects, with `docs:`, `test:` and `chore:`
   left out
 - an updated formula in the tap, installing `devmachine` and `advm`
-
-## The documentation site
-
-https://mydevmachine.sh/ is built by the `mydevmachine/docs`
-repository from this repository's `docs/` on `main`. It rebuilds every six
-hours on its own. After pushing a change under `docs/`, or after a release,
-rebuild it now:
-
-```
-gh workflow run deploy.yml -R mydevmachine/docs
-gh run watch -R mydevmachine/docs $(gh run list -R mydevmachine/docs --limit 1 --json databaseId -q '.[0].databaseId')
-```
-
-The skills in `mydevmachine/packages` carry a copy of the reference pages. After
-a release that changed them, regenerate that copy there with
-`scripts/sync-skill-references.sh <path-to-this-release's-docs>`; the packages
-CI fails until it matches the latest release.
 
 ## Verify
 
