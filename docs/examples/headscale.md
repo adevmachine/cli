@@ -60,12 +60,14 @@ for the config fields and current version.
 
 ```
 headscale users create acme
-headscale preauthkeys create --user acme --expiration 1h
+headscale users list
+headscale preauthkeys create --user <id> --expiration 1h
 ```
 
-The key printed is what a device trades for a place on your network. It
-expires — here, in one hour — so generate a fresh one per device rather
-than reusing it.
+`--user` takes the user's number from the `ID` column of `users list`, not
+its name. The key printed is what a device trades for a place on your
+network. It expires — here, in one hour — and by default works once, so
+generate a fresh one per device.
 
 ### 3. Join your devmachine server
 
@@ -139,4 +141,4 @@ devmachine server with a `100.64.x.x` address and shows it online.
 
 Source: [Headscale](https://headscale.net),
 [Headscale — Official releases](https://headscale.net/stable/setup/install/official/),
-[Headscale — Getting started](https://docs.headscale.org/usage/getting-started/)
+[Headscale — Getting started](https://headscale.net/stable/usage/getting-started/)
