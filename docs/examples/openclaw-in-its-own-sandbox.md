@@ -1,8 +1,10 @@
-# An agent in its own workspace
+# OpenClaw, in its own sandbox
 
-Run [OpenClaw](https://openclaw.ai/), an autonomous agent, in a dedicated
-workspace with its own account, files and logins — isolated from your own
-work. Whatever the agent installs, or breaks, stays inside that workspace.
+Give [OpenClaw](https://openclaw.ai/) a machine to act on, not your laptop.
+It runs around the clock in a sandbox of its own: a workspace, which is a
+separate account on your server with its own files and logins, no `sudo`,
+and no way into your other workspaces. Whatever the agent installs, or
+breaks, stays inside it.
 
 **You need:** a Debian or Ubuntu VPS.
 

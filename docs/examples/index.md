@@ -19,16 +19,16 @@ session. Only a reboot stops it.
   start a session on your server, drive it from the Claude app.
 - [Start Claude from your phone](start-claude-from-your-phone.md) — a session
   that stays up on the server, so you never have to SSH in first.
-- [An agent in its own workspace](an-agent-in-its-own-workspace.md) — an
-  autonomous agent, kept in its own account.
+- [OpenClaw, in its own sandbox](openclaw-in-its-own-sandbox.md) — an
+  autonomous agent, always on, in a sandbox of its own.
 - [Keep your sessions running](keep-sessions-running.md) — close the laptop,
   and Claude Code keeps working on the server.
 - [A Claude that never sleeps](claude-that-never-sleeps.md) — `/rc` by hand,
   then drive the session from your phone or Claude Desktop.
 - [One consultant, three startups](one-consultant-three-startups.md) — a
-  workspace per client, each with its own stack and its own logins.
-- [Hermes Agent](hermes-agent.md) — Nous Research's agent in its own
-  workspace, kept running.
+  sandbox per client, each with its own stack and its own logins.
+- [Hermes Agent, in its own sandbox](hermes-agent-in-its-own-sandbox.md) —
+  Nous Research's agent, always on, in a sandbox of its own.
 - [Agno AgentOS with a control plane](agno-agentos-with-control-plane.md) —
   an agent API and its dashboard, each on its own subdomain.
 - [wuzapi as your own package](wuzapi-as-your-own-package.md) — a WhatsApp API

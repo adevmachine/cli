@@ -1,7 +1,8 @@
 # Agno AgentOS with a control plane
 
 Run [Agno AgentOS](https://docs.agno.com/agent-platform/overview), the
-runtime that serves your agents over a REST API, in a workspace `agno`, next
+runtime that serves your agents over a REST API, in an isolated workspace
+`agno`, next
 to the [AgentOS control plane](https://github.com/djalmaaraujo/agentos-control-plane),
 a small open dashboard that talks to it. Both end up live at their own
 subdomain, with HTTPS.

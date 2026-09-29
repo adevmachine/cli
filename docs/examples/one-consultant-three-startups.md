@@ -7,10 +7,10 @@ different people. One laptop, and until now, one tangled `~/dev` folder
 where a stray `.env` from Acme could leak into a Globex repo without anyone
 noticing.
 
-The fix is one VPS, three workspaces: `acme`, `globex`, `initech`. Each one
-is its own Linux account, with its own files, its own language runtime, its
-own logins. Nothing crosses between them, because nothing is shared between
-them.
+The fix is one VPS, three sandboxes: the workspaces `acme`, `globex` and
+`initech`. Each is an isolated environment, its own Linux account with its
+own files, its own language runtime and its own logins. Nothing crosses
+between them, because nothing is shared between them.
 
 **You need:** a Debian or Ubuntu VPS with 12 GB of RAM or more, and GitHub and Claude accounts for
 each client (invented here as `acme`, `globex`, `initech`).

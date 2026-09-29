@@ -1,8 +1,9 @@
-# Hermes Agent in its own workspace
+# Hermes Agent, in its own sandbox
 
 Run [Hermes Agent](https://github.com/NousResearch/hermes-agent), Nous
-Research's open source agent, in a dedicated workspace `hermes` — its own
-account, files and model keys, isolated from your own work.
+Research's open source agent, always on, in a sandbox of its own: a
+workspace `hermes`, which is a separate account on your server with its own
+files and model keys, no `sudo`, and no way into your other workspaces.
 
 **You need:** nothing beyond [Getting started](../getting-started.md).
 
