@@ -37,6 +37,9 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 - [Keep your sessions running](examples/keep-sessions-running.md)
 - [A Claude that never sleeps](examples/claude-that-never-sleeps.md)
 - [One consultant, three startups](examples/one-consultant-three-startups.md)
+- [Hermes Agent](examples/hermes-agent.md)
+- [Agno AgentOS with a control plane](examples/agno-agentos-with-control-plane.md)
+- [wuzapi as your own package](examples/wuzapi-as-your-own-package.md)
 
 ## Concepts
 

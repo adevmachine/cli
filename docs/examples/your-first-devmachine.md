@@ -1,8 +1,7 @@
 # Your first devmachine, explained
 
-This walks through the six commands on the [home page](../getting-started.md)
-one at a time, slower, so you know what each one asks and what you see on
-screen. If you already ran them and it worked, you do not need this page.
+The first commands, one at a time: what each asks and what it does. At the
+end you have a workspace called `alice` on your server.
 
 **You need:** a Debian or Ubuntu VPS you can reach as root over SSH, and a
 Mac or Linux computer.
@@ -16,94 +15,59 @@ brew install mydevmachine/tap/devmachine
 ```
 
 On Linux without Homebrew, get the binary from the
-[releases page](https://github.com/mydevmachine/devmachine/releases) instead.
-Nothing on the server changes yet — this only puts `devmachine` on your own
-computer.
+[releases page](https://github.com/mydevmachine/devmachine/releases).
 
-### 2. `devmachine setup`
+### 2. Connect the server
 
 ```
 devmachine setup
 ```
 
-It asks for your server's address, the admin account (usually `root`), the
-port, and a domain (empty is fine). Then it shows a code called the
-**fingerprint** and asks if it matches what your provider's dashboard shows
-for that server. Check it before you say yes — that is the only way
-`devmachine` knows it is talking to your server and not someone else's.
+It asks for the server's address and login, then shows its **fingerprint**.
+Check it against your provider's dashboard before you say yes: that is how
+you know it is your server. Then it installs a key, proves the key works,
+and turns password logins off. See
+[how setup locks the server](../how-it-works/trust-bootstrap.md).
 
-Say yes, and it does four things in order: makes a key and installs it on the
-server, opens a brand new connection using only that key to prove it works,
-turns password logins off, and installs Ansible. If the proof step fails,
-nothing is locked down, and the error tells you where to look. See
-[setting up a server for the first time](../how-it-works/trust-bootstrap.md)
-for why the order matters.
-
-### 3. `devmachine skills add`
+### 3. Teach your agent the CLI
 
 ```
 devmachine skills add
 ```
 
-Teaches your coding agent (Claude Code, Codex, or another) the whole
-`devmachine` CLI, so it can run these commands for you correctly. It only
-takes effect in a new agent session, so run it once, early. You can run it
-before `setup` too.
+Any new Claude Code or Codex session can now run devmachine for you.
 
-### 4. `devmachine workspaces new alice`
+### 4. Create the workspace
 
 ```
 devmachine workspaces new alice
-```
-
-Creates a workspace called `alice` in your configuration. Nothing happens on
-the server yet — this only writes to a file on your own computer. A
-workspace is its own Linux account with its own tools, files, and logins;
-see [machines and workspaces](../concepts/machines-and-workspaces.md).
-
-### 5. `devmachine sync`
-
-```
 devmachine sync
 ```
 
-Builds the workspace on the server: creates the Linux account and installs
-its default packages — git, the GitHub CLI, Node LTS, bun, and zsh with Oh My
-Zsh. It shows the plan first and asks before it changes anything. The first
-run takes a few minutes.
+The first line adds `alice` to your configuration. `sync` builds it on the
+server: its own account, with git, the GitHub CLI, Node, bun and zsh. It
+shows the plan and asks before changing anything.
 
-### 6. `devmachine ssh alice`
+### 5. Open it
 
 ```
 devmachine ssh alice
 ```
 
-Opens a real SSH session as `alice`. It lands inside a tmux session, so if
-your connection drops or you close the terminal, whatever you started keeps
-running — `devmachine ssh alice` again puts you right back. See
-[keep your sessions running](keep-sessions-running.md).
+You land inside tmux, so what you start keeps running after you close the
+terminal. See [keep your sessions running](keep-sessions-running.md).
 
 ## With your agent
 
-Open a session on your own computer, with any coding agent, and say:
+Install the CLI (step 1), then say to Claude Code or Codex on your computer:
 
 ```text
-Set up devmachine for me: read https://mydevmachine.sh/agent-setup.md and
-follow it.
+Set up devmachine for me with a workspace called alice:
+read https://mydevmachine.sh/agent-setup.md and follow it.
 ```
 
-The agent installs the CLI, runs `devmachine skills add`, then walks through
-the same steps above, asking you one question at a time. You still do the
-parts only you can do: confirming the fingerprint against your provider's
-dashboard, typing the server's root password if it needs one, approving
-`devmachine sync` once the agent shows you the plan, and any browser or
-device sign-in such as `devmachine login gh`. See
-[set up with a coding agent](../agent-setup.md) for the full page the agent
-follows.
+It asks for what it needs, one question at a time. You still check the
+fingerprint in `devmachine setup`, and you approve the `sync`.
 
-**Check it:** `devmachine doctor` reports the machine healthy, and
-`devmachine ssh alice` drops you into a working shell.
-
-Source: [getting started](../getting-started.md),
-[set up with a coding agent](../agent-setup.md),
-[setting up a server for the first time](../how-it-works/trust-bootstrap.md)
+**Check it:** `devmachine doctor` passes, and `devmachine ssh alice` opens a
+shell on the server.

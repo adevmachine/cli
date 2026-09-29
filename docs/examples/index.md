@@ -27,3 +27,9 @@ session. Only a reboot stops it.
   then drive the session from your phone or Claude Desktop.
 - [One consultant, three startups](one-consultant-three-startups.md) — a
   workspace per client, each with its own stack and its own logins.
+- [Hermes Agent](hermes-agent.md) — Nous Research's agent in its own
+  workspace, kept running.
+- [Agno AgentOS with a control plane](agno-agentos-with-control-plane.md) —
+  an agent API and its dashboard, each on its own subdomain.
+- [wuzapi as your own package](wuzapi-as-your-own-package.md) — a WhatsApp API
+  written once as a package, running on two machines.
