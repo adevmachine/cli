@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/provision"
 	"github.com/mydevmachine/devmachine/internal/remote"
@@ -94,6 +95,58 @@ func configWithBrokenLocalPackage(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func TestSyncRefreshesSSHAliasesAndPrintsHowToReachAWorkspace(t *testing.T) {
+	stubSync(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := configWithTrustedKey(t,
+		"    packages: [base]\nworkspaces:\n  - name: alice\n    packages: [claude-code]\nssh_aliases: true\n")
+	writeLocalPackage(t, dir, "base", packages.ScopeMachine)
+	writeLocalPackage(t, dir, "claude-code", packages.ScopeWorkspace)
+
+	out, err := execute(t, "--config", dir, "sync", "--yes")
+	if err != nil {
+		t.Fatalf("sync returned %v", err)
+	}
+	if !strings.Contains(out, "updated the SSH aliases") {
+		t.Fatalf("did not refresh the aliases: %q", out)
+	}
+	if !strings.Contains(out, "devmachine ssh alice") || !strings.Contains(out, "alice-devmachine") {
+		t.Fatalf("did not say how to reach the workspace: %q", out)
+	}
+
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "alice-devmachine") {
+		t.Fatalf("the alias was not written: %s", body)
+	}
+}
+
+func TestSyncDoesNotTouchAliasesWhenNotEnabled(t *testing.T) {
+	stubSync(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := configWithTrustedKey(t, "    packages: [base]\nworkspaces:\n  - name: alice\n    packages: [claude-code]\n")
+	writeLocalPackage(t, dir, "base", packages.ScopeMachine)
+	writeLocalPackage(t, dir, "claude-code", packages.ScopeWorkspace)
+
+	out, err := execute(t, "--config", dir, "sync", "--yes")
+	if err != nil {
+		t.Fatalf("sync returned %v", err)
+	}
+	if strings.Contains(out, "updated the SSH aliases") {
+		t.Fatalf("refreshed the aliases without being told to: %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".ssh", "config")); err == nil {
+		t.Fatal("aliases were written even though ssh_aliases was not set")
+	}
 }
 
 func TestSyncPrintsThePlanAndAsks(t *testing.T) {

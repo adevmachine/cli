@@ -137,8 +137,11 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 			return err
 		}
 		repo.AutoCommit(cmd.Context(), dir, "chore(config): lock packages for "+machine.Name)
+		if err := refreshAliases(cfg, notes); err != nil {
+			return err
+		}
 	}
-	return reportSync(cmd, opts, machine.Name, check, summary, result)
+	return reportSync(cmd, opts, cfg, machine.Name, check, summary, result)
 }
 
 // validateLocalPackages checks the operator's own recipes before anything is
@@ -188,7 +191,7 @@ func syncCommandLine(check bool, tags []string) string {
 	return command
 }
 
-func reportSync(cmd *cobra.Command, opts *options, machine string, check bool, plan []string, result provision.Result) error {
+func reportSync(cmd *cobra.Command, opts *options, cfg config.Config, machine string, check bool, plan []string, result provision.Result) error {
 	if opts.format == formatJSON {
 		return writeJSON(cmd.OutOrStdout(), struct {
 			Machine string           `json:"machine"`
@@ -206,6 +209,21 @@ func reportSync(cmd *cobra.Command, opts *options, machine string, check bool, p
 	}
 	if check {
 		return writeLine(out, "a dry run: nothing changed, and the lock was not written")
+	}
+
+	workspaces := cfg.WorkspacesOn(machine)
+	if len(workspaces) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(out, "\nReach a workspace:"); err != nil {
+		return err
+	}
+	for _, w := range workspaces {
+		for _, line := range reachLines(w.Name, cfg.SSHAliases) {
+			if err := writeLine(out, "  "+line); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

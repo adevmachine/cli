@@ -269,6 +269,18 @@ func runWorkspaceNew(cmd *cobra.Command, opts *options, name string, o workspace
 	repo.AutoCommit(cmd.Context(), dir, "chore(config): add workspace "+name)
 	cmd.Printf("%s is in the configuration, on %s, with %s.\n", name, machine.Name, describePackages(list))
 	cmd.Println("The machine is untouched: `devmachine sync` is what creates the account.")
+
+	updated, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	if err := refreshAliases(updated, cmd.OutOrStdout()); err != nil {
+		return err
+	}
+	cmd.Println("\nOnce `devmachine sync` has run, reach it:")
+	for _, line := range reachLines(name, updated.SSHAliases) {
+		cmd.Printf("  %s\n", line)
+	}
 	return nil
 }
 
@@ -392,7 +404,12 @@ func newWorkspacesRmCmd(opts *options) *cobra.Command {
 			cmd.Printf("The account %s, its home and its files are still on the machine %s.\n",
 				w.LinuxUser(), machineNameOf(cfg, w))
 			cmd.Println("Remove them there by hand if you really want them gone.")
-			return nil
+
+			updated, err := config.Load(dir)
+			if err != nil {
+				return err
+			}
+			return refreshAliases(updated, cmd.OutOrStdout())
 		},
 	}
 	c.Flags().BoolVar(&yes, "yes", false, "forget it without asking")
@@ -529,7 +546,12 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			} else {
 				cmd.Printf("%s is destroyed: the account, its home and its configuration are gone.\n", w.Name)
 			}
-			return nil
+
+			updated, err := config.Load(dir)
+			if err != nil {
+				return err
+			}
+			return refreshAliases(updated, cmd.OutOrStdout())
 		},
 	}
 	c.Flags().StringVar(&confirmName, "confirm", "", "the workspace name, to skip the interactive prompt")
@@ -658,6 +680,14 @@ func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspac
 			"and %s keeps everything it had.\n", e.machine, was)
 	}
 	cmd.Println("The machine is untouched until the next `devmachine sync`.")
+
+	if e.machine != "" && e.machine != was {
+		updated, err := config.Load(dir)
+		if err != nil {
+			return err
+		}
+		return refreshAliases(updated, cmd.OutOrStdout())
+	}
 	return nil
 }
 

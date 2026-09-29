@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/keys"
 )
@@ -68,6 +69,51 @@ func TestWorkspacesNewUsesTheConfiguredDefault(t *testing.T) {
 	}
 	if !slices.Equal(w.Packages, []string{"workspace", "dev", "zsh"}) {
 		t.Fatalf("got %#v", w.Packages)
+	}
+}
+
+func TestWorkspacesNewRefreshesSSHAliasesWhenEnabled(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := configWithTrustedKey(t, "ssh_aliases: true\n")
+
+	out, err := execute(t, "--config", dir, "workspaces", "new", "alice", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "updated the SSH aliases") {
+		t.Fatalf("did not say the aliases were refreshed: %q", out)
+	}
+	if !strings.Contains(out, "devmachine ssh alice") {
+		t.Fatalf("did not say how to reach it: %q", out)
+	}
+
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "alice-devmachine") {
+		t.Fatalf("the alias was not written: %s", body)
+	}
+}
+
+func TestWorkspacesNewLeavesAliasesAloneWhenNotEnabled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := configWithTrustedKey(t, "")
+
+	out, err := execute(t, "--config", dir, "workspaces", "new", "alice", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "updated the SSH aliases") {
+		t.Fatalf("refreshed the aliases without being told to: %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".ssh", "config")); err == nil {
+		t.Fatal("aliases were written even though ssh_aliases was not set")
 	}
 }
 
