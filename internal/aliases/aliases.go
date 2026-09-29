@@ -42,8 +42,9 @@ type Alias struct {
 	Host string `json:"host"`
 	User string `json:"user"`
 	Port int    `json:"port"`
-	// IdentityFile is empty when the SSH agent holds the key, which is how a
-	// key kept in a password manager works: there is no file to point at.
+	// IdentityFile is empty when the SSH agent offers every key it holds:
+	// there is no file naming just one. It holds the machine's own key when
+	// there is one, or the recorded agent key's public half otherwise.
 	IdentityFile string `json:"identity_file,omitempty"`
 	// HostKeyAlias is the same for every alias of one machine. known_hosts is
 	// indexed by address, so a machine on two addresses gets two entries and
@@ -82,9 +83,13 @@ func List(cfg config.Config) ([]Alias, error) {
 			return nil, fmt.Errorf("reading SSH host trust for machine %q: %w", machine.Name, err)
 		}
 
+		identityFile := machine.Key
+		if identityFile == "" {
+			identityFile = machine.AgentKeyFile
+		}
 		entry := Alias{
 			Name: w.Name + suffix, Host: addresses[0], User: w.LinuxUser(),
-			Port: machine.Port, IdentityFile: machine.Key,
+			Port: machine.Port, IdentityFile: identityFile,
 			HostKeyAlias:       hostkeys.Lookup(machine.Name, machine.Port),
 			UserKnownHostsFile: machine.KnownHostsFile,
 			HostKeyAlgorithms:  strings.Join(hostkeys.Algorithms(key), ","),

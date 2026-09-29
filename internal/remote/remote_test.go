@@ -23,6 +23,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 // throwawayKey writes a private key nothing will ever authenticate with.
@@ -488,6 +489,101 @@ func sshServerRejecting(t *testing.T) *fakeSSHServer {
 	return sshServer(t, "")
 }
 
+// sshServerAcceptingOnlyKey refuses every public key except one, so a test can
+// tell a client that filtered the agent down to the right key apart from one
+// that let the library try every key the agent holds.
+func sshServerAcceptingOnlyKey(t *testing.T, want ssh.PublicKey) *fakeSSHServer {
+	t.Helper()
+
+	s := &fakeSSHServer{}
+	cfg := &ssh.ServerConfig{
+		AuthLogCallback: func(_ ssh.ConnMetadata, method string, _ error) {
+			if method == "none" {
+				return
+			}
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.methods = append(s.methods, method)
+		},
+		PasswordCallback: func(ssh.ConnMetadata, []byte) (*ssh.Permissions, error) {
+			return nil, errors.New("refused")
+		},
+		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			if !bytes.Equal(key.Marshal(), want.Marshal()) {
+				return nil, errors.New("refused")
+			}
+			return &ssh.Permissions{}, nil
+		},
+	}
+	signer := serverHostKey(t)
+	s.key = signer.PublicKey()
+	cfg.AddHostKey(signer)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+	s.addr = listener.Addr().String()
+
+	go s.serve(listener, cfg)
+	return s
+}
+
+// agentHolding runs a real SSH agent in this process, holding the given
+// private keys under the given comments, and returns the socket to talk to
+// it.
+func agentHolding(t *testing.T, keys ...agent.AddedKey) string {
+	t.Helper()
+
+	keyring := agent.NewKeyring()
+	for _, k := range keys {
+		if err := keyring.Add(k); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dir, err := os.MkdirTemp("", "ag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "s")
+	listener, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				_ = agent.ServeAgent(keyring, conn)
+			}()
+		}
+	}()
+
+	return sock
+}
+
+func addedKey(t *testing.T, comment string) (agent.AddedKey, ssh.PublicKey) {
+	t.Helper()
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return agent.AddedKey{PrivateKey: private, Comment: comment}, signer.PublicKey()
+}
+
 func sshServer(t *testing.T, accept string) *fakeSSHServer {
 	t.Helper()
 
@@ -628,6 +724,55 @@ func TestDialWithOffersOnlyTheKeyWhenOneIsGiven(t *testing.T) {
 
 	if got := server.methodsOffered(); !slices.Equal(got, []string{"publickey"}) {
 		t.Fatalf("offered %v", got)
+	}
+}
+
+func TestDialWithOffersOnlyTheRecordedAgentKey(t *testing.T) {
+	// The agent holds a key the server would refuse and the recorded key,
+	// with the wrong one added first. Without filtering, the library tries
+	// the wrong key before the right one, which is exactly the MaxAuthTries
+	// problem this field exists to avoid.
+	wrong, _ := addedKey(t, "wrong key")
+	right, rightPublic := addedKey(t, "right key")
+	sock := agentHolding(t, wrong, right)
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	server := sshServerAcceptingOnlyKey(t, rightPublic)
+	m := machineAt(t, server)
+	recorded := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(rightPublic)))
+
+	client, _, err := DialWith(context.Background(), m, "root", Auth{Agent: true, AgentPublicKey: recorded})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if got := server.methodsOffered(); !slices.Equal(got, []string{"publickey"}) {
+		t.Fatalf("offered %v, want exactly one publickey attempt", got)
+	}
+}
+
+func TestDialWithSaysTheAgentDoesNotHoldTheRecordedKey(t *testing.T) {
+	held, _ := addedKey(t, "held key")
+	sock := agentHolding(t, held)
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	_, missingPublic := addedKey(t, "not in the agent")
+	recorded := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(missingPublic)))
+	fingerprint := ssh.FingerprintSHA256(missingPublic)
+
+	server := sshServerAcceptingOnlyKey(t, missingPublic)
+	m := machineAt(t, server)
+
+	_, _, err := DialWith(context.Background(), m, "root", Auth{Agent: true, AgentPublicKey: recorded})
+	if err == nil {
+		t.Fatal("expected an error: the agent does not hold the recorded key")
+	}
+	if !strings.Contains(err.Error(), fingerprint) {
+		t.Fatalf("the error does not name the fingerprint: %v", err)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "unlock") {
+		t.Fatalf("the error does not say what to do: %v", err)
 	}
 }
 

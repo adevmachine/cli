@@ -69,6 +69,30 @@ func TestStrictSSHArgsPinEveryIdentitySource(t *testing.T) {
 	}
 }
 
+func TestStrictSSHArgsPointIdentityAtTheAgentKeyFile(t *testing.T) {
+	m, _ := pinnedMachine(t, 22, false)
+	m.Key = ""
+	m.AgentKeyFile = "/config/keys/main.agent.pub"
+
+	args := strictSSHArgs(m)
+	joined := strings.Join(args, " ")
+	for _, want := range []string{"-i " + m.AgentKeyFile, "IdentitiesOnly=yes"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("missing %q in %#v", want, args)
+		}
+	}
+}
+
+func TestStrictSSHArgsSetNoIdentityWithNeitherKeyNorAgentKey(t *testing.T) {
+	m, _ := pinnedMachine(t, 22, false)
+	m.Key = ""
+
+	args := strictSSHArgs(m)
+	if slices.Contains(args, "-i") {
+		t.Fatalf("an identity was set with neither key nor agent_key: %#v", args)
+	}
+}
+
 func TestStrictSSHCommandQuotesNestedMoshArguments(t *testing.T) {
 	m, _ := pinnedMachine(t, 2222, true)
 	got := strictSSHCommand(m)

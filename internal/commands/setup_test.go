@@ -437,12 +437,24 @@ func TestSetupOffersTheKeysTheAgentHolds(t *testing.T) {
 	if !steps.provedWith.Agent || steps.provedWith.KeyPath != "" {
 		t.Fatalf("it did not log in through the agent: %#v", steps.provedWith)
 	}
+	if steps.provedWith.AgentPublicKey != "ssh-ed25519 AAAAagent alice laptop" {
+		t.Fatalf("it did not narrow the agent to the chosen key: %#v", steps.provedWith)
+	}
 
 	// An agent key has no path, so the configuration says nothing about a key
-	// file: an empty `key` is what makes the CLI ask the agent later.
+	// file: an empty `key` is what makes the CLI ask the agent later. The
+	// chosen key is recorded instead, so only it gets offered from now on.
 	cfg, _ := config.Load(dir)
 	if cfg.Machines[0].Key != "" {
 		t.Fatalf("key = %q, want empty", cfg.Machines[0].Key)
+	}
+	if cfg.Machines[0].AgentKey != "ssh-ed25519 AAAAagent alice laptop" {
+		t.Fatalf("agent_key = %q, want the chosen key", cfg.Machines[0].AgentKey)
+	}
+	if body, err := os.ReadFile(cfg.Machines[0].AgentKeyFile); err != nil {
+		t.Fatalf("the agent key's public file was not written: %v", err)
+	} else if strings.TrimSpace(string(body)) != "ssh-ed25519 AAAAagent alice laptop" {
+		t.Fatalf("got %q", body)
 	}
 }
 

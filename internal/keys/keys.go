@@ -68,6 +68,34 @@ func Generate(dir, name string) (path, public string, err error) {
 	return path, public, nil
 }
 
+// AgentFile is where WriteAgent puts the public half of an agent-held key,
+// for a machine that logs in with one key the agent offers instead of every
+// key it holds.
+func AgentFile(dir, name string) string {
+	return filepath.Join(Dir(dir), name+".agent.pub")
+}
+
+// WriteAgent records the public key an agent-held login uses, so the system
+// ssh binary can point `-i` at it and offer only that key.
+//
+// It never writes a private key: an agent key never leaves the agent, and
+// this file only ever holds the public half.
+func WriteAgent(dir, name, public string) (path string, err error) {
+	if err := checkName(name); err != nil {
+		return "", err
+	}
+
+	if err := os.MkdirAll(Dir(dir), 0o700); err != nil {
+		return "", fmt.Errorf("making the key directory: %w", err)
+	}
+
+	path = AgentFile(dir, name)
+	if err := os.WriteFile(path, []byte(public+"\n"), 0o644); err != nil {
+		return "", fmt.Errorf("writing %s: %w", path, err)
+	}
+	return path, nil
+}
+
 func checkName(name string) error {
 	if name == "" {
 		return fmt.Errorf("a key needs a name")

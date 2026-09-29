@@ -34,7 +34,7 @@ DEVMACHINE_CONFIG=~/.config/devmachine-test devmachine doctor
 ```
 <config>/config.yml     machines, workspaces, domain, DNS provider
 <config>/secrets.json   names of stored secrets, and values the keychain refused
-<config>/keys/          keys the CLI generated, when it generated any
+<config>/keys/          keys the CLI generated, and the public half of a chosen agent key
 <config>/history.log    one line per command that reached a machine
 ```
 
@@ -49,6 +49,7 @@ machines:
     user: root             # the account it logs in as
     port: 22
     key: /keys/main        # optional; without it the SSH agent serves
+    # agent_key: ssh-ed25519 AAAA...  # optional; the one agent key to use instead of `key`
     packages: [base, docker, caddy, firewall, fail2ban, ssh_hardening, git]
     settings:
       base.timezone: Europe/Lisbon

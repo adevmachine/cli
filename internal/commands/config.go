@@ -65,6 +65,9 @@ func newConfigShowCmd(opts *options) *cobra.Command {
 				if m.Key != "" {
 					cmd.Printf("  key        %s\n", m.Key)
 				}
+				if m.AgentKey != "" {
+					cmd.Printf("  agent_key  %s\n", m.AgentKey)
+				}
 				for _, w := range cfg.WorkspacesOn(m.Name) {
 					cmd.Printf("  workspace  %s (user %s)\n", w.Name, w.LinuxUser())
 				}
@@ -89,6 +92,7 @@ type machineJSON struct {
 	AdminUser  string   `json:"admin_user"`
 	Port       int      `json:"port"`
 	Key        string   `json:"key,omitempty"`
+	AgentKey   string   `json:"agent_key,omitempty"`
 	Workspaces []string `json:"workspaces"`
 	Self       bool     `json:"self,omitempty"`
 }
@@ -120,7 +124,7 @@ func asJSON(cfg config.Config) configJSON {
 		}
 		out.Machines = append(out.Machines, machineJSON{
 			Name: m.Name, Hosts: addresses, AdminUser: m.User,
-			Port: m.Port, Key: m.Key, Workspaces: names, Self: m.Self,
+			Port: m.Port, Key: m.Key, AgentKey: m.AgentKey, Workspaces: names, Self: m.Self,
 		})
 	}
 

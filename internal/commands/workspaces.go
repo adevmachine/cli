@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"maps"
@@ -15,6 +16,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/keys"
 	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 )
 
@@ -323,7 +325,27 @@ func adminKey(m config.Machine) error {
 				"reachable because a key is copied into it, and there is nothing to copy. "+
 				"Run `devmachine setup`", m.Name)
 	}
-	return nil
+
+	if m.AgentKey == "" {
+		return nil
+	}
+	// The machine logs in with one recorded key, not whatever the agent
+	// happens to hold: a workspace is only reachable through the key that
+	// actually gets in.
+	want, _, _, _, err := ssh.ParseAuthorizedKey([]byte(m.AgentKey))
+	if err != nil {
+		return fmt.Errorf("machine %q's `agent_key` is not a usable public key: %w", m.Name, err)
+	}
+	for _, k := range held {
+		if parsed, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k.PublicKey)); err == nil &&
+			bytes.Equal(parsed.Marshal(), want.Marshal()) {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"machine %q logs in with the agent key %s, and the SSH agent does not currently hold it: "+
+			"unlock the password manager it lives in, or check SSH_AUTH_SOCK points at the right agent",
+		m.Name, ssh.FingerprintSHA256(want))
 }
 
 func newWorkspacesRmCmd(opts *options) *cobra.Command {

@@ -10,6 +10,14 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/keys"
+)
+
+// testAgentKey and testAgentKey2 are real authorized_keys lines, so
+// ParseAuthorizedKey has something valid to parse.
+const (
+	testAgentKey  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIwq96VZXRs174bKzGUdytXjlvG0uIYHCTPTPplRnmv main"
+	testAgentKey2 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBd3EtiUGoL0YW/tZAOFOH+SlRRh0PJ1fDGC7CkvrWve other"
 )
 
 // withKey writes the public half of the machine's key, which is the thing a
@@ -90,6 +98,34 @@ func TestWorkspacesNewRefusesWhenNothingHoldsTheKeyEither(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "devmachine setup") {
 		t.Fatalf("the error does not say how to fix it: %v", err)
+	}
+}
+
+func TestWorkspacesNewRefusesWhenTheAgentDoesNotHoldTheRecordedKey(t *testing.T) {
+	// A workspace is reachable through the key the machine actually logs in
+	// with. An agent holding some other key is no better than holding none.
+	t.Cleanup(swap(&agentKeys, func() ([]keys.Offered, error) {
+		return []keys.Offered{{Fingerprint: "SHA256:other", Comment: "other", PublicKey: testAgentKey2}}, nil
+	}))
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    agent_key: "+testAgentKey+"\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "new", "alice", "--yes")
+	if err == nil {
+		t.Fatal("it made a workspace nobody could reach")
+	}
+	if !strings.Contains(err.Error(), "SHA256:") {
+		t.Fatalf("the error does not name the fingerprint: %v", err)
+	}
+}
+
+func TestWorkspacesNewAcceptsTheRecordedKeyWhenTheAgentHoldsIt(t *testing.T) {
+	t.Cleanup(swap(&agentKeys, func() ([]keys.Offered, error) {
+		return []keys.Offered{{Fingerprint: "SHA256:xxxx", Comment: "main", PublicKey: testAgentKey}}, nil
+	}))
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    agent_key: "+testAgentKey+"\n")
+
+	if _, err := execute(t, "--config", dir, "workspaces", "new", "alice", "--yes"); err != nil {
+		t.Fatal(err)
 	}
 }
 

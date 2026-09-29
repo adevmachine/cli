@@ -23,7 +23,9 @@ Connects to your server for the first time and gets it ready to use.
 With no `config.yml` yet, it asks for a machine name, an address, the
 admin account, a port, a domain, and how to log in: a key devmachine
 makes for itself (recommended), a key file already on your computer, or
-one your SSH agent holds (for a key in a password manager).
+one your SSH agent holds (for a key in a password manager). Choosing an
+agent key records its public half as `agent_key:`, so only that key is
+offered from then on — never every key the agent holds.
 
 It shows the server's fingerprint first and asks you to check it against
 your provider's dashboard. Say no and nothing is sent or changed.
@@ -124,10 +126,10 @@ devmachine machines delete-local <name> [--yes]   destroy it and everything on i
 Manages the list of machines devmachine knows about.
 
 `list --format json` prints each machine with `name`, `hosts`,
-`admin_user`, `port`, `key`, `workspaces`, and `self: true` on your own
-computer. **Your computer is never picked by default** — a command with
-no `--machine` still acts on the server, even with a self machine also
-configured.
+`admin_user`, `port`, `key`, `agent_key`, `workspaces`, and `self: true`
+on your own computer. **Your computer is never picked by default** — a
+command with no `--machine` still acts on the server, even with a self
+machine also configured.
 
 `add` sets up another server, same as [setup](#setup). `add --self
 <name>` instead names the computer devmachine runs on: no address, port
@@ -268,6 +270,11 @@ nothing about.
   command.
 - `IdentitiesOnly yes` goes with `IdentityFile`, so ssh offers only this
   key and does not burn login attempts on others in your agent.
+  `IdentityFile` points at `key:` when the machine has one, or at the
+  recorded `agent_key:`'s public file otherwise — ssh matches a public-key
+  `IdentityFile` against the agent instead of reading a private key from it.
+  With neither, there is no `IdentityFile`, and ssh offers everything the
+  agent holds.
 
 A `-pub` alias is only written when a second address exists and the
 first did not already resolve to it.

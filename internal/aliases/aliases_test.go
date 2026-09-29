@@ -404,6 +404,30 @@ func TestRenderOffersTheMachinesKeyAndOnlyThat(t *testing.T) {
 	}
 }
 
+func TestRenderOffersTheRecordedAgentKeyAndOnlyThat(t *testing.T) {
+	withResolver(t, map[string][]string{"main": {"203.0.113.10"}})
+	cfg := config.Config{
+		Machines: []config.Machine{{
+			Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}},
+			User: "root", Port: 22,
+			AgentKey: "ssh-ed25519 AAAAagent", AgentKeyFile: "/config/keys/main.agent.pub",
+		}},
+		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
+	}
+	pinMachine(t, &cfg.Machines[0], false)
+
+	block, err := Render(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(block, `IdentityFile "/config/keys/main.agent.pub"`) {
+		t.Fatalf("got:\n%s", block)
+	}
+	if !strings.Contains(block, "IdentitiesOnly yes") {
+		t.Fatalf("got:\n%s", block)
+	}
+}
+
 func TestRenderLeavesTheKeyToTheAgentWhenThereIsNoFile(t *testing.T) {
 	block, err := Render(oneAddress(t))
 	if err != nil {

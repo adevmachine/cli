@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mydevmachine/devmachine/internal/keys"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 )
 
@@ -108,6 +110,14 @@ type Machine struct {
 	// instead, which is how a 1Password-style agent is supported without this
 	// package knowing such a thing exists.
 	Key string `yaml:"key,omitempty"`
+	// AgentKey is the public half, in authorized_keys format, of the one key
+	// `setup` or `machines add` chose from the SSH agent. It is never a
+	// secret — the private half never leaves the agent — and it is what lets
+	// the CLI offer that one key instead of every key the agent holds.
+	//
+	// Left empty with Key also empty, the agent offers everything it holds,
+	// which is the CLI's behaviour before this field existed.
+	AgentKey string `yaml:"agent_key,omitempty"`
 	// Packages are the recipes this machine gets, by name.
 	Packages []string `yaml:"packages,omitempty"`
 	// Settings override the variables a package declares. A key is written
@@ -116,6 +126,11 @@ type Machine struct {
 	// KnownHostsFile is runtime metadata resolved from the configuration
 	// directory. It is never another source of user configuration.
 	KnownHostsFile string `yaml:"-"`
+	// AgentKeyFile is where AgentKey's public key is written on disk, so the
+	// system ssh binary can point `-i` at it. It is runtime metadata,
+	// resolved the same way as KnownHostsFile, and empty whenever AgentKey
+	// is.
+	AgentKeyFile string `yaml:"-"`
 }
 
 // Route is one public hostname a workspace's port answers to. Caddy holds the
@@ -255,6 +270,9 @@ func Load(dir string) (Config, error) {
 
 	for i := range c.Machines {
 		c.Machines[i].KnownHostsFile = filepath.Join(dir, KnownHostsFileName)
+		if c.Machines[i].AgentKey != "" {
+			c.Machines[i].AgentKeyFile = keys.AgentFile(dir, c.Machines[i].Name)
+		}
 		if c.Machines[i].Self {
 			// A self machine has no address, so the admin-login and port
 			// defaults that only make sense for one would trip Validate's
@@ -396,6 +414,16 @@ func (c Config) Validate() error {
 			case m.Port < 1 || m.Port > 65535:
 				return fmt.Errorf("machine %q has port %d: use a port between 1 and 65535", m.Name, m.Port)
 			}
+			if m.Key != "" && m.AgentKey != "" {
+				return fmt.Errorf(
+					"machine %q sets both `key` and `agent_key`: keep only one, whichever one the CLI should log in with",
+					m.Name)
+			}
+			if m.AgentKey != "" {
+				if _, _, _, _, err := ssh.ParseAuthorizedKey([]byte(m.AgentKey)); err != nil {
+					return fmt.Errorf("machine %q's `agent_key` is not a usable public key: %w", m.Name, err)
+				}
+			}
 			for j, h := range m.Hosts {
 				if h.Address == "" {
 					return fmt.Errorf("machine %q: host %d is empty", m.Name, j+1)
@@ -482,6 +510,8 @@ func refusesAddress(m Machine) error {
 		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "port")
 	case m.Key != "":
 		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "key")
+	case m.AgentKey != "":
+		return fmt.Errorf("machine %q is your computer (self: true), so it has no %s: remove it", m.Name, "agent_key")
 	}
 	return nil
 }
@@ -847,6 +877,7 @@ func machineNode(m Machine) *yaml.Node {
 	setField(node, "user", stringNode(m.User))
 	setField(node, "port", intNode(m.Port))
 	setField(node, "key", stringNode(m.Key))
+	setField(node, "agent_key", stringNode(m.AgentKey))
 	if len(m.Packages) > 0 {
 		setField(node, "packages", sequenceNode(m.Packages))
 	}

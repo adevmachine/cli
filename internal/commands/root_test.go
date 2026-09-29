@@ -139,6 +139,23 @@ func TestConfigShowAsJSONCarriesEveryHost(t *testing.T) {
 	}
 }
 
+func TestConfigShowAsJSONCarriesTheAgentKey(t *testing.T) {
+	agentKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAS++gfMHbfjZ9LMQG6lgmPbM3lDJMd/ejWLuqwFcG2W alice laptop"
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    agent_key: "+agentKey+"\n")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "config", "show")
+	if err != nil {
+		t.Fatalf("config show returned %v", err)
+	}
+	var got configJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output was not JSON: %v (%q)", err, out)
+	}
+	if got.Machines[0].AgentKey != agentKey {
+		t.Fatalf("agent_key = %q", got.Machines[0].AgentKey)
+	}
+}
+
 func TestConfigShowFailsWhenThereIsNoConfig(t *testing.T) {
 	if _, err := execute(t, "--config", t.TempDir(), "config", "show"); err == nil {
 		t.Fatal("expected an error when config.yml is missing")

@@ -23,7 +23,7 @@ devmachine workspaces new alice
 devmachine sync
 ```
 
-Already have a machine? See step 4 for moving it to the 1Password key. See
+Already have a machine? See step 3 for moving it to the 1Password key. See
 [getting started](../getting-started.md) for what each command does.
 
 ## By hand
@@ -51,12 +51,30 @@ export SSH_AUTH_SOCK=~/.1password/agent.sock
 
 `ssh-add -l` now lists the keys 1Password offers.
 
-### 3. Offer only the key devmachine uses
+### 3. Choose the key in `setup`
 
-A server hangs up after about six wrong keys. Without a `key:` in your
-configuration, devmachine offers the agent's keys one after another, so a
-vault with many keys can use up those tries before reaching the right one.
-The error says "Too many authentication failures".
+```
+devmachine setup
+```
+
+When it asks how the CLI should log in, pick the line that ends in
+`(from the SSH agent)` with your key's fingerprint. `setup` installs that
+key on the server, proves it works, and turns password logins off, as usual.
+It records the key's public half as `agent_key:` in `config.yml`, and that
+is what tells devmachine to ask the agent for that one key from then on —
+never every key in the vault.
+
+For a machine you already set up with another key: add the 1Password
+key's public half to the server's `/root/.ssh/authorized_keys`, then
+delete the machine's `key:` line from `config.yml` and replace it with
+`agent_key:`, set to that same public key line.
+
+### 4. Optional: limit what the agent offers everywhere else
+
+Step 3 is enough for devmachine itself. Plain `ssh` and anything else on
+your computer still ask 1Password for every key in the vault, one after
+another, and a vault with many keys can hit the server's limit — the
+error says "Too many authentication failures".
 
 Tell 1Password which key to offer, in `~/.config/1Password/ssh/agent.toml`:
 
@@ -68,23 +86,8 @@ vault = "Private"
 
 `item` is the key's name in 1Password, `vault` the vault it is in. Add one
 `[[ssh-keys]]` block per key you still want the agent to offer, such as
-your GitHub key.
-
-### 4. Choose the key in `setup`
-
-```
-devmachine setup
-```
-
-When it asks how the CLI should log in, pick the line that ends in
-`(from the SSH agent)` with your key's fingerprint. `setup` installs that
-key on the server, proves it works, and turns password logins off, as usual.
-It leaves `key:` out of the configuration, and that is what tells
-devmachine to ask the agent every time.
-
-For a machine you already set up with another key: add the 1Password
-key's public half to the server's `/root/.ssh/authorized_keys`, then delete
-the machine's `key:` line from `config.yml`.
+your GitHub key. Skip this if devmachine (`ssh`, `mosh`, `run`) is the
+only thing you use this key for — it already offers only the one key.
 
 ### 5. Use it
 
@@ -103,7 +106,7 @@ to the path in step 2 itself.
 
 ## With your agent
 
-Steps 1 and 3 happen in 1Password, and step 4's choice is yours, so do those
+Steps 1 and 4 happen in 1Password, and step 3's choice is yours, so do those
 by hand. Then, in a new Claude Code or Codex session on your computer:
 
 ```text

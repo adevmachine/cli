@@ -120,6 +120,32 @@ func TestLoadAssociatesMachinesWithTheConfigurationTrustStore(t *testing.T) {
 	}
 }
 
+func TestLoadResolvesTheAgentKeyFileOnlyWhenAgentKeyIsSet(t *testing.T) {
+	dir := writeConfig(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    agent_key: "+testAgentKey+"\n"+
+		"  - name: sandbox\n    hosts: [127.0.0.1]\n")
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "keys", "main.agent.pub")
+	if cfg.Machines[0].AgentKeyFile != want {
+		t.Fatalf("got %q, want %q", cfg.Machines[0].AgentKeyFile, want)
+	}
+	if cfg.Machines[1].AgentKeyFile != "" {
+		t.Fatalf("a machine with no agent_key got a file: %q", cfg.Machines[1].AgentKeyFile)
+	}
+}
+
+func TestMachineAgentKeyFilePathIsRuntimeOnly(t *testing.T) {
+	body, err := yaml.Marshal(Machine{Name: "main", AgentKeyFile: "/private/config/keys/main.agent.pub"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "agent.pub") {
+		t.Fatalf("runtime agent key file path leaked into YAML:\n%s", body)
+	}
+}
+
 func TestMachineTrustStorePathIsRuntimeOnly(t *testing.T) {
 	body, err := yaml.Marshal(Machine{Name: "main", KnownHostsFile: "/private/config/known_hosts"})
 	if err != nil {
@@ -284,6 +310,51 @@ func TestValidateRejectsAPortOutOfRange(t *testing.T) {
 		if err := c.Validate(); err == nil {
 			t.Fatalf("expected an error for port %d", port)
 		}
+	}
+}
+
+// testAgentKey is a real authorized_keys line, so ParseAuthorizedKey has
+// something valid to parse.
+const testAgentKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJCxZSGQhtHNQAuBgxqtDOX9gMd/zqJH6uxite447zWK test-agent-key"
+
+func TestValidateRefusesBothKeyAndAgentKey(t *testing.T) {
+	c := Config{Machines: []Machine{{
+		Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22,
+		Key: "/keys/main", AgentKey: testAgentKey,
+	}}}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "main") ||
+		!strings.Contains(err.Error(), "key") || !strings.Contains(err.Error(), "agent_key") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateRefusesAnUnusableAgentKey(t *testing.T) {
+	c := Config{Machines: []Machine{{
+		Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22,
+		AgentKey: "not a key",
+	}}}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "main") || !strings.Contains(err.Error(), "agent_key") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateAcceptsAnAgentKeyAlone(t *testing.T) {
+	c := Config{Machines: []Machine{{
+		Name: "main", Hosts: []Host{{Address: "203.0.113.10"}}, User: "root", Port: 22,
+		AgentKey: testAgentKey,
+	}}}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("a machine with only agent_key was refused: %v", err)
+	}
+}
+
+func TestValidateRefusesAnAgentKeyOnASelfMachine(t *testing.T) {
+	cfg := Config{Machines: []Machine{{Name: "mac", Self: true, AgentKey: testAgentKey}}}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "agent_key") {
+		t.Fatalf("got %v", err)
 	}
 }
 
@@ -625,6 +696,30 @@ domain: example.com
 	}
 	if cfg.Domain != "example.com" {
 		t.Fatalf("domain = %q", cfg.Domain)
+	}
+}
+
+func TestAddMachineWritesTheAgentKey(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	err := AddMachine(dir, Machine{
+		Name: "sandbox", Hosts: []Host{{Address: "198.51.100.7"}}, User: "root", Port: 22,
+		AgentKey: testAgentKey,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := cfg.Machines[1]
+	if added.AgentKey != testAgentKey {
+		t.Fatalf("agent_key = %q, want %q", added.AgentKey, testAgentKey)
+	}
+	if added.Key != "" {
+		t.Fatalf("key = %q, want empty: an agent key has no file", added.Key)
 	}
 }
 

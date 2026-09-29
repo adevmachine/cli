@@ -176,6 +176,10 @@ type Auth struct {
 	KeyPath  string
 	Password string
 	Agent    bool
+	// AgentPublicKey narrows Agent to the one key the agent should offer,
+	// in authorized_keys format. Empty means every key the agent holds, the
+	// CLI's behaviour before a chosen key could be recorded.
+	AgentPublicKey string
 }
 
 // describe names the method in the words of whoever has to fix it.
@@ -185,10 +189,23 @@ func (a Auth) describe() string {
 		return "the key " + a.KeyPath
 	case a.Password != "":
 		return "a password"
+	case a.AgentPublicKey != "":
+		return "the agent key " + agentKeyFingerprint(a.AgentPublicKey)
 	case a.Agent:
 		return "a key from the SSH agent"
 	}
 	return "nothing"
+}
+
+// agentKeyFingerprint names a recorded agent key the way a person recognises
+// it. An unparsable line falls back to the line itself, since that is still
+// more useful than nothing when something has gone wrong upstream of here.
+func agentKeyFingerprint(public string) string {
+	parsed, _, _, _, err := ssh.ParseAuthorizedKey([]byte(public))
+	if err != nil {
+		return public
+	}
+	return ssh.FingerprintSHA256(parsed)
 }
 
 // Dial tries each of a machine's addresses in order and returns the first
@@ -220,7 +237,7 @@ func authFor(m config.Machine) (Auth, error) {
 	if os.Getenv("SSH_AUTH_SOCK") == "" {
 		return Auth{}, fmt.Errorf("no key in the configuration and no SSH agent: set `key` in config.yml or start an agent")
 	}
-	return Auth{Agent: true}, nil
+	return Auth{Agent: true, AgentPublicKey: m.AgentKey}, nil
 }
 
 // DialWith is Dial with the authentication method chosen by the caller, which
@@ -479,7 +496,43 @@ func authMethods(a Auth) ([]ssh.AuthMethod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reaching the SSH agent: %w", err)
 	}
-	return []ssh.AuthMethod{ssh.PublicKeysCallback(agent.NewClient(conn).Signers)}, nil
+	client := agent.NewClient(conn)
+	if a.AgentPublicKey == "" {
+		return []ssh.AuthMethod{ssh.PublicKeysCallback(client.Signers)}, nil
+	}
+	signer, err := agentSignerFor(client, a.AgentPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+}
+
+// agentSignerFor picks the one signer the agent holds for a recorded key,
+// out of everything else it might also be holding.
+//
+// Offering the whole agent again after a key was chosen would put the CLI
+// right back where recording the choice was meant to get it out of: a server
+// cutting the connection at MaxAuthTries before the right key is tried.
+func agentSignerFor(client agent.Agent, public string) (ssh.Signer, error) {
+	want, _, _, _, err := ssh.ParseAuthorizedKey([]byte(public))
+	if err != nil {
+		return nil, fmt.Errorf("the machine's recorded agent_key is not a usable public key: %w", err)
+	}
+	fingerprint := ssh.FingerprintSHA256(want)
+
+	signers, err := client.Signers()
+	if err != nil {
+		return nil, fmt.Errorf("asking the SSH agent what it holds: %w", err)
+	}
+	for _, signer := range signers {
+		if bytes.Equal(signer.PublicKey().Marshal(), want.Marshal()) {
+			return signer, nil
+		}
+	}
+	return nil, fmt.Errorf(
+		"the SSH agent does not hold the key %s that this machine logs in with: "+
+			"unlock the password manager it lives in, or check SSH_AUTH_SOCK points at the right agent",
+		fingerprint)
 }
 
 type sshClient struct {

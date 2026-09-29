@@ -32,8 +32,14 @@ func StrictSSHArgs(m config.Machine) []string {
 		"-o", "KnownHostsCommand=none",
 		"-o", "HostKeyAlgorithms=" + algorithms,
 	}
-	if m.Key != "" {
+	switch {
+	case m.Key != "":
 		args = append(args, "-i", m.Key, "-o", "IdentitiesOnly=yes")
+	case m.AgentKeyFile != "":
+		// Pointing IdentityFile at the public half alone is enough: with no
+		// private key beside it, ssh matches it against the agent instead of
+		// trying to read a private key that is not there.
+		args = append(args, "-i", m.AgentKeyFile, "-o", "IdentitiesOnly=yes")
 	}
 	return args
 }

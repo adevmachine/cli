@@ -167,7 +167,9 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	if err != nil {
 		return err
 	}
-	m.Key = key.Path
+	if err := recordKey(dir, &m, key); err != nil {
+		return err
+	}
 
 	release, err := latestPackagesRelease(ctx)
 	if err != nil {
@@ -412,7 +414,7 @@ type chosenKey struct {
 
 func (k chosenKey) auth() remote.Auth {
 	if k.Path == "" {
-		return remote.Auth{Agent: true}
+		return remote.Auth{Agent: true, AgentPublicKey: k.Public}
 	}
 	return remote.Auth{KeyPath: k.Path}
 }
@@ -422,6 +424,26 @@ func (k chosenKey) describe() string {
 		return "the key from the SSH agent"
 	}
 	return "the key " + k.Path
+}
+
+// recordKey puts the chosen key on the machine the way its origin needs: a
+// path when it is a file, or the public half plus the file that lets the
+// system ssh binary find it in the agent when it is not.
+func recordKey(dir string, m *config.Machine, key chosenKey) error {
+	if key.Path != "" {
+		m.Key = key.Path
+		return nil
+	}
+	if key.Public == "" {
+		// No key was chosen (no agent, no file, nothing generated): keep the
+		// pre-existing behaviour of asking the agent for everything it holds.
+		return nil
+	}
+	if _, err := keys.WriteAgent(dir, m.Name, key.Public); err != nil {
+		return err
+	}
+	m.AgentKey = key.Public
+	return nil
 }
 
 // askForKey offers the three ways in: a key of the CLI's own, a key file, or
@@ -642,7 +664,9 @@ func machineEntry(m config.Machine) machineFile {
 	for _, h := range m.Hosts {
 		addresses = append(addresses, h.Address)
 	}
-	return machineFile{Name: m.Name, Hosts: addresses, User: m.User, Port: m.Port, Key: m.Key}
+	return machineFile{
+		Name: m.Name, Hosts: addresses, User: m.User, Port: m.Port, Key: m.Key, AgentKey: m.AgentKey,
+	}
 }
 
 // configFile is the shape written to disk. It is separate from config.Config so
@@ -665,6 +689,7 @@ type machineFile struct {
 	User     string   `yaml:"user"`
 	Port     int      `yaml:"port"`
 	Key      string   `yaml:"key,omitempty"`
+	AgentKey string   `yaml:"agent_key,omitempty"`
 	Packages []string `yaml:"packages,omitempty"`
 }
 

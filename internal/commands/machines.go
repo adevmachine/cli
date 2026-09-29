@@ -213,7 +213,9 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err != nil {
 		return err
 	}
-	m.Key = key.Path
+	if err := recordKey(dir, &m, key); err != nil {
+		return err
+	}
 	m.Packages = startingPackages(ctx, dir, current.Packages, opts.noEssentials, out)
 
 	if err := config.AddMachine(dir, m); err != nil {

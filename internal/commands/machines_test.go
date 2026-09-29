@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/keys"
 )
 
 // withoutLima empties PATH, which is the only honest way to meet the machine
@@ -89,6 +90,34 @@ func TestMachinesAddBootstrapsAndWritesTheNewMachine(t *testing.T) {
 	}
 	if cfg.Domain != "example.com" {
 		t.Fatalf("the rest of the configuration changed: %q", cfg.Domain)
+	}
+}
+
+func TestMachinesAddRecordsTheChosenAgentKey(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	stubBootstrap(t, bootstrapStubs{keyWorks: false, agent: []keys.Offered{
+		{Fingerprint: "SHA256:bbbb", Comment: "bob key", PublicKey: "ssh-ed25519 AAAAagent bob key"},
+	}})
+
+	out, err := executeWithInput(t, "sandbox\n198.51.100.7\nroot\n2222\n3\ndevmachine\n",
+		"--config", dir, "machines", "add")
+	if err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := cfg.Machines[1]
+	if added.Key != "" {
+		t.Fatalf("key = %q, want empty", added.Key)
+	}
+	if added.AgentKey != "ssh-ed25519 AAAAagent bob key" {
+		t.Fatalf("agent_key = %q, want the chosen key", added.AgentKey)
+	}
+	if _, err := os.Stat(added.AgentKeyFile); err != nil {
+		t.Fatalf("the agent key file was not written: %v", err)
 	}
 }
 

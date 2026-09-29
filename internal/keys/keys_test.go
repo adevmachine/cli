@@ -184,3 +184,63 @@ func TestPublicForSaysWhereToLookForAKeyItCannotRead(t *testing.T) {
 		t.Fatalf("the error does not name the file: %v", err)
 	}
 }
+
+func TestWriteAgentWritesThePublicKeyAtItsDeterministicPath(t *testing.T) {
+	dir := t.TempDir()
+	public := "ssh-ed25519 AAAAagent alice laptop"
+
+	path, err := WriteAgent(dir, "main", public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != AgentFile(dir, "main") {
+		t.Fatalf("path = %q, want %q", path, AgentFile(dir, "main"))
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != public {
+		t.Fatalf("got %q, want %q", body, public)
+	}
+}
+
+func TestWriteAgentCreatesTheDirectoryItWritesInto(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "not-yet-there")
+
+	if _, err := WriteAgent(dir, "main", "ssh-ed25519 AAAAagent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(AgentFile(dir, "main")); err != nil {
+		t.Fatalf("the file was not written: %v", err)
+	}
+}
+
+func TestWriteAgentRefusesANameThatEscapesTheDirectory(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, err := WriteAgent(dir, "../elsewhere", "ssh-ed25519 AAAAagent"); err == nil {
+		t.Fatal("a name that escapes the directory was accepted")
+	}
+}
+
+func TestWriteAgentOverwritesAStaleFile(t *testing.T) {
+	// Choosing a different agent key for the same machine replaces the
+	// authorized fingerprint, not adds to it.
+	dir := t.TempDir()
+	if _, err := WriteAgent(dir, "main", "ssh-ed25519 AAAAold old key"); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := WriteAgent(dir, "main", "ssh-ed25519 AAAAnew new key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != "ssh-ed25519 AAAAnew new key" {
+		t.Fatalf("got %q", body)
+	}
+}

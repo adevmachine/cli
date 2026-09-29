@@ -41,15 +41,41 @@ SSH agent and load one.
 ## It used to connect, and now it does not
 
 **What it means:** If you recently added keys to your SSH agent, that is very
-likely the cause. A server gives up after a few tries, and an agent holding
-many keys can use them all up before it reaches the one that works.
+likely the cause, and only on a machine with neither `key:` nor
+`agent_key:` in its configuration. A server gives up after a few tries, and
+an agent holding many keys can use them all up before it reaches the one
+that works.
 
-devmachine avoids this by offering one key at a time. Plain `ssh`, and
-anything else on your computer, does not. Setting `key:` on the server makes
-devmachine immune to whatever your agent is holding.
+A machine with `key:` or `agent_key:` set is immune to this: devmachine
+offers that one key and nothing else. Plain `ssh`, and anything else on
+your computer, is not — it still asks the agent for everything it holds.
 
-**What to do:** Set `key:` on the server. Full explanation:
+**What to do:** On a machine with neither field yet, `devmachine setup` and
+`devmachine machines add` only choose a key the first time — run them again
+on an existing machine and they resume, without asking. Set the field by
+hand in `config.yml` instead: `key: <path>` for a file, or
+`agent_key: <public key line>` (`ssh-add -L` lists what your agent holds,
+in that format) for one from the agent. Full explanation:
 [SSH and authentication](how-it-works/ssh-and-authentication.md).
+
+## "the SSH agent does not hold the key … that this machine logs in with"
+
+**What it means:** The machine's `agent_key:` names a key your SSH agent is
+not currently offering — the password manager it lives in is locked, or
+`SSH_AUTH_SOCK` points at a different agent than the one that key is in.
+
+**What to do:** Unlock the password manager (1Password, say) and try
+again. If that does not fix it, check `SSH_AUTH_SOCK`:
+
+```
+echo $SSH_AUTH_SOCK
+ssh-add -l
+```
+
+Compare the fingerprint `ssh-add -l` lists against the one the error
+names. If they never match, `agent_key:` in `config.yml` names the wrong
+key: replace it by hand with the line `ssh-add -L` prints for the key you
+meant.
 
 ## "ansible-playbook is not on the machine"
 
