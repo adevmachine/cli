@@ -11,6 +11,7 @@ its own.
 | `config.yml` | machines, workspaces, packages, settings | **yes** |
 | `packages.lock` | the resolved package versions | **yes** |
 | `known_hosts` | public SSH host identities you approved | **yes** |
+| `AGENTS.md` | rules for a coding agent working in this folder | **yes** |
 | `keys/` | private SSH keys | **never** |
 | `secrets.json` | the keyring fallback, in the clear | **never** |
 | `cache/` | downloaded package trees | **never** |

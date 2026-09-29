@@ -587,6 +587,71 @@ func TestSetupWritesAConfigurationThatLoads(t *testing.T) {
 	}
 }
 
+func TestSetupWritesAgentsMdForANewConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if _, err := runSetupIn(t, dir,
+		answers("sandbox", "198.51.100.7", "root", "2222", "", "1"),
+		setupOptions{}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, agentsFileName))
+	if err != nil {
+		t.Fatalf("AGENTS.md was not written: %v", err)
+	}
+	if string(body) != agentsTemplate {
+		t.Fatalf("AGENTS.md = %q, want the template", body)
+	}
+}
+
+func TestSetupLeavesAnExistingAgentsMdUntouched(t *testing.T) {
+	dir := t.TempDir()
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	custom := "# AGENTS.md\n\nmy own rules\n"
+	if err := os.WriteFile(filepath.Join(dir, agentsFileName), []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runSetupIn(t, dir,
+		answers("sandbox", "198.51.100.7", "root", "2222", "", "1"),
+		setupOptions{}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, agentsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != custom {
+		t.Fatalf("AGENTS.md was overwritten: %q", body)
+	}
+}
+
+func TestSetupResumingWritesNoAgentsMd(t *testing.T) {
+	dir := t.TempDir()
+	original := []byte("machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	if err := os.WriteFile(filepath.Join(dir, config.FileName), original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(swap(&dial, func(_ context.Context, m config.Machine, user string) (remote.Client, string, error) {
+		return nopClient{}, m.Hosts[0].Address, nil
+	}))
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error { return nil }))
+
+	if _, err := runSetupIn(t, dir, answers(), setupOptions{machine: "main"}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, agentsFileName)); err == nil {
+		t.Fatal("resuming setup wrote AGENTS.md")
+	} else if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+}
+
 func TestSetupTakesTheDefaultsOnEmptyAnswers(t *testing.T) {
 	dir := t.TempDir()
 	stubBootstrap(t, bootstrapStubs{keyWorks: true})

@@ -43,6 +43,10 @@ time](../how-it-works/trust-bootstrap.md) for why the order matters.
 Works on **Debian and Ubuntu** only; elsewhere it names your distro and
 stops. The password is used once and written nowhere.
 
+With no `config.yml` yet, it also writes `AGENTS.md` if none exists, telling
+a coding agent how to work in this folder — it never overwrites one already
+there.
+
 | Flag | Meaning |
 | --- | --- |
 | `--force` | discard the existing configuration and start over |
@@ -63,8 +67,8 @@ devmachine setup git [--yes] [--check]
 ```
 
 Turns your configuration directory into a git repository, so you can push
-it to a private remote. `config.yml`, `packages.lock` and `known_hosts`
-are committed — see [versioning your
+it to a private remote. `config.yml`, `packages.lock`, `known_hosts` and
+`AGENTS.md` are committed — see [versioning your
 configuration](../how-it-works/versioning-your-configuration.md) for what
 never is.
 

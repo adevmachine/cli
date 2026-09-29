@@ -189,6 +189,10 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	}
 	fmt.Fprintf(out, "\nwrote %s\n\n", path)
 
+	if err := writeAgentsFile(dir); err != nil {
+		return err
+	}
+
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
 		return err
 	}
@@ -207,10 +211,10 @@ func nextAfterSetup(machinePackages []string) string {
 		note = "The machine starts with the essentials: base tools, git, a firewall and Caddy.\n" +
 			"To start bare instead, remove `essentials` from config.yml, or run setup with --no-essentials.\n"
 	}
-	return "\n" + note + `
+	return "\n" + note + "AGENTS.md tells coding agents how to work in this folder.\n" + `
 Next:
-  devmachine workspaces new alice   your first workspace (any name)
-  devmachine sync                   build it all on the server
+  devmachine workspaces new acme   your first workspace (any name)
+  devmachine sync                  build it all on the server
 `
 }
 

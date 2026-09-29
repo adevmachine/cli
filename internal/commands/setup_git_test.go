@@ -175,6 +175,20 @@ func TestSetupGitCommitsThePublicTrustStoreButNotThePrivateKey(t *testing.T) {
 	}
 }
 
+func TestSetupGitCommitsAgentsMd(t *testing.T) {
+	dir := configDirWithSecrets(t)
+	mustWrite(t, filepath.Join(dir, agentsFileName), agentsTemplate)
+	withoutGh(t)
+
+	if _, err := execute(t, "--config", dir, "setup", "git", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(trackedFiles(t, dir), agentsFileName) {
+		t.Fatalf("the first commit does not carry %s: %#v", agentsFileName, trackedFiles(t, dir))
+	}
+}
+
 func TestSetupGitStopsOnADirectoryThatAlreadyTracksAKey(t *testing.T) {
 	dir := repoAlreadyTracking(t, "keys/id_ed25519")
 	withoutGh(t)

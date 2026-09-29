@@ -42,10 +42,13 @@ Open a coding agent there when the configuration itself is the work:
   setup.
 - **Reading the history.** With [git set up](how-it-works/versioning-your-configuration.md),
   every change the CLI makes is a commit.
-- **Your own rules.** A `CLAUDE.md` or `AGENTS.md` in this folder loads only
-  in a session opened here. Put in it what your agent must know about your
-  setup: which machine is production, what to ask before touching it, notes
-  about your network.
+- **Your own rules.** `setup` writes an `AGENTS.md` here the first time it
+  writes a configuration. Edit it: what your agent must know about your
+  setup, which machine is production, what to ask before touching it, notes
+  about your network. Codex, Pi, OpenCode and Claude Code (with a recent
+  enough version, or its skills) all read it in a session opened here. An
+  older Claude Code that only reads `CLAUDE.md` picks it up too, with a
+  one-line `CLAUDE.md` here containing `@AGENTS.md`.
 
 In short: to use devmachine, ask from where you are. To change devmachine,
 open a session in its folder.
