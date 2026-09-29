@@ -1,0 +1,33 @@
+docs/examples/cloudflare-dns.md
+  s_a0cbf6c120c4f8::t_de26a7c238e7b3 1-125
+docs/index.md
+  s_a0cbf6c120c4f8::t_a7cf350c5f0765 25-26,49-52,69-70
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_a7cf350c5f0765 44-51
+docs/examples/headscale.md
+  s_a0cbf6c120c4f8::t_f2426e1823f449 1-142
+docs/examples/ruby-on-rails.md
+  s_a0cbf6c120c4f8::t_069e8ccfa90892 1-126
+docs/upgrade.md
+  s_a0cbf6c120c4f8::t_2756dcf479a016 1-90
+docs/concepts/private-networks.md
+  s_a0cbf6c120c4f8::t_dc4de04c39209f 1-111
+docs/examples/logins-and-secrets.md
+  s_a0cbf6c120c4f8::t_248c2e28754fb4 1-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ffe6fac4fd3ae75ed6cc140e3d6a451031796e04",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
