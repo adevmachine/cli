@@ -1,11 +1,17 @@
 package commands
 
 import (
+	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
+	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
+	"golang.org/x/crypto/ssh"
 )
 
 // loggingIn drives a login without opening a session and without a machine: it
@@ -176,6 +182,112 @@ func TestLoginTrustsTheMachineTheSameWayEveryOtherCommandDoes(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("login does not enforce %q: %#v", want, args)
 		}
+	}
+}
+
+// configWithTailscaleCredential is a machine with a `tailscale` login of its
+// own, so `login tailscale` has something to log into.
+func configWithTailscaleCredential(t *testing.T) string {
+	t.Helper()
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [tailscale-pkg]\n")
+	writeCredentialPackage(t, dir, "tailscale-pkg", packages.ScopeMachine,
+		"  - name: tailscale\n    kind: manual\n    scope: machine\n    command: tailscale up\n")
+	key := commandHostKey(t)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, key); err != nil {
+		t.Fatal(err)
+	}
+	wasScan := scanHostKey
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		return key, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { scanHostKey = wasScan })
+	return dir
+}
+
+func TestLoginTailscalePrependsTheMachinesTailnetName(t *testing.T) {
+	captureInteractive(t)
+	client := &recordingRemote{out: `{"Self":{"HostName":"main-abc123"}}`}
+	dialing(t, client)
+	dir := configWithTailscaleCredential(t)
+
+	out, err := execute(t, "--config", dir, "login", "tailscale")
+	if err != nil {
+		t.Fatalf("login returned %v", err)
+	}
+	if !strings.Contains(out, "tailscale:main-abc123") {
+		t.Fatalf("did not say what it added: %q", out)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Hosts) != 2 || m.Hosts[0].Address != "tailscale:main-abc123" || m.Hosts[1].Address != "203.0.113.10" {
+		t.Fatalf("hosts = %#v", m.Hosts)
+	}
+}
+
+func TestLoginTailscaleWithoutAReadableNameSaysHowToAddItByHand(t *testing.T) {
+	captureInteractive(t)
+	client := &recordingRemote{out: `not json`}
+	dialing(t, client)
+	dir := configWithTailscaleCredential(t)
+
+	out, err := execute(t, "--config", dir, "login", "tailscale")
+	if err != nil {
+		t.Fatalf("login returned %v", err)
+	}
+	if !strings.Contains(out, "tailscale:<name>") {
+		t.Fatalf("did not say how to add it by hand: %q", out)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Hosts) != 1 {
+		t.Fatalf("hosts = %#v, want nothing added", m.Hosts)
+	}
+}
+
+func TestLoginTailscaleSkipsAnAddressAlreadyPresent(t *testing.T) {
+	captureInteractive(t)
+	client := &recordingRemote{out: `{"Self":{"HostName":"main-abc123"}}`}
+	dialing(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [tailscale:main-abc123, 203.0.113.10]\n    packages: [tailscale-pkg]\n")
+	writeCredentialPackage(t, dir, "tailscale-pkg", packages.ScopeMachine,
+		"  - name: tailscale\n    kind: manual\n    scope: machine\n    command: tailscale up\n")
+	key := commandHostKey(t)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("main", 22, key); err != nil {
+		t.Fatal(err)
+	}
+	scanHostKey = func(context.Context, config.Machine) (ssh.PublicKey, string, error) {
+		return key, "203.0.113.10", nil
+	}
+	t.Cleanup(func() { scanHostKey = remote.ScanHostKey })
+
+	out, err := execute(t, "--config", dir, "login", "tailscale")
+	if err != nil {
+		t.Fatalf("login returned %v", err)
+	}
+	if !strings.Contains(out, "already in") {
+		t.Fatalf("did not say it was already there: %q", out)
 	}
 }
 

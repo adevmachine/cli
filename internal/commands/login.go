@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -66,7 +68,88 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 		cmd.Printf("logged in as %s\n", tgt.login())
 		return nil
 	}
+	if d.Name == tailscalePackage {
+		return finishTailscaleLogin(cmd, opts, found.machine)
+	}
 	return keepForTheWorkspaces(cmd, found.machine, d)
+}
+
+// tailscaleStatusCommand asks a machine's own tailscale for its status. It is
+// the same shape `tailscale status --json` gives everywhere: this is how the
+// CLI learns the name the machine answers to on the tailnet, which is what a
+// `tailscale:<name>` host entry has to match.
+const tailscaleStatusCommand = "tailscale status --json"
+
+// finishTailscaleLogin is what makes `devmachine login tailscale` more than a
+// login: once the machine has signed in, it can say what it is called on the
+// tailnet, and that name is what turns into a private address in the
+// configuration — automatically, because asking somebody to copy a hostname
+// out of JSON is not a step anyone should have to do by hand.
+func finishTailscaleLogin(cmd *cobra.Command, opts *options, m config.Machine) error {
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return err
+	}
+
+	client, _, err := dial(cmd.Context(), m, "")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	byHand := fmt.Sprintf(
+		"logged in. Add this line above the public address, under %s in config.yml, to reach it that way too:\n  tailscale:<name>\n",
+		m.Name)
+
+	out, err := client.Run(cmd.Context(), tailscaleStatusCommand)
+	if err != nil {
+		cmd.Printf("logged in, but could not read its tailnet name (%v).\n", err)
+		cmd.Print(byHand)
+		return nil
+	}
+	name, err := tailscaleSelfHostName(out)
+	if err != nil {
+		cmd.Printf("logged in, but could not read its tailnet name from `%s` (%v).\n", tailscaleStatusCommand, err)
+		cmd.Print(byHand)
+		return nil
+	}
+
+	entry := "tailscale:" + name
+	for _, h := range m.Hosts {
+		if h.Address == entry {
+			cmd.Printf("logged in; %s is already in %s's hosts.\n", entry, m.Name)
+			return nil
+		}
+	}
+
+	addresses := make([]string, 0, len(m.Hosts)+1)
+	addresses = append(addresses, entry)
+	for _, h := range m.Hosts {
+		addresses = append(addresses, h.Address)
+	}
+	if err := config.SetMachineHosts(dir, m.Name, addresses); err != nil {
+		return err
+	}
+	cmd.Printf("logged in; added %s above the public address for %s. The public address stays as a fallback.\n",
+		entry, m.Name)
+	return nil
+}
+
+// tailscaleSelfHostName reads the name the machine answers to on the
+// tailnet out of its own `tailscale status --json`.
+func tailscaleSelfHostName(body string) (string, error) {
+	var status struct {
+		Self struct {
+			HostName string `json:"HostName"`
+		} `json:"Self"`
+	}
+	if err := json.Unmarshal([]byte(body), &status); err != nil {
+		return "", fmt.Errorf("parsing the tailscale status: %w", err)
+	}
+	if status.Self.HostName == "" {
+		return "", errors.New("the tailscale status did not name the machine")
+	}
+	return status.Self.HostName, nil
 }
 
 // loginArgs is the session the login runs in.
