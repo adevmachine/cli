@@ -381,6 +381,11 @@ just rebuilt the server on purpose, run
 without writing, and `--yes` to skip confirmation — that never substitutes
 for `--replace`.
 
+`run` can keep working for up to five minutes after the key changes. It
+reuses the connection it opened last time, which was checked when it was
+opened and still goes to the same server. The first new connection after
+that checks the key again and stops with this error.
+
 ## The SSH trust file is malformed
 
 **What it means:** The error names `<config>/known_hosts` and the bad line.

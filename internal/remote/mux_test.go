@@ -241,3 +241,34 @@ func TestMuxClientUploadReturnsAClearError(t *testing.T) {
 		t.Fatal("expected Upload to refuse")
 	}
 }
+
+func TestMuxClientStopsAtARefusedHostKeyAndSaysSo(t *testing.T) {
+	fakeCacheDir(t)
+	m := muxTestMachine(t)
+	m.Hosts = append(m.Hosts, config.Host{Address: "203.0.113.11"})
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\necho x >> " + calls + "\necho 'Host key verification failed.' >&2\nexit 255\n"
+	if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	origLookPath := lookPath
+	lookPath = func(string) (string, error) { return fakeSSH, nil }
+	t.Cleanup(func() { lookPath = origLookPath })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Run(context.Background(), "true")
+	if !errors.Is(err, ErrHostKeyRejected) {
+		t.Fatalf("got %v, want ErrHostKeyRejected", err)
+	}
+	body, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(body), "x"); n != 1 {
+		t.Fatalf("ssh ran %d times, want 1: a refused key must not fall through to the next address", n)
+	}
+}

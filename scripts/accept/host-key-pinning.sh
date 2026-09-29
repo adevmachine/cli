@@ -110,6 +110,16 @@ done
 printf '%s\n' "$SCAN" > "$SCENARIO_DIR/stabilize.log"
 [ "$STABLE_SCANS" -eq 3 ] || die "the rotated SSH daemon never presented the new key consistently: $SCAN"
 
+# `run` keeps its SSH connection open for a few minutes, and restarting sshd
+# does not end it. Reusing it performs no handshake, so it would never meet the
+# new key; close it so the next command has to verify the server again.
+case "$(uname -s)" in
+  Darwin) CONTROL_DIR="$HOME/Library/Caches/devmachine/cm" ;;
+  *) CONTROL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/devmachine/cm" ;;
+esac
+ssh -o ControlPath="$CONTROL_DIR/%C" -p "$PORT" -O exit root@127.0.0.1 \
+  >"$SCENARIO_DIR/close-master.log" 2>&1 || true
+
 CHANGED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true 2>&1)
 CHANGED_STATUS=$?
 printf '%s\n' "$CHANGED" > "$SCENARIO_DIR/run-changed.log"

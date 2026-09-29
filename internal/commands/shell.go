@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -218,7 +219,7 @@ func newRunCmd(opts *options) *cobra.Command {
 			if out != "" {
 				cmd.Print(out)
 			}
-			return err
+			return explainHostKey(cmd.Context(), tgt.machine, err)
 		},
 	}
 	c.Flags().StringVar(&workspace, "workspace", "", "run inside this workspace instead of as the machine's admin")
@@ -271,5 +272,18 @@ func runPackage(cmd *cobra.Command, opts *options, name, workspace string, args 
 	if out.Len() > 0 {
 		cmd.Print(out.String())
 	}
-	return callErr
+	return explainHostKey(cmd.Context(), tgt.machine, callErr)
+}
+
+// explainHostKey turns ssh's bare refusal into what changed and how to fix it.
+// The check runs only after a refusal, so the connection `run` reuses between
+// calls stays free of an extra handshake.
+func explainHostKey(ctx context.Context, m config.Machine, err error) error {
+	if !errors.Is(err, remote.ErrHostKeyRejected) {
+		return err
+	}
+	if verr := verifySystemHost(ctx, m); verr != nil {
+		return verr
+	}
+	return err
 }

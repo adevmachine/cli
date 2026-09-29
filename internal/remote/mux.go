@@ -127,7 +127,8 @@ func (c *muxClient) Close() error { return nil }
 // OpenSSH's own ssh distinguishes the two failure shapes this needs: exit
 // 255 is ssh's code for "never reached the machine" (bad address, refused
 // connection, failed handshake), so that address is dropped in favour of the
-// next one. Any other exit status is the remote command's own, and is
+// next one — unless ssh refused the host key: that is the answer, and trying
+// another address would hide it. Any other exit status is the remote command's own, and is
 // returned the same way sshClient.Run returns one: the error wraps it, and
 // stdout still holds whatever the command printed before it failed.
 func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -151,6 +152,9 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 		}
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) && exitErr.ExitCode() == 255 {
+			if strings.Contains(errBuf.String(), "Host key verification failed") {
+				return fmt.Errorf("machine %q at %s: %w", c.machine, address, ErrHostKeyRejected)
+			}
 			failures = append(failures, fmt.Sprintf("%s (%s)", address, strings.TrimSpace(errBuf.String())))
 			continue
 		}

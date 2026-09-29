@@ -162,6 +162,11 @@ var ErrHostKeyUnknown = errors.New("the SSH host key is not trusted")
 // ErrHostKeyChanged says the machine presented a key different from its pin.
 var ErrHostKeyChanged = errors.New("the SSH host key changed")
 
+// ErrHostKeyRejected says the system ssh refused the machine's host key. It
+// does not say why — changed or never trusted — so a caller that wants to tell
+// the person runs the same check `ssh` does to find out.
+var ErrHostKeyRejected = errors.New("the system ssh refused the SSH host key")
+
 // Auth says how to authenticate. Exactly one field is set.
 //
 // Never more than one: a server counts every method offered against

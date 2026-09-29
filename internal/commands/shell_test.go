@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -492,5 +493,33 @@ func TestExecCommandContextKillsTheChildItStarted(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the child outlived the context")
+	}
+}
+
+func TestRunExplainsARefusedHostKey(t *testing.T) {
+	dialing(t, fakeRemote{err: fmt.Errorf("machine %q: %w", "main", remote.ErrHostKeyRejected)})
+	verifySystemHost = func(context.Context, config.Machine) error {
+		return fmt.Errorf("%w for machine %q: run `devmachine machines trust main --replace`", remote.ErrHostKeyChanged, "main")
+	}
+	t.Cleanup(func() { verifySystemHost = realVerifySystemHost })
+	dir := configWith(t, twoMachineConfig)
+
+	_, err := execute(t, "--config", dir, "--machine", "main", "run", "true")
+	if !errors.Is(err, remote.ErrHostKeyChanged) || !strings.Contains(err.Error(), "--replace") {
+		t.Fatalf("got %v, want the explained host key change", err)
+	}
+}
+
+func TestRunPackageExplainsARefusedHostKey(t *testing.T) {
+	dir := configDirWithProvider(t, "cloudflare", `print("unused")`)
+	dialing(t, fakeRemote{err: fmt.Errorf("machine %q: %w", "main", remote.ErrHostKeyRejected)})
+	verifySystemHost = func(context.Context, config.Machine) error {
+		return fmt.Errorf("%w for machine %q: run `devmachine machines trust main --replace`", remote.ErrHostKeyChanged, "main")
+	}
+	t.Cleanup(func() { verifySystemHost = realVerifySystemHost })
+
+	_, err := execute(t, "--config", dir, "run", "--package", "cloudflare", "--", "zones")
+	if !errors.Is(err, remote.ErrHostKeyChanged) {
+		t.Fatalf("got %v, want the explained host key change", err)
 	}
 }
