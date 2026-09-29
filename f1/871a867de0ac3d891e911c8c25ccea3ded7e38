@@ -1,0 +1,69 @@
+docs/examples/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 17
+docs/examples/wuzapi-as-your-own-package.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 15
+docs/examples/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 13
+docs/examples/claude-24-7-in-telegram.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 26
+docs/upgrade.md
+  s_a0cbf6c120c4f8::t_73680c2fe5e5ae 11,15-17
+docs/examples/keep-sessions-running.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 13
+docs/examples/a-local-vm-with-lima.md
+  s_a0cbf6c120c4f8::t_c442a9e0bce0b7 16
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_29caeb7c231b5e 12,17-19
+docs/examples/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 19
+docs/examples/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/headscale.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 22
+README.md
+  s_a0cbf6c120c4f8::t_7cc022ddbd2640 11
+docs/examples/openclaw-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/cloudflare-dns.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 15
+docs/examples/hermes-agent-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 13
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 21
+docs/examples/ruby-on-rails.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/pi-coding-agent.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/ssh-or-mosh.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 13
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_221523bbb03f8b 31-39
+docs/examples/claude-that-never-sleeps.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 20
+docs/examples/logins-and-secrets.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+docs/examples/shared-skills-for-every-workspace.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 19
+docs/examples/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_29f7ec8975ef35 14
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_380cfa5009e776 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f1871a867de0ac3d891e911c8c25ccea3ded7e38",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
