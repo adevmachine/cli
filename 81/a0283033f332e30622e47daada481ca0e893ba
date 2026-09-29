@@ -1,0 +1,23 @@
+scripts/accept/host-key-pinning.sh
+  s_a0cbf6c120c4f8::t_51bad94c8cd3f0 61,72
+scripts/accept/v06-expose-tunnel.sh
+  s_a0cbf6c120c4f8::t_51bad94c8cd3f0 95
+scripts/accept/v05-packages-credentials-dns.sh
+  s_a0cbf6c120c4f8::t_51bad94c8cd3f0 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "81a0283033f332e30622e47daada481ca0e893ba",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
