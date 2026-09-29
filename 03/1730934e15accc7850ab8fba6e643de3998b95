@@ -1,0 +1,32 @@
+docs/concepts/reaching-your-server.md
+  s_a0cbf6c120c4f8::t_00f2a4879e5fda 29-39
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_53a220e55e3975 475-477,490-518
+  s_a0cbf6c120c4f8::t_13ed75cac19830 114-123
+  s_a0cbf6c120c4f8::t_4bc87557218fba 564-566
+  s_a0cbf6c120c4f8::t_bfcee4b58d2b82 519,567
+docs/examples/logins-and-secrets.md
+  s_a0cbf6c120c4f8::t_12fe60d2783775 128-154
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_96c44360f816ce 124-139
+  s_a0cbf6c120c4f8::t_b011692117d2b8 194-215
+  s_a0cbf6c120c4f8::t_8675de874bc972 216
+docs/concepts/credentials.md
+  s_a0cbf6c120c4f8::t_9c4d7f800bd377 69-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "031730934e15accc7850ab8fba6e643de3998b95",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
