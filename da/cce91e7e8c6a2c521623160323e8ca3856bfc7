@@ -1,0 +1,39 @@
+internal/commands/credentials.go
+  s_a0cbf6c120c4f8::t_2b0ef02ba6b173 298-304,314-318,328-333,359-371,379-385,387-389,410-437
+  s_a0cbf6c120c4f8::t_b50f9035b4719e 260-262
+  s_a0cbf6c120c4f8::t_6218a56080d0d2 52,80-118
+  s_a0cbf6c120c4f8::t_cf754365643b8b 438,477-484
+internal/secrets/workspace.go
+  s_a0cbf6c120c4f8::t_f345f7955faff2 1-136
+internal/commands/secrets.go
+  s_a0cbf6c120c4f8::t_98f46445de41fe 12
+  s_a0cbf6c120c4f8::t_b61c553f044ba0 68-69,75-82,90,102,111-132,135-148,153-157,161-192,194-196,199-201,211-231,235-237,239-247,252-262,266-269,272-275,281-310,313,317-320
+  s_a0cbf6c120c4f8::t_96089dde8a5e9d 5
+internal/credentials/dotenv_test.go
+  s_a0cbf6c120c4f8::t_6d2f6e5a1298e9 119,169,180
+  s_a0cbf6c120c4f8::t_b78d41f0f63799 1-118,120-168,170-179,181-238
+internal/credentials/dotenv.go
+  s_a0cbf6c120c4f8::t_e9e3aabec5aeca 1-232
+internal/commands/secrets_workspace_test.go
+  s_a0cbf6c120c4f8::t_2da2f7e0871937 1-308
+internal/commands/credentials_test.go
+  s_a0cbf6c120c4f8::t_12e1ef137b7d0e 265-270
+internal/secrets/workspace_test.go
+  s_a0cbf6c120c4f8::t_498c26138104b7 1-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dacce91e7e8c6a2c521623160323e8ca3856bfc7",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
