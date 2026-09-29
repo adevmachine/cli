@@ -40,6 +40,7 @@ Real setups, done in a few steps. Start at [the list](examples/index.md).
 - [Hermes Agent, in its own sandbox](examples/hermes-agent-in-its-own-sandbox.md)
 - [Agno AgentOS with a control plane](examples/agno-agentos-with-control-plane.md)
 - [wuzapi as your own package](examples/wuzapi-as-your-own-package.md)
+- [Log in with your 1Password SSH key](examples/log-in-with-1password.md)
 
 ## Concepts
 

@@ -33,3 +33,5 @@ session. Only a reboot stops it.
   an agent API and its dashboard, each on its own subdomain.
 - [wuzapi as your own package](wuzapi-as-your-own-package.md) — a WhatsApp API
   written once as a package, running on two machines.
+- [Log in with your 1Password SSH key](log-in-with-1password.md) — keep the
+  key in your vault, and approve each use with Touch ID.

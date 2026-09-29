@@ -2,13 +2,18 @@
 
 ## devmachine logs in with one key, not all of yours
 
-If a machine has a `key:` in your configuration, devmachine uses that key.
-If not, it asks your SSH agent. It never tries every key you have.
+If a machine has a `key:` in your configuration, devmachine uses that key,
+and only that key. The key `setup` makes for you is always used this way.
 
 The reason: a server lets you try only a few times — six, usually — and
-then hangs up. If devmachine tried every key in your agent, it could use
-up those tries on the wrong keys before reaching the right one, and you
-would get a refusal that makes no sense.
+then hangs up. Offering every key you have could use up those tries on the
+wrong keys before reaching the right one, and you would get a refusal that
+makes no sense.
+
+With no `key:`, devmachine asks your SSH agent instead, and the agent
+offers the keys it holds, one after another. An agent with many keys, such
+as a password manager's, can run into that limit. Limit what the agent
+offers — see [logging in with your 1Password SSH key](../examples/log-in-with-1password.md).
 
 ## Two different programs
 

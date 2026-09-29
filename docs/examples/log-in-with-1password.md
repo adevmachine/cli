@@ -1,0 +1,124 @@
+# Log in with your 1Password SSH key
+
+Keep the key devmachine logs in with inside 1Password, instead of a file on
+your disk. 1Password's SSH agent hands the key over when devmachine needs
+it, and asks you to approve with Touch ID or your password.
+
+If you do not already keep SSH keys in 1Password, you do not need this: the
+key `setup` makes for devmachine is simpler, and just as safe.
+
+**You need:** a Debian or Ubuntu VPS, 1Password 8 on your computer, and an
+SSH key saved in 1Password.
+
+## Before you start: machine, skills, workspace
+
+Do steps 1 to 3 below first. `setup` needs the agent running to offer its
+keys.
+
+```
+brew install mydevmachine/tap/devmachine
+devmachine setup
+devmachine skills add
+devmachine workspaces new alice
+devmachine sync
+```
+
+Already have a machine? See step 4 for moving it to the 1Password key. See
+[getting started](../getting-started.md) for what each command does.
+
+## By hand
+
+### 1. Turn on the 1Password SSH agent
+
+In 1Password, open **Settings → Developer** and turn on **Use the SSH
+agent**.
+
+### 2. Point your terminal at it
+
+Add one line to `~/.zshrc` (or `~/.bashrc`), then open a new terminal.
+
+On macOS:
+
+```
+export SSH_AUTH_SOCK=~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
+```
+
+On Linux:
+
+```
+export SSH_AUTH_SOCK=~/.1password/agent.sock
+```
+
+`ssh-add -l` now lists the keys 1Password offers.
+
+### 3. Offer only the key devmachine uses
+
+A server hangs up after about six wrong keys. Without a `key:` in your
+configuration, devmachine offers the agent's keys one after another, so a
+vault with many keys can use up those tries before reaching the right one.
+The error says "Too many authentication failures".
+
+Tell 1Password which key to offer, in `~/.config/1Password/ssh/agent.toml`:
+
+```toml
+[[ssh-keys]]
+item = "devmachine"
+vault = "Private"
+```
+
+`item` is the key's name in 1Password, `vault` the vault it is in. Add one
+`[[ssh-keys]]` block per key you still want the agent to offer, such as
+your GitHub key.
+
+### 4. Choose the key in `setup`
+
+```
+devmachine setup
+```
+
+When it asks how the CLI should log in, pick the line that ends in
+`(from the SSH agent)` with your key's fingerprint. `setup` installs that
+key on the server, proves it works, and turns password logins off, as usual.
+It leaves `key:` out of the configuration, and that is what tells
+devmachine to ask the agent every time.
+
+For a machine you already set up with another key: add the 1Password
+key's public half to the server's `/root/.ssh/authorized_keys`, then delete
+the machine's `key:` line from `config.yml`.
+
+### 5. Use it
+
+```
+devmachine ssh alice
+```
+
+1Password asks you to approve, and the session opens. `devmachine ssh` and
+`mosh` run the system `ssh`, which reads the same `SSH_AUTH_SOCK`.
+`devmachine run` keeps its connection open for five minutes, so a few
+commands in a row ask only once.
+
+A program you open from the Dock or a launcher does not read your
+`~/.zshrc`. If it calls devmachine for you, it has to set `SSH_AUTH_SOCK`
+to the path in step 2 itself.
+
+## With your agent
+
+Steps 1 and 3 happen in 1Password, and step 4's choice is yours, so do those
+by hand. Then, in a new Claude Code or Codex session on your computer:
+
+```text
+Check that devmachine logs in with my 1Password SSH key: run
+devmachine doctor and tell me what it says.
+```
+
+The agent runs `devmachine doctor`. 1Password asks you to approve, and every
+line should pass. If one says the login was refused, the agent can list
+the agent's keys with `ssh-add -l` and compare them with the key `setup`
+installed.
+
+**Check it:** `devmachine doctor` passes, and 1Password showed an approval
+prompt for it.
+
+Source: [1Password — SSH agent](https://www.1password.dev/ssh/agent/),
+[1Password — advanced use](https://www.1password.dev/ssh/agent/advanced),
+[1Password — agent config file](https://www.1password.dev/ssh/agent/config)
