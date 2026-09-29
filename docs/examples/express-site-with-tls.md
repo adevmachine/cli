@@ -24,18 +24,12 @@ does.
 
 ## By hand
 
-### 1. Add Caddy to the machine
+Caddy came with `setup` (it's in the `essentials` package), and it will
+answer this site and get its own certificate. If your machine was set up
+with `--no-essentials`, or before CLI v0.7.14, add it first: `devmachine
+packages add caddy` then `devmachine sync`.
 
-```
-devmachine packages add caddy
-devmachine sync
-```
-
-Caddy answers every exposed site and gets its own certificate. A new machine
-has no web server, so this step is needed once per machine — skip it if
-`devmachine packages list` already shows `caddy` there.
-
-### 2. Write and start the app
+### 1. Write and start the app
 
 ```
 devmachine ssh alice
@@ -54,7 +48,7 @@ Leave this running and close the terminal: the login is inside tmux, so the
 app keeps going. To make it survive a reboot too, run it under a process
 manager such as [pm2](https://pm2.keymetrics.io/docs/usage/quick-start/).
 
-### 3. Expose the port
+### 2. Expose the port
 
 Back on your own computer:
 
@@ -77,10 +71,11 @@ Set up an Express "hello world" app in my devmachine workspace alice,
 listening on port 3000, and expose it at app.example.com.
 ```
 
-The agent runs the same commands: adds `caddy` if it is missing, writes
-`server.js` over SSH, starts it, then runs `expose add` and `sync`. You still
-approve `sync` when it asks, and if `setup` has not run yet, you check the
-fingerprint yourself — the agent cannot do that part.
+The agent runs the same commands: writes `server.js` over SSH, starts it,
+then runs `expose add` and `sync` (adding `caddy` first only if it's missing
+from the machine). You still approve `sync` when it asks, and if `setup` has
+not run yet, you check the fingerprint yourself — the agent cannot do that
+part.
 
 **Check it:** `curl https://app.example.com` returns "Hello from alice",
 with a valid certificate.

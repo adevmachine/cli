@@ -25,17 +25,18 @@ does.
 
 ## By hand
 
-### 1. Add Docker and Caddy to the machine
+### 1. Add Docker to the machine
 
 ```
 devmachine packages add docker
-devmachine packages add caddy
 devmachine sync
 ```
 
-A new machine has no web server or Docker: `setup` installs no packages on
-the machine itself. Skip what is already there — `devmachine packages list`
-shows each package with your machine's name next to it.
+`setup` already installed Caddy as part of the `essentials` package. If your
+machine was set up with `--no-essentials`, or before CLI v0.7.14, add it by
+hand: `devmachine packages add caddy`. Docker is never in essentials, so you
+always add it yourself. `devmachine packages list` shows each package with
+your machine's name next to it.
 
 ### 2. Put the workspace in the docker group
 
@@ -77,11 +78,12 @@ Run nginx in a Docker container on my devmachine workspace alice,
 publishing on 127.0.0.1:8080, and expose it at site.example.com.
 ```
 
-The agent adds `docker` and `caddy`, puts `alice` in the `docker` group,
-starts the container over SSH, then runs `expose add` and `sync`. You still
-approve `sync` when it asks, and putting a workspace in the `docker` group
-is worth reading before you say yes — it is a lot of trust for one
-container.
+If your machine is missing from the config, or you have more than one, the
+agent asks which one to use. It adds `docker` (and `caddy` too, if `setup`
+ran with `--no-essentials`), puts `alice` in the `docker` group, starts the
+container over SSH, then runs `expose add` and `sync`. You still approve
+`sync` when it asks, and putting a workspace in the `docker` group is worth
+reading before you say yes — it is a lot of trust for one container.
 
 **Check it:** `curl https://site.example.com` serves the nginx welcome
 page, with a valid certificate.

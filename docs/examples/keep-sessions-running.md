@@ -84,7 +84,8 @@ rather land in a plain shell.
 
 ## With your agent
 
-Open a session on your own computer and say:
+Open a session on your own computer (`devmachine skills add` taught it the
+CLI) and say:
 
 ```text
 Add Claude Code to my devmachine workspace alice, sign me in, and start a

@@ -107,7 +107,8 @@ to the path in step 2 itself.
 ## With your agent
 
 Steps 1 and 4 happen in 1Password, and step 3's choice is yours, so do those
-by hand. Then, in a new Claude Code or Codex session on your computer:
+by hand. Then, in a new Claude Code or Codex session on your computer
+(`devmachine skills add` taught it the CLI):
 
 ```text
 Check that devmachine logs in with my 1Password SSH key: run

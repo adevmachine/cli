@@ -127,13 +127,15 @@ the right account when it asks.
 ### 6. A preview URL, if a client wants one
 
 ```
-devmachine packages add caddy
 devmachine expose add globex 3000 --host globex.example.com --publish
 devmachine sync
 ```
 
-`caddy` installs once on the machine and serves every client's preview from
-its own domain — see [publishing](../concepts/publishing.md).
+Caddy came with `setup` (it's in the `essentials` package) and serves every
+client's preview from its own domain — see
+[publishing](../concepts/publishing.md). If your machine was set up with
+`--no-essentials`, or before CLI v0.7.14, add it first: `devmachine packages
+add caddy`.
 
 ## Why this works
 
@@ -169,7 +171,8 @@ they are; take those down by hand if the domain should stop pointing here.
 
 ## With your agent
 
-Open a session on your own computer and say:
+Open a session on your own computer (`devmachine skills add` taught it the
+CLI) and say:
 
 ```text
 Set up a devmachine workspace called globex for a Next.js project: add
@@ -177,11 +180,12 @@ Claude Code, give it Docker for its Redis, pin Node 22 with mise, and expose
 port 3000 at globex.example.com.
 ```
 
-The agent creates the workspace, adds `claude-code`, `docker` and `caddy`,
-puts `globex` in the `docker` group, runs
-`mise use -g node@22` over SSH, then `expose add` and `sync` — showing you
-the plan first. Signing in to GitHub and Claude Code stays yours to do,
-since those are browser and device logins nobody else can finish for you.
+The agent creates the workspace, adds `claude-code` and `docker` (and
+`caddy` too, if `setup` ran with `--no-essentials`), puts `globex` in the
+`docker` group, runs `mise use -g node@22` over SSH, then `expose add` and
+`sync` — showing you the plan first. Signing in to GitHub and Claude Code
+stays yours to do, since those are browser and device logins nobody else can
+finish for you.
 
 **Check it:** `devmachine ssh globex` drops you into a shell with `node -v`
 reporting 22, while `devmachine ssh acme` on the same machine still reports

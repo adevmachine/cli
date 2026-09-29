@@ -27,18 +27,20 @@ does.
 
 ## By hand
 
-### 1. Add Caddy, Docker, and the docker group
+### 1. Add Docker and the docker group
 
 ```
-devmachine packages add caddy
 devmachine packages add docker
 devmachine workspaces edit agno --set workspace.groups=[docker]
 devmachine sync
 ```
 
-Caddy answers every exposed site. Docker runs the control plane's
-container; putting `agno` in the `docker` group is a lot of trust for one
-workspace — [workspaces](../reference/commands.md#workspaces) says why.
+Caddy came with `setup` (it's in the `essentials` package) and will answer
+both exposed sites. If your machine was set up with `--no-essentials`, or
+before CLI v0.7.14, add it too: `devmachine packages add caddy`. Docker runs
+the control plane's container; putting `agno` in the `docker` group is a lot
+of trust for one workspace — [workspaces](../reference/commands.md#workspaces)
+says why.
 
 ### 2. Run AgentOS
 
@@ -151,12 +153,13 @@ Docker container pointed at it on port 8810. Expose AgentOS at
 api.agents.example.com and the control plane at console.agents.example.com.
 ```
 
-The agent adds `caddy` and `docker`, puts `agno` in the `docker` group,
-installs `uv` and Agno over SSH, writes the AgentOS app, starts both
-processes, then runs `expose add` twice and `sync`. You still approve
-`sync` when it asks, pick and type in the model API key yourself, and
-choose the `OS_SECURITY_KEY` and `CP_AUTH_TOKEN` values — the agent should
-not be generating the tokens that guard your own agents.
+The agent adds `docker` (and `caddy` too, if `setup` ran with
+`--no-essentials`), puts `agno` in the `docker` group, installs `uv` and
+Agno over SSH, writes the AgentOS app, starts both processes, then runs
+`expose add` twice and `sync`. You still approve `sync` when it asks, pick
+and type in the model API key yourself, and choose the `OS_SECURITY_KEY` and
+`CP_AUTH_TOKEN` values — the agent should not be generating the tokens that
+guard your own agents.
 
 **Check it:** `curl -H "Authorization: Bearer <OS_SECURITY_KEY>" https://api.agents.example.com/config`
 returns AgentOS's own config, and `https://console.agents.example.com`

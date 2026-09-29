@@ -80,7 +80,8 @@ machines and workspaces — not inside the workspace where Pi itself runs.
 
 ## With your agent
 
-Open a session on your own computer and say:
+Open a session on your own computer (`devmachine skills add --agent pi`, or
+the plain `devmachine skills add`, taught it the CLI) and say:
 
 ```text
 SSH into my devmachine workspace alice and install the Pi coding agent

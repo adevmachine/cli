@@ -115,7 +115,8 @@ commands check `<config>/known_hosts` first, the same as any other login.
 
 ## With your agent
 
-Open a session on your own computer and say:
+Open a session on your own computer (`devmachine skills add` taught it the
+CLI) and say:
 
 ```text
 Open the mosh UDP range on my devmachine machine, over Tailscale only, then

@@ -131,7 +131,6 @@ moving on.
 
 ```
 devmachine packages add docker
-devmachine packages add caddy
 devmachine packages add wuzapi --workspace whatsapp
 devmachine workspaces edit whatsapp --set workspace.groups=[docker]
 devmachine secrets set whatsapp/wuzapi_admin_token
@@ -139,9 +138,12 @@ devmachine credentials push
 devmachine sync
 ```
 
-`secrets set` asks for the token without echoing it, so it never reaches
-your shell history. `credentials push` delivers it to the machine;
-`sync` installs Docker, Caddy, and runs the wuzapi container.
+Caddy came with `setup` (it's in the `essentials` package). If your machine
+was set up with `--no-essentials`, or before CLI v0.7.14, add it too:
+`devmachine packages add caddy`. `secrets set` asks for the token without
+echoing it, so it never reaches your shell history. `credentials push`
+delivers it to the machine; `sync` installs Docker and runs the wuzapi
+container.
 
 ### 4. Publish it
 
@@ -156,7 +158,6 @@ devmachine sync
 devmachine machines add
 devmachine workspaces new whatsapp-eu --machine backup
 devmachine packages add docker --machine backup
-devmachine packages add caddy --machine backup
 devmachine packages add wuzapi --workspace whatsapp-eu --machine backup
 devmachine workspaces edit whatsapp-eu --machine backup --set workspace.groups=[docker]
 devmachine secrets set whatsapp-eu/wuzapi_admin_token
