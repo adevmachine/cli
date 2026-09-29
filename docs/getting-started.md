@@ -36,8 +36,11 @@ password logins, so only you can get in.
 `workspaces new alice` creates a workspace called alice. `sync` builds it on
 the server.
 
-A new workspace comes with git, the GitHub CLI, Node LTS (through mise), bun
-and zsh. The server itself gets nothing else until you add packages to it.
+A new workspace comes with git, the GitHub CLI, Node LTS (through mise), bun,
+and zsh with Oh My Zsh. Every SSH login lands in a tmux session, so a dropped
+connection loses nothing: connect again and you are back where you were. Turn
+that off with the [`zsh.tmux_auto_attach`](reference/settings.md) setting. The server itself gets
+nothing else until you add packages to it.
 
 Something failed? [Troubleshooting](troubleshooting.md) says what each error
 really means.

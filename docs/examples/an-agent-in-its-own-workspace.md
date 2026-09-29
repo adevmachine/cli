@@ -29,16 +29,17 @@ The installer sets up Node itself if the account has none.
 ## 3. Keep it running
 
 ```
-tmux new -s agent
 openclaw onboard
 ```
 
 `openclaw onboard` walks through first-time setup, then runs the Gateway in
-the foreground. tmux keeps that session alive after you log out — detach with
-`Ctrl-b d`. To make it survive a reboot too, see OpenClaw's own docs on
+the foreground. You do not need to start tmux: every SSH login to a workspace
+already lands in a tmux session called `main` (the `zsh` package does this),
+and it stays alive after you log out. Detach with `Ctrl-b d`, or just close
+the terminal. To make it survive a reboot too, see OpenClaw's own docs on
 running it as a background service (`openclaw onboard --install-daemon`).
 
-**Check it:** back in the workspace (`devmachine ssh agent`, then `tmux
-attach -t agent`), the Gateway is still running.
+**Check it:** `devmachine ssh agent` again. You land back in the same
+session, and the Gateway is still running.
 
 Source: [OpenClaw — Install](https://docs.openclaw.ai/install)
