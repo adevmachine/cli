@@ -13,6 +13,7 @@ format: 1
 name: sharing
 scope: workspace
 summary: File sharing, uploads by API key and downloads by public link.
+category: Web
 requires:
   cli: ">= 0.2.0"
 needs: [docker]
@@ -38,6 +39,9 @@ credentials:
 	}
 	if m.Name != "sharing" || m.Scope != ScopeWorkspace {
 		t.Fatalf("got %#v", m)
+	}
+	if m.Category != "Web" {
+		t.Fatalf("category is %q", m.Category)
 	}
 	if m.Requires.CLI != ">= 0.2.0" {
 		t.Fatalf("requires.cli is %q", m.Requires.CLI)

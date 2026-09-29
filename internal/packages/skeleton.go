@@ -31,6 +31,7 @@ var schemaFields = []SchemaField{
 	{"name", true, "The package's name, which has to be the directory it lives in."},
 	{"scope", true, `Where it is installed: "machine" or "workspace".`},
 	{"summary", true, "One line saying what it installs. It is what `packages list` prints."},
+	{"category", false, `A word or two grouping it with packages like it, such as "Security" or "DNS". The packages page filters by it.`},
 	{"requires", false, `Which CLI can run it, written as requires.cli: ">= 0.2.0".`},
 	{"needs", false, "Packages that have to run before this one. It is the only thing that decides order."},
 	{"provides", false, "Places other packages may write into, as <place>: <absolute path on the machine>."},

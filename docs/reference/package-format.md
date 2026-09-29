@@ -45,6 +45,14 @@ per workspace that asks for it.
 
 One line saying what the package installs. `packages list` prints it.
 
+### `category`
+
+A word or two grouping the package with others like it, such as
+`Security`, `Coding agents` or `DNS`. The
+[packages page](https://mydevmachine.sh/packages/) filters by it. The CLI
+does not read it, so any value is accepted, and a package without one is
+listed as `Other`.
+
 ### `requires.cli`
 
 Which version of the CLI can run this package: `">= 0.2.0"`, `"> 0.2.0"`

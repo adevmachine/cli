@@ -86,10 +86,13 @@ type Manifest struct {
 	// Format is the shape of this file, and it is required. Without it the
 	// first change to the format would make every existing recipe fail in a
 	// different way, none of them saying why.
-	Format   int    `yaml:"format"`
-	Name     string `yaml:"name"`
-	Scope    string `yaml:"scope"`
-	Summary  string `yaml:"summary"`
+	Format  int    `yaml:"format"`
+	Name    string `yaml:"name"`
+	Scope   string `yaml:"scope"`
+	Summary string `yaml:"summary"`
+	// Category groups the package with others like it on the packages page.
+	// Nothing in the CLI reads it, so no value is refused.
+	Category string `yaml:"category"`
 	Requires struct {
 		CLI string `yaml:"cli"`
 	} `yaml:"requires"`
