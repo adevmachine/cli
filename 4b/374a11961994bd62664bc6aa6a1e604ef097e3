@@ -1,0 +1,30 @@
+docs/examples/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_b03985d044dc3c 1-109
+docs/examples/keep-sessions-running.md
+  s_a0cbf6c120c4f8::t_b5e489f6ed2fe4 1-104
+docs/examples/claude-that-never-sleeps.md
+  s_a0cbf6c120c4f8::t_cd471afe20a8da 1-117
+docs/examples/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_2356c0a6e23c56 72-74,77-78
+  s_a0cbf6c120c4f8::t_87c17c001e23cf 1-71,75-76,79-164
+docs/examples/index.md
+  s_a0cbf6c120c4f8::t_abc2cdc3caa449 11-12,24-29
+docs/index.md
+  s_a0cbf6c120c4f8::t_993da19d34320f 30,37-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4b374a11961994bd62664bc6aa6a1e604ef097e3",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
