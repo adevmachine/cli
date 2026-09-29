@@ -1,0 +1,40 @@
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_642e1a1e4c2aee 13,20
+  s_a0cbf6c120c4f8::t_a27e16ca8a0afa 60-91,121-122,178-179,182,197,201-208,210-211,213,663-668
+internal/commands/setup_test.go
+  s_a0cbf6c120c4f8::t_619be8258db1c2 787-792,794-798,802-833,835-841
+  s_a0cbf6c120c4f8::t_a27e16ca8a0afa 834
+internal/commands/machines.go
+  s_a0cbf6c120c4f8::t_b96b6f9cb9e244 99-100,217
+internal/commands/machines_test.go
+  s_a0cbf6c120c4f8::t_62d4f697cf3058 232-249
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_48f09325ef7003 18,34-37,48,114
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_07c60b24ab055a 9,36-40,45-55
+  s_a0cbf6c120c4f8::t_e8aec707d37a6c 56
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_b96b6f9cb9e244 850-852
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_07c60b24ab055a 74-77
+README.md
+  s_a0cbf6c120c4f8::t_07c60b24ab055a 19-20
+docs/examples/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_07c60b24ab055a 29-30,41,48-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80f4d10c6f0698d7dd4c99fb342159bc5c6224c6",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
