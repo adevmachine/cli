@@ -2,10 +2,55 @@ package commands
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/mydevmachine/devmachine/internal/aliases"
+	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/spf13/cobra"
 )
+
+// refreshAliases keeps ~/.ssh/config's managed block in step with the
+// configuration, for a person who already said yes once.
+//
+// It never asks: the answer is `cfg.SSHAliases`, recorded during setup or
+// `machines add`. A configuration that never turned it on is left exactly as
+// it always was — the pre-existing behaviour of every command that did not
+// know this field existed.
+func refreshAliases(cfg config.Config, out io.Writer) error {
+	if !cfg.SSHAliases {
+		return nil
+	}
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		return err
+	}
+	block, err := aliases.Render(cfg)
+	if err != nil {
+		return err
+	}
+	changed, err := aliases.WriteChanged(path, block)
+	if err != nil {
+		return err
+	}
+	if changed {
+		fmt.Fprintf(out, "updated the SSH aliases in %s\n", path)
+	}
+	return nil
+}
+
+// reachLines is how to reach a workspace, printed at the end of whatever
+// command just made it reachable for the first time (or changed the set of
+// workspaces a machine answers for).
+func reachLines(name string, sshAliases bool) []string {
+	lines := []string{
+		fmt.Sprintf("devmachine ssh %s (or `devmachine mosh %s`) reaches it from here", name, name),
+	}
+	if sshAliases {
+		lines = append(lines, fmt.Sprintf(
+			"ssh %s-devmachine reaches it from any terminal or editor (VS Code Remote-SSH, Zed, the macOS app)", name))
+	}
+	return lines
+}
 
 func newAliasesCmd(opts *options) *cobra.Command {
 	var (
@@ -40,6 +85,10 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 		return fmt.Errorf("--path says where to write and nothing is being written: pass --write too")
 	}
 
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return err
+	}
 	cfg, err := loadConfig(opts)
 	if err != nil {
 		return err
@@ -53,11 +102,12 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 		return err
 	}
 
+	defaultPath, err := aliases.DefaultPath()
+	if err != nil {
+		return err
+	}
 	if write && path == "" {
-		path, err = aliases.DefaultPath()
-		if err != nil {
-			return err
-		}
+		path = defaultPath
 	}
 
 	written := false
@@ -79,14 +129,25 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 			return err
 		}
 		written = true
+
+		// Writing this by hand into the default file is exactly the answer
+		// `setup` asks for. Recording it is what makes every later change
+		// keep it up to date without asking again.
+		if path == defaultPath && !cfg.SSHAliases {
+			if err := config.SetSSHAliases(dir, true); err != nil {
+				return err
+			}
+			cfg.SSHAliases = true
+		}
 	}
 
 	if opts.format == formatJSON {
 		return writeJSON(cmd.OutOrStdout(), struct {
-			Aliases []aliases.Alias `json:"aliases"`
-			Path    string          `json:"path,omitempty"`
-			Written bool            `json:"written"`
-		}{found, path, written})
+			Aliases    []aliases.Alias `json:"aliases"`
+			Path       string          `json:"path,omitempty"`
+			Written    bool            `json:"written"`
+			SSHAliases bool            `json:"ssh_aliases"`
+		}{found, path, written, cfg.SSHAliases})
 	}
 
 	switch {
@@ -102,6 +163,9 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 			cmd.Printf("%-24s %s@%s:%d\n", a.Name, a.User, a.Host, a.Port)
 		}
 		cmd.Printf("\nWritten into %s, between the devmachine markers.\n", path)
+		if path == defaultPath && cfg.SSHAliases {
+			cmd.Println("This will stay up to date automatically from now on.")
+		}
 	default:
 		cmd.Printf("%s\n%s%s\n", aliases.Begin, block, aliases.End)
 	}

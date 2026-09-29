@@ -38,3 +38,29 @@ func confirm(in io.Reader, out io.Writer, question string) (bool, error) {
 		return false, nil
 	}
 }
+
+// confirmDefaultYes asks a yes-or-no question whose empty answer means yes.
+//
+// It is for a question where the safe, normal thing needs no typing, and
+// only opting out takes a deliberate "n" — unlike confirm, which defaults a
+// change to not happening.
+func confirmDefaultYes(in io.Reader, out io.Writer, question string) (bool, error) {
+	if _, err := fmt.Fprintf(out, "%s [Y/n]: ", question); err != nil {
+		return false, err
+	}
+
+	line, err := bufio.NewReader(in).ReadString('\n')
+	if err != nil && line == "" {
+		if errors.Is(err, io.EOF) {
+			return true, nil
+		}
+		return false, fmt.Errorf("reading the answer: %w", err)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "n", "no":
+		return false, nil
+	default:
+		return true, nil
+	}
+}

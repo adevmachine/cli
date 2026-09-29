@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
@@ -271,6 +272,128 @@ func TestSetupFallsBackToThePassword(t *testing.T) {
 	}
 	if steps.password != "devmachine" {
 		t.Fatalf("password = %q", steps.password)
+	}
+}
+
+func TestSetupAsksToWriteSSHAliasesAndWritesThemOnYes(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+
+	out, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "", "1", "y", "n"), setupOptions{})
+	if err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+	if !strings.Contains(out, "wrote the SSH aliases") {
+		t.Fatalf("output does not say the aliases were written: %q", out)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SSHAliases {
+		t.Fatal("ssh_aliases was not recorded")
+	}
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the ssh config was not written: %v", err)
+	}
+}
+
+func TestSetupNoAliasesFlagSkipsTheQuestionAndWritesNothing(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := t.TempDir()
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "", "1"),
+		setupOptions{noAliases: true}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSHAliases {
+		t.Fatal("--no-aliases still recorded ssh_aliases")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".ssh", "config")); err == nil {
+		t.Fatal("--no-aliases still wrote ~/.ssh/config")
+	}
+}
+
+func TestSetupYesFlagAnswersTheAliasesQuestionWithoutAsking(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "", "1"),
+		setupOptions{yes: true}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SSHAliases {
+		t.Fatal("--yes did not record ssh_aliases: true")
+	}
+}
+
+func TestSetupOffersTailscaleAndAddsThePackageOnYes(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "", "1", "n", "y"),
+		setupOptions{}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(m.Packages, "tailscale") {
+		t.Fatalf("packages = %#v, want tailscale added", m.Packages)
+	}
+}
+
+func TestSetupDecliningTailscaleAddsNoPackage(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+
+	if _, err := runSetupIn(t, dir,
+		answers("main", "203.0.113.10", "root", "22", "", "1", "n", "n"),
+		setupOptions{}); err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(m.Packages, "tailscale") {
+		t.Fatal("declining tailscale still added the package")
 	}
 }
 

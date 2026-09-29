@@ -86,6 +86,44 @@ func TestAliasesAsksBeforeTouchingTheFile(t *testing.T) {
 	}
 }
 
+func TestAliasesWriteToTheDefaultPathRecordsSSHAliases(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	out, err := execute(t, "--config", dir, "aliases", "--write", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "stay up to date automatically") {
+		t.Fatalf("did not say it would keep itself up to date: %q", out)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.SSHAliases {
+		t.Fatal("writing to the default path did not record ssh_aliases: true")
+	}
+}
+
+func TestAliasesWriteToACustomPathDoesNotRecordSSHAliases(t *testing.T) {
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	path := filepath.Join(t.TempDir(), "ssh_config")
+
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--path", path, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSHAliases {
+		t.Fatal("a custom --path should not turn automatic refresh on")
+	}
+}
+
 func TestAliasesCheckWritesNothing(t *testing.T) {
 	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 	path := filepath.Join(t.TempDir(), "ssh_config")

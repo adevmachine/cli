@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
@@ -60,8 +61,14 @@ type setupOptions struct {
 	force        bool
 	noHarden     bool
 	noEssentials bool
+	noAliases    bool
+	yes          bool
 	machine      string
 }
+
+// tailscalePackage is the recipe `setup` and `machines add` offer to add when
+// the person wants the machine reachable over Tailscale too.
+const tailscalePackage = "tailscale"
 
 // essentials is the package a new machine starts with: base tools, git, a
 // firewall, SSH hardening and Caddy. Nearly everyone wants them, so the choice
@@ -120,6 +127,9 @@ func newSetupCmd(opts *options) *cobra.Command {
 		"during a new takeover, leave password login on (the key is still installed and proved)")
 	c.Flags().BoolVar(&s.noEssentials, "no-essentials", false,
 		"start the machine with no packages, instead of the essentials")
+	c.Flags().BoolVar(&s.noAliases, "no-aliases", false,
+		"do not ask about SSH host entries, and do not write them")
+	c.Flags().BoolVar(&s.yes, "yes", false, "answer yes to writing SSH host entries, without asking")
 	c.AddCommand(newSetupGitCmd(opts))
 	return c
 }
@@ -196,26 +206,134 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
 		return err
 	}
+	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes); err != nil {
+		return err
+	}
+	if err := offerTailscale(r, out, dir, m.Name); err != nil {
+		return err
+	}
 	if err := finishSetup(ctx, dir, in, out); err != nil {
 		return err
 	}
 
-	fmt.Fprint(out, nextAfterSetup(entry.Packages))
+	sshAliases, err := currentSSHAliases(dir)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(out, nextAfterSetup(entry.Packages, sshAliases))
 	return nil
 }
 
 // nextAfterSetup is printed once the machine is reachable.
-func nextAfterSetup(machinePackages []string) string {
+func nextAfterSetup(machinePackages []string, sshAliases bool) string {
 	note := "The machine starts with no packages: `devmachine packages add essentials` gives it base tools, git, a firewall and Caddy.\n"
 	if slices.Contains(machinePackages, essentials) {
 		note = "The machine starts with the essentials: base tools, git, a firewall and Caddy.\n" +
 			"To start bare instead, remove `essentials` from config.yml, or run setup with --no-essentials.\n"
 	}
+	reach := "Once a workspace exists: `devmachine ssh <workspace>` (or `mosh`) reaches it from here.\n"
+	if sshAliases {
+		reach += "With SSH aliases on: `ssh <workspace>-devmachine` reaches it from any terminal or editor " +
+			"(VS Code Remote-SSH, Zed, the macOS app).\n"
+	}
 	return "\n" + note + "AGENTS.md tells coding agents how to work in this folder.\n" + `
 Next:
   devmachine workspaces new acme   your first workspace (any name)
   devmachine sync                  build it all on the server
-`
+` + "\n" + reach
+}
+
+// offerSSHAliases asks once whether the CLI should keep ~/.ssh/config's
+// managed block up to date on its own, and does the first write when the
+// answer is yes.
+//
+// It only runs during a new setup or `machines add`: those are the two
+// moments a machine goes from unreachable to reachable, and "ssh
+// acme-devmachine does not work" is the exact complaint this closes.
+func offerSSHAliases(r *bufio.Reader, out io.Writer, dir string, noAliases, yes bool) error {
+	if noAliases {
+		return nil
+	}
+	ok := yes
+	if !yes {
+		var err error
+		ok, err = confirmDefaultYes(r, out,
+			"Write SSH host entries to ~/.ssh/config so `ssh <workspace>-devmachine` and `mosh` work from any terminal?")
+		if err != nil {
+			return err
+		}
+	}
+	if !ok {
+		return nil
+	}
+	if err := config.SetSSHAliases(dir, true); err != nil {
+		return err
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	path, err := aliases.DefaultPath()
+	if err != nil {
+		return err
+	}
+	block, err := aliases.Render(cfg)
+	if err != nil {
+		return err
+	}
+	if err := aliases.Write(path, block); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "wrote the SSH aliases into %s; they will stay up to date automatically from now on.\n", path)
+	return nil
+}
+
+// offerTailscale asks whether the machine should also be reachable over
+// Tailscale, and adds the package when the answer is yes.
+//
+// It only adds the package: the private address itself is recorded by
+// `devmachine login tailscale`, once the machine has actually signed in and
+// can say what it is called on the tailnet.
+func offerTailscale(r *bufio.Reader, out io.Writer, dir, machine string) error {
+	ok, err := confirm(r, out,
+		"Reach this machine over Tailscale too (a private address that keeps working when the public one does not)?")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	for i := range cfg.Machines {
+		if cfg.Machines[i].Name != machine {
+			continue
+		}
+		if slices.Contains(cfg.Machines[i].Packages, tailscalePackage) {
+			return nil
+		}
+		cfg.Machines[i].Packages = append(cfg.Machines[i].Packages, tailscalePackage)
+		if err := config.Save(dir, cfg); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "added the %s package to %s.\n", tailscalePackage, machine)
+		fmt.Fprintln(out, "Next: `devmachine sync`, then `devmachine login tailscale` to sign in and "+
+			"add its private address; the public address stays as a fallback.")
+		return nil
+	}
+	return nil
+}
+
+// currentSSHAliases reads the operator's recorded answer back, so the closing
+// message can say whether an alias also reaches a workspace.
+func currentSSHAliases(dir string) (bool, error) {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return false, err
+	}
+	return cfg.SSHAliases, nil
 }
 
 // prepareExisting resumes setup without taking ownership a second time. The

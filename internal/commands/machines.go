@@ -100,6 +100,9 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 		"start the machine with no packages, instead of the essentials")
 	c.Flags().BoolVar(&s.noHarden, "no-harden", false,
 		"leave password login on (the key is still installed and proved)")
+	c.Flags().BoolVar(&s.noAliases, "no-aliases", false,
+		"do not ask about SSH host entries, and do not write them")
+	c.Flags().BoolVar(&s.yes, "yes", false, "answer yes to writing SSH host entries, without asking")
 	c.Flags().StringVar(&selfName, "self", "",
 		"add your computer as a machine, named <name>, instead of asking for an address")
 	return c
@@ -176,7 +179,12 @@ func newMachinesRmCmd(opts *options) *cobra.Command {
 				"changed or deleted, and the key still gets in.\n")
 			cmd.Printf("`machines delete-local` is the one that destroys a machine, and only " +
 				"one on your computer.\n")
-			return nil
+
+			updated, err := config.Load(dir)
+			if err != nil {
+				return err
+			}
+			return refreshAliases(updated, cmd.OutOrStdout())
 		},
 	}
 	c.Flags().BoolVar(&yes, "yes", false, "forget it without asking")
@@ -226,6 +234,18 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
 		return err
+	}
+	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes); err != nil {
+		return err
+	}
+	if err := offerTailscale(r, out, dir, m.Name); err != nil {
+		return err
+	}
+
+	if updated, err := config.Load(dir); err == nil {
+		if err := refreshAliases(updated, out); err != nil {
+			return err
+		}
 	}
 
 	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n",
