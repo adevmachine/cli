@@ -92,7 +92,7 @@ printf '%s\n' "$CLOUD_INIT" > "$SCENARIO_LOG_DIR/cloud-init.log"
 PORT=$(limactl list --format '{{.SSHLocalPort}}' "$VM")
 [ -n "$PORT" ] || die "$VM never received an SSH port"
 printf '%s\n' "$VM" "127.0.0.1" "root" "$PORT" "example.com" "y" "1" "devmachine" \
-  | "$DEVMACHINE_ACCEPT_BIN" setup --no-essentials >"$SCENARIO_LOG_DIR/setup.log" 2>&1 \
+  | "$DEVMACHINE_ACCEPT_BIN" setup --no-essentials --no-aliases >"$SCENARIO_LOG_DIR/setup.log" 2>&1 \
   || die "could not set up $VM"
 "$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true \
   >"$SCENARIO_LOG_DIR/connect.log" 2>&1 || die "$VM does not answer"

@@ -101,7 +101,7 @@ esac
 PORT=$(limactl list --format '{{.SSHLocalPort}}' "$VM")
 [ -n "$PORT" ] || die "$VM never received an SSH port"
 printf '%s\n' "$VM" "127.0.0.1" "root" "$PORT" "example.com" "y" "1" "devmachine" \
-  | "$DEVMACHINE_ACCEPT_BIN" setup --no-essentials || die "could not set up $VM"
+  | "$DEVMACHINE_ACCEPT_BIN" setup --no-essentials --no-aliases || die "could not set up $VM"
 "$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true > /dev/null 2>&1 \
   || die "$VM does not answer; downstream assertions would be meaningless"
 

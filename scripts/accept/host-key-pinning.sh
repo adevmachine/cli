@@ -58,7 +58,7 @@ limactl shell "$VM" -- sudo sh -eu -c '
 ' >"$SCENARIO_DIR/ed25519-only.log" 2>&1 || die "could not make the fixture negotiate Ed25519"
 
 SETUP=$(printf '%s\n' "$VM" "127.0.0.1" "root" "$PORT" "example.com" "y" "1" "devmachine" \
-  | "$DEVMACHINE_ACCEPT_BIN" setup 2>&1) || die "could not set up $VM: $SETUP"
+  | "$DEVMACHINE_ACCEPT_BIN" setup --no-aliases 2>&1) || die "could not set up $VM: $SETUP"
 printf '%s\n' "$SETUP" > "$SCENARIO_DIR/setup.log"
 contains "$SETUP" "SHA256:" "setup prints the presented SHA256 fingerprint" || true
 contains "$SETUP" "ssh-ed25519 host key" "the fixture pins the key it will rotate" || true
@@ -69,7 +69,7 @@ TRUST=$(cat "$KNOWN_HOSTS")
 contains "$TRUST" "$VM-devmachine" "setup stores the stable machine alias" || true
 
 CONFIG_BEFORE=$(cksum "$DEVMACHINE_CONFIG/config.yml" | awk '{print $1 ":" $2}')
-RESUMED=$("$DEVMACHINE_ACCEPT_BIN" setup 2>&1) || die "could not resume setup for $VM: $RESUMED"
+RESUMED=$("$DEVMACHINE_ACCEPT_BIN" setup --no-aliases 2>&1) || die "could not resume setup for $VM: $RESUMED"
 printf '%s\n' "$RESUMED" > "$SCENARIO_DIR/setup-resumed.log"
 contains "$RESUMED" "without rewriting configuration" "setup resumes an existing configuration" || true
 CONFIG_AFTER=$(cksum "$DEVMACHINE_CONFIG/config.yml" | awk '{print $1 ":" $2}')
