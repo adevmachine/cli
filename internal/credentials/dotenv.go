@@ -103,12 +103,12 @@ func joinDotenvLines(lines []string) []byte {
 	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
-// dotenvLocateScript sets $home and $full for $user and $rel, and refuses a
+// homeLocateScript sets $home and $full for $user and $rel, and refuses a
 // path that leaves the home through a symbolic link. These scripts run as the
 // machine's admin, and any directory or file under the home is the workspace
 // account's to replace with a link: followed blindly, that link would point a
 // root read, write, chmod or chown at any file on the machine.
-const dotenvLocateScript = `home=$(getent passwd "$user" | cut -d: -f6)
+const homeLocateScript = `home=$(getent passwd "$user" | cut -d: -f6)
 if [ -z "$home" ]; then
 	echo "there is no account named $user on this machine" >&2
 	exit 1
@@ -139,7 +139,7 @@ fi
 const dotenvReadScript = `set -eu
 user=%s
 rel=%s
-` + dotenvLocateScript + `if [ -f "$full" ]; then
+` + homeLocateScript + `if [ -f "$full" ]; then
 	printf 'EXISTS\n'
 	cat "$full"
 else
@@ -169,17 +169,21 @@ func readDotenv(ctx context.Context, c remote.Client, user, rel string) (content
 	}
 }
 
-// dotenvWriteScript writes what arrives on stdin to rel, relative to user's
-// home, atomically and owned by user. It never chmods a file that already
-// existed — %[3]s decides whether a first edit keeps a backup, which only
-// ever happens for a person's own file (`--env-file`): the default file is
-// entirely devmachine's, and backing it up would just be noise.
-const dotenvWriteScript = `set -eu
+// homeWriteScript writes what arrives on stdin to rel, relative to user's
+// home, atomically and owned by user. The file is replaced by a rename, never
+// written through, so a link put in its place cannot redirect the write.
+//
+// %[3]s decides whether a first edit keeps a backup, which only ever happens
+// for a person's own file (`--env-file`): the default file is entirely
+// devmachine's, and backing it up would just be noise. %[4]s is the mode the
+// file gets; empty keeps the mode a file that already existed had.
+const homeWriteScript = `set -eu
 umask 077
 user=%[1]s
 rel=%[2]s
 backup=%[3]s
-` + dotenvLocateScript + `dir=$(dirname "$full")
+mode=%[4]s
+` + homeLocateScript + `dir=$(dirname "$full")
 make_dirs() {
 	if [ -d "$1" ]; then
 		return
@@ -196,9 +200,11 @@ if [ "$backup" = "1" ] && [ -e "$full" ] && [ ! -e "$full` + backupSuffix + `" ]
 	cp -p "$full" "$full` + backupSuffix + `"
 	chown "$user" "$full` + backupSuffix + `"
 fi
-mode=0600
-if [ -e "$full" ]; then
-	mode=$(stat -c %%a "$full" 2>/dev/null || stat -f %%Lp "$full")
+if [ -z "$mode" ]; then
+	mode=0600
+	if [ -e "$full" ]; then
+		mode=$(stat -c %%a "$full" 2>/dev/null || stat -f %%Lp "$full")
+	fi
 fi
 tmp=$(mktemp "$dir/.devmachine.XXXXXX")
 chmod "$mode" "$tmp"
@@ -208,11 +214,17 @@ mv -f "$tmp" "$full"
 `
 
 func writeDotenv(ctx context.Context, c remote.Client, user, rel string, backup bool, content []byte) error {
+	return writeHomeFile(ctx, c, user, rel, backup, "", content)
+}
+
+// writeHomeFile runs homeWriteScript. mode is empty to keep an existing
+// file's mode.
+func writeHomeFile(ctx context.Context, c remote.Client, user, rel string, backup bool, mode string, content []byte) error {
 	flag := "0"
 	if backup {
 		flag = "1"
 	}
-	script := fmt.Sprintf(dotenvWriteScript, shellQuote(user), shellQuote(rel), flag)
+	script := fmt.Sprintf(homeWriteScript, shellQuote(user), shellQuote(rel), flag, shellQuote(mode))
 	if _, err := c.RunInput(ctx, script, bytes.NewReader(content)); err != nil {
 		return fmt.Errorf("writing %s: %w", rel, err)
 	}
@@ -224,7 +236,7 @@ func writeDotenv(ctx context.Context, c remote.Client, user, rel string, backup 
 // `--env-file` named. Everything already in rel is kept, other than the one
 // line this sets.
 //
-// backup is only ever true for `--env-file`: see dotenvWriteScript.
+// backup is only ever true for `--env-file`: see homeWriteScript.
 func PushWorkspaceEnv(ctx context.Context, c remote.Client, user, rel, name, value string, backup bool) error {
 	if value == "" {
 		return fmt.Errorf("secret %q has no value to deliver", name)

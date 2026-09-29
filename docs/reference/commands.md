@@ -567,6 +567,11 @@ It also delivers every workspace's own secret set with `secrets set
 --workspace` (see above) whose workspace lives on the machine being
 pushed to, and removes the ones marked with `secrets rm --from-file`.
 
+Anything it delivers inside a workspace's home — a package's workspace
+credential or a workspace's own secret — is refused when a symbolic link
+on the way leads out of that home, and the file is replaced, never
+written through, so a link in its place cannot redirect the write.
+
 ## packages
 
 ```

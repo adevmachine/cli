@@ -47,7 +47,8 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// writeScript puts one value on the machine.
+// writeScript puts one value on the machine, where the path is not inside a
+// workspace's home: those go through pushIntoHome.
 //
 // The value arrives on stdin, never in an argument: an argument is in `ps` for
 // every account on the machine to read while the command runs.
@@ -117,8 +118,26 @@ func Push(ctx context.Context, c remote.Client, d Declared, value string) error 
 		body = EnvBody(d, value)
 	}
 
+	if rel, inHome := strings.CutPrefix(destination, "~/"); inHome && d.LinuxUser != "" {
+		return pushIntoHome(ctx, c, d, rel, body)
+	}
+
 	script := fmt.Sprintf(writeScript, shellQuote(d.LinuxUser), shellQuote(destination))
 	if _, err := c.RunInput(ctx, script, strings.NewReader(body)); err != nil {
+		return fmt.Errorf("delivering credential %q: %w", Key(d), err)
+	}
+	return nil
+}
+
+// pushIntoHome delivers into a workspace's home, which the workspace account
+// can fill with links. It goes through the same check and the same
+// write-then-rename as a workspace's own secrets, so root never follows one.
+func pushIntoHome(ctx context.Context, c remote.Client, d Declared, rel, body string) error {
+	cleaned, err := SafeWorkspacePath(rel)
+	if err != nil {
+		return fmt.Errorf("delivering credential %q: %w", Key(d), err)
+	}
+	if err := writeHomeFile(ctx, c, d.LinuxUser, cleaned, false, "0600", []byte(body)); err != nil {
 		return fmt.Errorf("delivering credential %q: %w", Key(d), err)
 	}
 	return nil
