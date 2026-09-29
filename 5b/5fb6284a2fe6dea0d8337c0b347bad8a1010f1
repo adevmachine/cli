@@ -1,0 +1,26 @@
+scripts/accept/workspace-secrets.sh
+  s_a0cbf6c120c4f8::t_489ed3b823a5e1 175
+  s_a0cbf6c120c4f8::t_a4784ed441a3ea 1-174
+scripts/accept/run.sh
+  s_a0cbf6c120c4f8::t_87864b8071ba50 43
+docs/development.md
+  s_a0cbf6c120c4f8::t_87864b8071ba50 74
+scripts/accept/common_test.sh
+  s_a0cbf6c120c4f8::t_87864b8071ba50 76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5b5fb6284a2fe6dea0d8337c0b347bad8a1010f1",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
