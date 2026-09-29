@@ -13,6 +13,10 @@ devmachine packages add caddy
 devmachine sync
 ```
 
+A new machine has no web server: `setup` installs no packages on the
+machine itself. Skip what is already there —
+`devmachine packages list` shows each package with your machine's name next to it.
+
 ## 2. Put the workspace in the docker group
 
 ```

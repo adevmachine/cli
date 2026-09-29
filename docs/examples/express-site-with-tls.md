@@ -14,24 +14,28 @@ devmachine packages add caddy
 devmachine sync
 ```
 
-Caddy answers every exposed site and gets its own certificate.
+Caddy answers every exposed site and gets its own certificate. A new machine has no web server: `setup` installs no packages on the
+machine itself. Skip this step if Caddy is already there —
+`devmachine packages list` shows `caddy` with your machine's name next to it.
 
 ## 2. Write and start the app
 
 ```
 devmachine ssh alice
 mkdir app && cd app
-npm init -y && npm install express pm2
+npm init -y && npm install express
 cat > server.js <<'EOF'
 const express = require('express');
 const app = express();
 app.get('/', (req, res) => res.send('Hello from alice'));
 app.listen(3000);
 EOF
-npx pm2 start server.js --name app
+node server.js
 ```
 
-pm2 keeps the app running in the background, even after you log out.
+Leave it running and close the terminal: the login is inside tmux, so the
+app keeps running on the server. To have it start again after a reboot, use
+a process manager such as [pm2](https://pm2.keymetrics.io/docs/usage/quick-start/).
 
 ## 3. Expose the port
 
@@ -53,5 +57,4 @@ printed the record to create by hand at your registrar.
 **Check it:** `curl https://app.example.com` returns "Hello from alice",
 with a valid certificate.
 
-Source: [Express — Hello world](https://expressjs.com/en/starter/hello-world.html),
-[pm2 — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/)
+Source: [Express — Hello world](https://expressjs.com/en/starter/hello-world.html)

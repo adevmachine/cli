@@ -33,7 +33,8 @@ claude
 ```
 
 With `remote_control_at_startup` on, Claude Code prints a session URL and a
-QR code as the session opens. Without it, run `/rc` inside the session to get
+QR code as the session opens. The login is inside tmux, so you can close the
+terminal and Claude keeps running: the phone keeps working without it. Without it, run `/rc` inside the session to get
 the same thing.
 
 ## 4. Open it from the phone
