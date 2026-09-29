@@ -1,0 +1,28 @@
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_e22d59a76aeefb 289
+  s_a0cbf6c120c4f8::t_fbbf459f469d34 9,12
+  s_a0cbf6c120c4f8::t_d79bdbc50911da 157,162-201
+  s_a0cbf6c120c4f8::t_b53a633638535a 31-33
+  s_a0cbf6c120c4f8::t_14046f1b2a7705 43-46
+  s_a0cbf6c120c4f8::t_113c5da6e069a9 202-203
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_af343ee97934b4 19
+  s_a0cbf6c120c4f8::t_4024e96a26ed3d 729-819
+  s_a0cbf6c120c4f8::t_cad99e45ee71ef 820
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a349119bfd3ed4dbc59723116b01dedbd5ac3651",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
