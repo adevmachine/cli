@@ -10,7 +10,7 @@ over SSH — for a session waiting for you with no SSH step at all, see
 ## Before you start: machine, skills, workspace
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
 devmachine workspaces new acme

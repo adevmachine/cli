@@ -8,12 +8,13 @@ server until you run `sync`.
 ## The CLI
 
 ```
-brew update && brew upgrade mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine version
 ```
 
-On Linux, get the newest binary from the
-[releases page](https://github.com/mydevmachine/devmachine/releases).
+The one-liner also upgrades: on macOS with Homebrew it runs `brew upgrade`
+through the tap, otherwise it fetches the newest release binary. On
+Homebrew you can instead run `brew update && brew upgrade mydevmachine/tap/devmachine`.
 
 ## The packages
 

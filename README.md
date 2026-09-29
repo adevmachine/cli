@@ -8,7 +8,7 @@ You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
 Linux computer.
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
 devmachine workspaces new acme && devmachine sync

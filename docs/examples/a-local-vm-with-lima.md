@@ -13,7 +13,7 @@ A local VM is not a bought server, so it is made and added differently, but
 everything after that is the same.
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine machines create-local sandbox
 devmachine setup
 devmachine skills add

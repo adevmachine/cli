@@ -18,7 +18,7 @@ each client (invented here as `acme`, `globex`, `initech`).
 ## Before you start: machine and skills
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
 ```

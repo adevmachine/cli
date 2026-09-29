@@ -9,13 +9,14 @@ Linux computer.
 Three commands:
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine workspaces new acme && devmachine sync
 ```
 
-On Linux without Homebrew, get the binary from the
-[releases page](https://github.com/mydevmachine/devmachine/releases).
+On macOS, that line installs through Homebrew if you have it. Prefer
+Homebrew directly? `brew install mydevmachine/tap/devmachine` works the same
+way.
 
 `devmachine skills add` teaches your coding agent how to use devmachine. You
 can run it before `setup`, too.

@@ -11,7 +11,7 @@ laptop, and keeps working after you close the terminal.
 ## Before you start: machine, skills, workspace
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
 devmachine workspaces new acme

@@ -10,7 +10,7 @@ files and model keys, no `sudo`, and no way into your other workspaces.
 ## Before you start: machine, skills, workspace
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
 devmachine workspaces new hermes

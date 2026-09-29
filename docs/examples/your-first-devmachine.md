@@ -11,11 +11,8 @@ Mac or Linux computer.
 ### 1. Install the CLI
 
 ```
-brew install mydevmachine/tap/devmachine
+curl -fsSL https://mydevmachine.sh/install.sh | sh
 ```
-
-On Linux without Homebrew, get the binary from the
-[releases page](https://github.com/mydevmachine/devmachine/releases).
 
 ### 2. Connect the server
 
