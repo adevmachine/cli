@@ -159,9 +159,18 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		return err
 	}
 
-	fmt.Fprintf(out, "\nNext: `devmachine doctor`, then `devmachine sync`.\n")
+	fmt.Fprint(out, nextAfterSetup)
 	return nil
 }
+
+// nextAfterSetup is printed once the machine is reachable. The machine has no
+// packages yet, and most people want the same few, so the first step names them.
+const nextAfterSetup = `
+Next:
+  devmachine packages add essentials   base tools, git, a firewall and Caddy
+  devmachine workspaces new alice      your first workspace (any name)
+  devmachine sync                      build it all on the server
+`
 
 // prepareExisting resumes setup without taking ownership a second time. The
 // configuration already says which key and host identity to trust, so this

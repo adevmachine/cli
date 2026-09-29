@@ -37,16 +37,18 @@ devmachine skills add
 
 Any new Claude Code or Codex session can now run devmachine for you.
 
-### 4. Create the workspace
+### 4. Add the essentials and a workspace
 
 ```
+devmachine packages add essentials
 devmachine workspaces new alice
 devmachine sync
 ```
 
-The first line adds `alice` to your configuration. `sync` builds it on the
-server: its own account, with git, the GitHub CLI, Node, bun and zsh. It
-shows the plan and asks before changing anything.
+`essentials` gives the server base tools, git, a firewall and Caddy.
+`workspaces new` adds `alice` to your configuration. `sync` builds both on the
+server: `alice` is its own account, with git, the GitHub CLI, Node, bun and
+zsh. It shows the plan and asks before changing anything.
 
 ### 5. Open it
 

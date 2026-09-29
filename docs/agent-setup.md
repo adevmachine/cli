@@ -66,12 +66,15 @@ When they say it finished, run `devmachine doctor`. Every line should pass.
 ## 4. Create the workspace
 
 ```
+devmachine packages add essentials
 devmachine workspaces new <name>
 devmachine packages add claude-code --workspace <name>
 devmachine sync --check
 ```
 
-Skip the second line if they wanted no coding agent. Show them the plan, and
+`essentials` is base tools, git, a firewall and Caddy — add it unless they
+said they want a bare server. Skip the `claude-code` line if they wanted no
+coding agent. Show them the plan, and
 once they agree run `devmachine sync --yes`. The first sync takes a few
 minutes.
 

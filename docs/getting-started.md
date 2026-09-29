@@ -6,11 +6,12 @@ own account on the server, called a workspace, with its own tools and logins.
 You need a Debian or Ubuntu VPS you can reach as root over SSH, and a Mac or
 Linux computer.
 
-Three commands:
+Four commands:
 
 ```
 brew install mydevmachine/tap/devmachine
 devmachine setup
+devmachine packages add essentials
 devmachine workspaces new alice && devmachine sync
 ```
 
@@ -33,14 +34,19 @@ fingerprint: check it matches the one in your provider's dashboard, so you
 know you are talking to your own server. Then it sets up a key and turns off
 password logins, so only you can get in.
 
-`workspaces new alice` creates a workspace called alice. `sync` builds it on
-the server.
+`packages add essentials` gives the server what almost everyone wants:
+base tools, git, a firewall, SSH with passwords kept off, and Caddy to
+publish sites with HTTPS. Docker is not in it; add it with `devmachine
+packages add docker` when you need it.
+
+`workspaces new alice` creates a workspace called alice. `sync` builds it
+all on the server.
 
 A new workspace comes with git, the GitHub CLI, Node LTS (through mise), bun,
 and zsh with Oh My Zsh. Every SSH login lands in a tmux session, so a dropped
 connection loses nothing: connect again and you are back where you were. Turn
 that off with the [`zsh.tmux_auto_attach`](reference/settings.md) setting. The server itself gets
-nothing else until you add packages to it.
+only the packages you add to it.
 
 Something failed? [Troubleshooting](troubleshooting.md) says what each error
 really means.

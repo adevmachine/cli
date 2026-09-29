@@ -11,12 +11,14 @@ Linux computer.
 brew install mydevmachine/tap/devmachine
 devmachine setup
 devmachine skills add
+devmachine packages add essentials
 devmachine workspaces new alice && devmachine sync
 devmachine ssh alice
 ```
 
 `setup` connects to the server and locks it down: it checks who you are
-talking to, installs a key, and turns off password logins. `workspaces new`
+talking to, installs a key, and turns off password logins. `packages add
+essentials` adds base tools, git, a firewall and Caddy. `workspaces new`
 adds a workspace to your configuration. `sync` builds it on the server.
 `skills add` teaches your coding agent the CLI, so you can ask for any of
 this from any Claude Code or Codex session.

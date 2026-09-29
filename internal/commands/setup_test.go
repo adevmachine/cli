@@ -783,3 +783,16 @@ func TestSetupWithoutTheLatestReleaseSaysHowToPin(t *testing.T) {
 		t.Fatalf("it does not say how to pin: %q", out)
 	}
 }
+
+func TestSetupEndsBySuggestingTheEssentials(t *testing.T) {
+	stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	out, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "root", "22", "example.com", "1"), setupOptions{})
+	if err != nil {
+		t.Fatalf("runSetup returned %v", err)
+	}
+	if !strings.Contains(out, "devmachine packages add essentials") {
+		t.Fatalf("setup does not suggest the essentials: %q", out)
+	}
+}
