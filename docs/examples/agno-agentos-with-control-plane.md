@@ -2,7 +2,7 @@
 
 Run [Agno AgentOS](https://docs.agno.com/agent-platform/overview), the
 runtime that serves your agents over a REST API, in an isolated workspace
-`agno`, next
+`agents`, next
 to the [AgentOS control plane](https://github.com/djalmaaraujo/agentos-control-plane),
 a small open dashboard that talks to it. Both end up live at their own
 subdomain, with HTTPS.
@@ -17,7 +17,7 @@ subdomain, with HTTPS.
 curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
-devmachine workspaces new agno
+devmachine workspaces new agents
 devmachine sync
 ```
 
@@ -31,21 +31,21 @@ does.
 
 ```
 devmachine packages add docker
-devmachine workspaces edit agno --set workspace.groups=[docker]
+devmachine workspaces edit agents --set workspace.groups=[docker]
 devmachine sync
 ```
 
 Caddy came with `setup` (it's in the `essentials` package) and will answer
 both exposed sites. If your machine was set up with `--no-essentials`, or
 before CLI v0.7.14, add it too: `devmachine packages add caddy`. Docker runs
-the control plane's container; putting `agno` in the `docker` group is a lot
+the control plane's container; putting `agents` in the `docker` group is a lot
 of trust for one workspace — [workspaces](../reference/commands.md#workspaces)
 says why.
 
 ### 2. Run AgentOS
 
 ```
-devmachine ssh agno
+devmachine ssh agents
 mise use -g python@3.12
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv && source .venv/bin/activate
@@ -88,7 +88,7 @@ use its JWT-based authorization instead for a production deployment — this
 example uses the security key because it is the simpler one, and the
 control plane only needs the one token anyway. Leave the terminal running:
 the SSH login is already inside tmux, so it keeps going after you log out —
-`devmachine ssh agno` puts you back. AgentOS listens on port `7777` by
+`devmachine ssh agents` puts you back. AgentOS listens on port `7777` by
 default.
 
 ### 3. Run the control plane
@@ -131,8 +131,8 @@ empty and anyone who reaches the URL gets in.
 Back on your own computer:
 
 ```
-devmachine expose add agno 7777 --host api.agents.example.com --publish
-devmachine expose add agno 8810 --host console.agents.example.com --publish
+devmachine expose add agents 7777 --host api.agents.example.com --publish
+devmachine expose add agents 8810 --host console.agents.example.com --publish
 devmachine sync
 ```
 
@@ -147,14 +147,14 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-In my devmachine workspace agno, set up Agno AgentOS with uv, running
+In my devmachine workspace agents, set up Agno AgentOS with uv, running
 on port 7777 with OS_SECURITY_KEY set, then run the agentos-control-plane
 Docker container pointed at it on port 8810. Expose AgentOS at
 api.agents.example.com and the control plane at console.agents.example.com.
 ```
 
 The agent adds `docker` (and `caddy` too, if `setup` ran with
-`--no-essentials`), puts `agno` in the `docker` group, installs `uv` and
+`--no-essentials`), puts `agents` in the `docker` group, installs `uv` and
 Agno over SSH, writes the AgentOS app, starts both processes, then runs
 `expose add` twice and `sync`. You still approve `sync` when it asks, pick
 and type in the model API key yourself, and choose the `OS_SECURITY_KEY` and

@@ -14,7 +14,7 @@ tunnel`, with Claude Code on hand to help.
 curl -fsSL https://mydevmachine.sh/install.sh | sh
 devmachine setup
 devmachine skills add
-devmachine workspaces new rubyui
+devmachine workspaces new components
 devmachine sync
 ```
 
@@ -28,7 +28,7 @@ does.
 
 ```
 devmachine login gh
-devmachine packages add claude-code --workspace rubyui
+devmachine packages add claude-code --workspace components
 devmachine sync
 ```
 
@@ -40,7 +40,7 @@ first login.
 ### 2. Fork and clone RubyUI
 
 ```
-devmachine ssh rubyui
+devmachine ssh components
 gh repo fork ruby-ui/ruby_ui --clone
 cd ruby_ui
 ```
@@ -93,7 +93,7 @@ was inside tmux.
 Back on your own computer:
 
 ```
-devmachine tunnel rubyui 3000
+devmachine tunnel components 3000
 ```
 
 Open `localhost:3000`. Nothing is published — no DNS record, no open port —
@@ -106,7 +106,7 @@ Open a session on your own computer (`devmachine skills add` taught it the
 CLI) and say:
 
 ```text
-In my devmachine workspace rubyui, fork and clone ruby-ui/ruby_ui with my
+In my devmachine workspace components, fork and clone ruby-ui/ruby_ui with my
 GitHub login, install Ruby 3.4 with mise, run the gem's test suite, and
 start the docs dev server on port 3000.
 ```
@@ -116,7 +116,7 @@ install`, `bundle exec rake`, and `bin/dev` over SSH, in that order. It
 needs `devmachine login gh` already done — a browser sign-in is not
 something it can do for you — and if it is not, the agent tells you to run
 it first. Once the dev server is up, it opens the tunnel with `devmachine
-tunnel rubyui 3000` and tells you to open `localhost:3000`.
+tunnel components 3000` and tells you to open `localhost:3000`.
 
 **Check it:** `bundle exec rake` in `gem/` passes with no failures, and
 `localhost:3000` (through the tunnel) shows the RubyUI docs and component
