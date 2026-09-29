@@ -27,12 +27,16 @@ computer, while you wait for a real one.
 
 Real setups, done in a few steps. Start at [the list](examples/index.md).
 
+- [Your first devmachine, explained](examples/your-first-devmachine.md)
 - [Try it on your own computer first](examples/a-local-vm-with-lima.md)
 - [Express site with TLS](examples/express-site-with-tls.md)
 - [Docker site on 8080](examples/docker-site-on-8080.md)
 - [Claude Code, controlled from your phone](examples/claude-code-remote-control.md)
 - [Start Claude from your phone](examples/start-claude-from-your-phone.md)
 - [An agent in its own workspace](examples/an-agent-in-its-own-workspace.md)
+- [Keep your sessions running](examples/keep-sessions-running.md)
+- [A Claude that never sleeps](examples/claude-that-never-sleeps.md)
+- [One consultant, three startups](examples/one-consultant-three-startups.md)
 
 ## Concepts
 
