@@ -506,6 +506,10 @@ first time it edits a file that already existed, it keeps a copy at
 `<path>.devmachine.bak`. See [credentials: your app's own
 secrets](../concepts/credentials.md#your-apps-own-secrets).
 
+Setting the same name again with a different `--env-file` (or with none,
+back to the default) moves it: the next push takes the `<NAME>=` line
+out of the file it was in before, then writes it to the new one.
+
 `list --workspace w` shows only that workspace's own secrets, with
 where each is delivered. `rm --workspace w --from-file` also removes
 the name from its file, on the next `credentials push` — it is not

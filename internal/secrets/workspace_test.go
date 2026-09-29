@@ -108,3 +108,48 @@ func TestTargetsOnAFreshDirectoryIsEmpty(t *testing.T) {
 		t.Fatalf("got %#v", got)
 	}
 }
+
+func TestRetargetRemembersTheFileItLeaves(t *testing.T) {
+	got := Target{Workspace: "alice", Name: "API_KEY"}.Retarget("app/.env")
+
+	if got.EnvFile != "app/.env" {
+		t.Fatalf("got %#v", got)
+	}
+	if len(got.LeftEnvFiles) != 1 || got.LeftEnvFiles[0] != "" {
+		t.Fatalf("the default file was not remembered: %#v", got.LeftEnvFiles)
+	}
+}
+
+func TestRetargetBetweenTwoFilesRemembersBoth(t *testing.T) {
+	got := Target{Workspace: "alice", Name: "API_KEY", EnvFile: "app/.env"}.
+		Retarget("web/.env").
+		Retarget("api/.env")
+
+	if len(got.LeftEnvFiles) != 2 || got.LeftEnvFiles[0] != "app/.env" || got.LeftEnvFiles[1] != "web/.env" {
+		t.Fatalf("got %#v", got.LeftEnvFiles)
+	}
+}
+
+func TestRetargetBackToAFileItLeftForgetsThatFile(t *testing.T) {
+	got := Target{Workspace: "alice", Name: "API_KEY"}.Retarget("app/.env").Retarget("")
+
+	if len(got.LeftEnvFiles) != 1 || got.LeftEnvFiles[0] != "app/.env" {
+		t.Fatalf("got %#v", got.LeftEnvFiles)
+	}
+}
+
+func TestRetargetToTheSameFileLeavesNothing(t *testing.T) {
+	got := Target{Workspace: "alice", Name: "API_KEY", EnvFile: "app/.env"}.Retarget("app/.env")
+
+	if len(got.LeftEnvFiles) != 0 {
+		t.Fatalf("got %#v", got.LeftEnvFiles)
+	}
+}
+
+func TestRetargetClearsAPendingRemoval(t *testing.T) {
+	got := Target{Workspace: "alice", Name: "API_KEY", PendingRemoval: true}.Retarget("")
+
+	if got.PendingRemoval {
+		t.Fatalf("setting the secret again should cancel its removal: %#v", got)
+	}
+}

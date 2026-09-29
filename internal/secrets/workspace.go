@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 )
 
@@ -26,6 +27,29 @@ type Target struct {
 	// PendingRemoval means the next `credentials push` removes Name from
 	// EnvFile, then forgets this target.
 	PendingRemoval bool `json:"pending_removal,omitempty"`
+	// LeftEnvFiles are the files Name was delivered into before EnvFile
+	// changed, "" standing for the default. The next `credentials push`
+	// removes Name from each of them, then forgets them.
+	LeftEnvFiles []string `json:"left_env_files,omitempty"`
+}
+
+// Retarget is t delivered into envFile from now on. The file it leaves is
+// remembered, so the next push can take Name out of it, and a file it comes
+// back to is no longer one to clean.
+func (t Target) Retarget(envFile string) Target {
+	var left []string
+	for _, f := range t.LeftEnvFiles {
+		if f != envFile && !slices.Contains(left, f) {
+			left = append(left, f)
+		}
+	}
+	if t.EnvFile != envFile && !slices.Contains(left, t.EnvFile) {
+		left = append(left, t.EnvFile)
+	}
+	t.EnvFile = envFile
+	t.LeftEnvFiles = left
+	t.PendingRemoval = false
+	return t
 }
 
 // Key is how a target is named in the index and in `secrets list`.

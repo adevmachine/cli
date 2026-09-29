@@ -100,6 +100,11 @@ file that already existed, it keeps a copy at `app/.env.devmachine.bak`
 next to it, so one bad push is not the only copy of what was there
 before.
 
+To move a secret to another file, set it again with the new
+`--env-file` (or with none, for the default). The next push takes its
+line out of the old file before it writes the new one, so the old file
+does not keep handing out a value nobody manages any more.
+
 `devmachine secrets list --workspace alice` shows the name and the
 target, never the value. `devmachine secrets rm STRIPE_KEY --workspace
 alice --from-file` removes the stored value and, on the next push,

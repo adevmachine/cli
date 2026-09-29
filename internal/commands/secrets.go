@@ -11,6 +11,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/credentials"
 	"github.com/mydevmachine/devmachine/internal/packages"
+	"github.com/mydevmachine/devmachine/internal/remote"
 	"github.com/mydevmachine/devmachine/internal/secrets"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -126,7 +127,13 @@ func newSecretsSetCmd(opts *options) *cobra.Command {
 					}
 				}
 				key = workspace + "/" + name
-				t = secrets.Target{Workspace: workspace, Name: name, EnvFile: rel}
+				t = secrets.Target{Workspace: workspace, Name: name}
+				if recorded, ok, err := secrets.FindTarget(dir, workspace, name); err != nil {
+					return err
+				} else if ok {
+					t = recorded
+				}
+				t = t.Retarget(rel)
 			}
 
 			if err := secrets.Set(dir, key, value); err != nil {
@@ -144,7 +151,16 @@ func newSecretsSetCmd(opts *options) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				for _, left := range t.LeftEnvFiles {
+					cmd.Printf("removed %s from %s\n", key, envFilePath(left))
+				}
 				cmd.Printf("delivered %s -> %s\n", key, destination)
+				if len(t.LeftEnvFiles) > 0 {
+					t.LeftEnvFiles = nil
+					if err := secrets.SetTarget(dir, t); err != nil {
+						return err
+					}
+				}
 			}
 			return nil
 		},
@@ -172,14 +188,35 @@ func pushWorkspaceSecret(ctx context.Context, opts *options, t secrets.Target, v
 	}
 	defer client.Close()
 
-	rel := t.EnvFile
-	if rel == "" {
-		rel = credentials.DefaultEnvFile
+	if err := leaveEnvFiles(ctx, client, tgt.user, t); err != nil {
+		return "", err
 	}
+	rel := envFilePath(t.EnvFile)
 	if err := credentials.PushWorkspaceEnv(ctx, client, tgt.user, rel, t.Name, value, t.EnvFile != ""); err != nil {
 		return "", err
 	}
 	return rel, nil
+}
+
+// leaveEnvFiles takes t's name out of every file it was delivered into
+// before its `--env-file` changed. Left there, the old file would keep
+// handing out a value nobody manages any more.
+func leaveEnvFiles(ctx context.Context, client remote.Client, user string, t secrets.Target) error {
+	for _, left := range t.LeftEnvFiles {
+		if err := credentials.RemoveWorkspaceEnv(ctx, client, user, envFilePath(left), t.Name, left != ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// envFilePath is where a workspace secret recorded with envFile lands,
+// relative to the workspace's home.
+func envFilePath(envFile string) string {
+	if envFile == "" {
+		return credentials.DefaultEnvFile
+	}
+	return envFile
 }
 
 // secretRow is one line of `secrets list`: a name, and where it goes when it

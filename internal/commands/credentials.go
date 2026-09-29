@@ -112,10 +112,7 @@ func linuxUsersOn(cfg config.Config, machine string) map[string]string {
 // workspaceSecretTargetPath is what a report and `secrets list` show: the
 // default file when nothing more specific was asked for.
 func workspaceSecretTargetPath(t secrets.Target) string {
-	if t.EnvFile == "" {
-		return credentials.DefaultEnvFile
-	}
-	return t.EnvFile
+	return envFilePath(t.EnvFile)
 }
 
 // storedNames is the set of secrets the operator has already stored. Names
@@ -377,6 +374,9 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 		fmt.Fprintf(notes, "%s -> %s\n", credentials.Key(w.d), credentials.Destination(w.d))
 	}
 	for _, w := range wsWork {
+		for _, left := range w.t.LeftEnvFiles {
+			fmt.Fprintf(notes, "%s: remove from %s\n", w.t.Key(), envFilePath(left))
+		}
 		if w.remove {
 			fmt.Fprintf(notes, "%s: remove from %s\n", w.t.Key(), workspaceSecretTargetPath(w.t))
 			continue
@@ -409,9 +409,11 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	}
 
 	for _, w := range wsWork {
-		rel := w.t.EnvFile
-		if rel == "" {
-			rel = credentials.DefaultEnvFile
+		rel := envFilePath(w.t.EnvFile)
+		if !check {
+			if err := leaveEnvFiles(cmd.Context(), client, w.user, w.t); err != nil {
+				return err
+			}
 		}
 		if w.remove {
 			if !check {
@@ -432,6 +434,12 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 			}
 			if err := credentials.PushWorkspaceEnv(cmd.Context(), client, w.user, rel, w.t.Name, value, w.t.EnvFile != ""); err != nil {
 				return err
+			}
+			if len(w.t.LeftEnvFiles) > 0 {
+				w.t.LeftEnvFiles = nil
+				if err := secrets.SetTarget(found.dir, w.t); err != nil {
+					return err
+				}
 			}
 		}
 		report.Delivered = append(report.Delivered, w.t.Key())
