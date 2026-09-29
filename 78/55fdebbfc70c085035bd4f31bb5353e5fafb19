@@ -1,0 +1,30 @@
+docs/examples/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_52416112327b1f 3-6,8-10,12-28,36-38,40,51,58-59,61,70-87
+docs/examples/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_b7fcaaaf5cf56b 3-6,8,10-26,37,40,46,55-56,58,60-61,65-79
+docs/examples/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_00193a3c34eb6a 3-5,7-9,11-27,34-36,38,53-55,57,66-70,72-78,80-83
+docs/examples/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_9269ddce745435 3-5,7-23,28-31,33-35,42,51,56-69
+  s_a0cbf6c120c4f8::t_578e73bafda6d6 70
+docs/examples/an-agent-in-its-own-workspace.md
+  s_a0cbf6c120c4f8::t_d2c52a5dddd735 4-5,7,9,12-14,19-23,25,32-34,36,43-60
+docs/examples/a-local-vm-with-lima.md
+  s_a0cbf6c120c4f8::t_400dc8dca6e369 10-13,16,18-21,24-25,34-39,41,43,53,56-58,64,72-91,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7855fdebbfc70c085035bd4f31bb5353e5fafb19",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
