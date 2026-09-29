@@ -10,6 +10,7 @@ Linux computer.
 ```
 brew install mydevmachine/tap/devmachine
 devmachine setup
+devmachine skills add
 devmachine workspaces new alice && devmachine sync
 devmachine ssh alice
 ```
@@ -17,6 +18,8 @@ devmachine ssh alice
 `setup` connects to the server and locks it down: it checks who you are
 talking to, installs a key, and turns off password logins. `workspaces new`
 adds a workspace to your configuration. `sync` builds it on the server.
+`skills add` teaches your coding agent the CLI, so you can ask for any of
+this from any Claude Code or Codex session.
 
 **Documentation: https://mydevmachine.sh/** — getting started,
 how it all works, every command, and fixes for common errors. The same pages
