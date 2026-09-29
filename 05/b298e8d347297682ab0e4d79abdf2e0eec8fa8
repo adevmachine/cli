@@ -1,0 +1,27 @@
+docs/concepts/private-networks.md
+  s_a0cbf6c120c4f8::t_84601972317b29 62-64
+docs/concepts/reaching-your-server.md
+  s_a0cbf6c120c4f8::t_9c1e255b857afe 91-93
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_47816cb817e300 547-549
+internal/commands/login.go
+  s_a0cbf6c120c4f8::t_a0ec58b7460500 100,136-152
+internal/commands/login_test.go
+  s_a0cbf6c120c4f8::t_6866922bd9220f 248-257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "05b298e8d347297682ab0e4d79abdf2e0eec8fa8",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
