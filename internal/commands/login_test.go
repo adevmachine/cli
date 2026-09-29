@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -232,6 +233,13 @@ func TestLoginTailscalePrependsTheMachinesTailnetName(t *testing.T) {
 	}
 	if len(m.Hosts) != 2 || m.Hosts[0].Address != "tailscale:main-abc123" || m.Hosts[1].Address != "203.0.113.10" {
 		t.Fatalf("hosts = %#v", m.Hosts)
+	}
+	body, err := os.ReadFile(filepath.Join(dir, config.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "    hosts:\n      - tailscale:main-abc123\n      - 203.0.113.10\n") {
+		t.Fatalf("hosts was not written as a block list:\n%s", body)
 	}
 }
 

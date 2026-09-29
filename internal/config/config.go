@@ -943,11 +943,34 @@ func SetMachineHosts(dir, name string, addresses []string) error {
 			if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != name {
 				continue
 			}
-			setField(entry, "hosts", sequenceNode(addresses))
+			setField(entry, "hosts", hostsNode(field(entry, "hosts"), addresses))
 			return nil
 		}
 		return fmt.Errorf("`machines` has no entry named %q", name)
 	})
+}
+
+// hostsNode is addresses as a block list, one per line, the way the manual
+// writes `hosts`. An address that was already there keeps its own node, and
+// with it any comment written next to it.
+func hostsNode(existing *yaml.Node, addresses []string) *yaml.Node {
+	kept := map[string]*yaml.Node{}
+	if existing != nil && existing.Kind == yaml.SequenceNode {
+		for _, item := range existing.Content {
+			if item.Kind == yaml.ScalarNode {
+				kept[item.Value] = item
+			}
+		}
+	}
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, a := range addresses {
+		item, ok := kept[a]
+		if !ok {
+			item = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: a}
+		}
+		node.Content = append(node.Content, item)
+	}
+	return node
 }
 
 // AddWorkspace appends a workspace to config.yml.

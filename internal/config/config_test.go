@@ -1663,3 +1663,56 @@ func TestSetMachineHostsRefusesAnUnknownMachine(t *testing.T) {
 		t.Fatalf("the error does not name it: %v", err)
 	}
 }
+
+func TestSetMachineHostsKeepsABlockListAndItsComments(t *testing.T) {
+	before := "# my machines\n" +
+		"machines:\n" +
+		"  - name: main # the VPS\n" +
+		"    hosts:\n" +
+		"      - 203.0.113.10 # public\n" +
+		"    packages: [tailscale-pkg]\n"
+	after := "# my machines\n" +
+		"machines:\n" +
+		"  - name: main # the VPS\n" +
+		"    hosts:\n" +
+		"      - tailscale:main\n" +
+		"      - 203.0.113.10 # public\n" +
+		"    packages: [tailscale-pkg]\n"
+	dir := configDirWith(t, before)
+
+	if err := SetMachineHosts(dir, "main", []string{"tailscale:main", "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != after {
+		t.Fatalf("got:\n%s\nwant:\n%s", body, after)
+	}
+}
+
+func TestSetMachineHostsWritesAFlowListAsABlockList(t *testing.T) {
+	before := "machines:\n" +
+		"  - name: main\n" +
+		"    hosts: [203.0.113.10]\n"
+	after := "machines:\n" +
+		"  - name: main\n" +
+		"    hosts:\n" +
+		"      - tailscale:main\n" +
+		"      - 203.0.113.10\n"
+	dir := configDirWith(t, before)
+
+	if err := SetMachineHosts(dir, "main", []string{"tailscale:main", "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != after {
+		t.Fatalf("got:\n%s\nwant:\n%s", body, after)
+	}
+}
