@@ -111,11 +111,16 @@ rest. Then one check per needed credential (`credential: <key>`) and per
 installed DNS provider (`dns: <provider>`). Exits non-zero if anything
 failed.
 
-The SSH aliases check passes when `~/.ssh/config`'s managed block exists
-and matches what `devmachine aliases` would write today; otherwise it
-**warns**, never fails, with the fix `devmachine aliases --write`. It is
-skipped on a self machine — there is no address to write a Host entry
-for.
+The SSH aliases check runs `ssh -G <alias>` for each workspace alias —
+a local lookup, no connection — and compares the hostname, user, port
+and host key alias against what `devmachine aliases` would write today.
+It passes as soon as every alias resolves correctly, whatever file it
+actually lives in: `~/.ssh/config`'s own managed block, or a file
+someone pulls in with `Include` while keeping `ssh_aliases: false` and
+managing `~/.ssh/config` themselves. Otherwise it **warns**, never
+fails, naming the alias and what is wrong, with the fix `devmachine
+aliases --write`. It is skipped on a self machine — there is no
+address to write a Host entry for.
 
 No credential or DNS provider needed is not a failure. A check that could
 not run reports `skip` and why — "I cannot tell" is not "it is not
@@ -467,8 +472,9 @@ plugins or language runtimes — that stays your choice.
 
 ```
 devmachine secrets set <name> [value] [--stdin]
-devmachine secrets list
-devmachine secrets rm <name>
+devmachine secrets set <name> [value] --workspace w [--env-file path] [--push]
+devmachine secrets list [--workspace w]
+devmachine secrets rm <name> [--workspace w] [--from-file]
 devmachine secrets example
 ```
 
@@ -480,6 +486,36 @@ history. `list` prints names only.
 `example` lists which `<NAME>=` a machine's packages need, no values,
 always to stdout — never to a file, since `.env.example` sits one typo
 from `.env`.
+
+### A workspace's own secret
+
+`--workspace` is a different thing from the plain form above: not a
+value a package declared, but your own app's secret — a key your code
+reads. It stores the value under `<workspace>/<name>` and delivers it
+on the next `devmachine credentials push`, or right away with `--push`.
+
+By default it lands in `~/.devmachine/env` — see
+[the `~/.devmachine/env` contract](#devmachine-env). `--env-file
+<path>` delivers into that dotenv file instead, relative to the
+workspace's home: the existing `<NAME>=` line is replaced, or a new one
+appended, and everything else in the file is left exactly as it was. A
+path that would reach outside the workspace's home is refused. The
+first time it edits a file that already existed, it keeps a copy at
+`<path>.devmachine.bak`. See [credentials: your app's own
+secrets](../concepts/credentials.md#your-apps-own-secrets).
+
+`list --workspace w` shows only that workspace's own secrets, with
+where each is delivered. `rm --workspace w --from-file` also removes
+the name from its file, on the next `credentials push` — it is not
+edited here, so `rm` never needs to reach the machine.
+
+### `~/.devmachine/env` {#devmachine-env}
+
+A sourceable file inside every workspace, `KEY='value'` per line,
+0600, owned by the workspace's own account. It holds every workspace
+secret delivered with no `--env-file`. A workspace's shell is expected
+to source it on login — the `zsh` package does — so `export`ing
+anything more is never necessary.
 
 ## login
 
@@ -524,6 +560,10 @@ Never prints a value.
 browser session) and naming any secret never stored; exits non-zero if
 it found one. A workspace's own value (`<workspace>/<name>`) wins over
 the shared one. `--check` previews and writes nothing.
+
+It also delivers every workspace's own secret set with `secrets set
+--workspace` (see above) whose workspace lives on the machine being
+pushed to, and removes the ones marked with `secrets rm --from-file`.
 
 ## packages
 

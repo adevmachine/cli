@@ -66,3 +66,41 @@ sharing actually copies.
 
 One credential is one value. Three keys in one `.env` file are three
 separate credentials, combined by the package when it writes the file.
+
+## Your app's own secrets
+
+A credential above is declared by a package: something a *tool* needs.
+Your own app's secrets — an API key your code reads, a database
+password — are not that. Nothing has to declare them:
+
+```
+devmachine secrets set STRIPE_KEY --workspace alice
+```
+
+This asks for the value the same way `secrets set` always does, stores
+it under `alice/STRIPE_KEY` in the keychain, and remembers to deliver
+it on the next `devmachine credentials push` — or right away, with
+`--push`.
+
+By default it lands in `~/.devmachine/env`, a file the workspace's
+shell sources on login (see
+[the `~/.devmachine/env` contract](../reference/commands.md#devmachine-env)
+in the command reference). Give `--env-file` a path instead, relative
+to the workspace's home, to edit that file directly:
+
+```
+devmachine secrets set STRIPE_KEY --workspace alice --env-file app/.env
+```
+
+**This edits a real file on the machine.** `credentials push` opens
+`app/.env` inside `alice`'s home, replaces the `STRIPE_KEY=` line if
+one is there or appends it if not, and leaves every other line —
+comments included — exactly as it was. The first time it touches a
+file that already existed, it keeps a copy at `app/.env.devmachine.bak`
+next to it, so one bad push is not the only copy of what was there
+before.
+
+`devmachine secrets list --workspace alice` shows the name and the
+target, never the value. `devmachine secrets rm STRIPE_KEY --workspace
+alice --from-file` removes the stored value and, on the next push,
+the line from the file too.

@@ -121,6 +121,22 @@ computer has no address, so it cannot carry these.
 **What to do:** Remove the field the message names. The same error appears,
 one field at a time, for `user`, `port` and `key`.
 
+## `sync` on a self machine fails with "ESTABLISH LOCAL CONNECTION FOR USER: root"
+
+**What it means:** Ansible asks the shell it runs in who is logged in, not
+your configuration. Some shells — a login shell started by a GUI app, cron,
+or a launcher — leave `LOGNAME` set to `root` with `USER` empty. Ansible
+believed it, looked for `/var/root`, and failed there instead of in your
+own home.
+
+**What to do:** Nothing — this is fixed for you. `devmachine sync` on a
+`self: true` machine pins `ansible_user` in the generated inventory to
+the account devmachine itself runs as (read from the operating system, not
+from `USER`/`LOGNAME`), and exports the right `USER`, `LOGNAME` and `HOME`
+around the `ansible-playbook` run. If you still see this on a current
+release, run `whoami` and `echo $HOME` in the terminal you launched
+devmachine from, and check they say what you expect.
+
 ## A `tailscale:` address is being ignored
 
 **What it means:** devmachine drops it when Tailscale is not installed, or
@@ -174,6 +190,29 @@ even though the values themselves live in your keychain.
 
 **What to do:** Check you are using the same configuration directory you used
 when storing it — see `devmachine config path` above.
+
+## `secrets set --env-file` refuses the path
+
+**What it means:** `--env-file` takes a path relative to the workspace's own
+home, and the one given would land outside it — an absolute path
+(`/etc/passwd`), or one with enough `../` to walk out of the home
+directory.
+
+**What to do:** Give a path inside the workspace, such as `app/.env` or
+`.env`. There is no way to deliver a workspace secret outside that
+workspace's own home.
+
+## A workspace secret was pushed, but the app never sees it
+
+**What it means:** `devmachine credentials push` writes the value into
+`~/.devmachine/env` (or the `--env-file` you gave), but nothing runs that
+file for you — that is the shell's job, not the CLI's.
+
+**What to do:** For the default `~/.devmachine/env`, check the workspace's
+shell actually sources it (the `zsh` package does, once installed and
+synced). For `--env-file`, check the app reads that exact file and reloads
+its process after the value changes — this only writes the file, it does
+not restart anything running.
 
 ## `dns status` says a name does not resolve, but it works in the browser
 

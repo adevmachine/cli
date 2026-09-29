@@ -125,6 +125,33 @@ the CLI can still reach and operate the machine — worth a look after any
 round of logins, since a bad key or a locked-out account shows up there
 first.
 
+### 8. Store a secret your own app needs
+
+The steps above are all credentials a *package* declared. Say `acme`'s
+own code reads a `STRIPE_KEY` — nothing in this CLI knows that, and
+nothing has to:
+
+```
+devmachine secrets set STRIPE_KEY --workspace acme
+devmachine credentials push
+```
+
+This stores the value under `acme/STRIPE_KEY` and, on the next push,
+writes it into `~/.devmachine/env` inside `acme`'s home — a file its
+shell sources on login. If the app reads an actual `.env` file instead,
+deliver straight into it:
+
+```
+devmachine secrets set STRIPE_KEY --workspace acme --env-file app/.env
+devmachine credentials push
+```
+
+This edits `app/.env` in place: the existing `STRIPE_KEY=` line is
+replaced, or a new one is appended, and every other line is left
+exactly as it was. The first time it touches a file that already
+existed, it keeps a copy at `app/.env.devmachine.bak`. See
+[credentials: your app's own secrets](../concepts/credentials.md#your-apps-own-secrets).
+
 ## With your agent
 
 Open a session on your own computer (`devmachine skills add` taught it the

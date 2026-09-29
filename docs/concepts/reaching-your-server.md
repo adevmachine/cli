@@ -26,8 +26,17 @@ Said no at the time, or set up before this existed? Turn it on:
 devmachine aliases --write
 ```
 
-`devmachine doctor` and `devmachine machine doctor` both warn when the block
-is missing or stale, with the same fix.
+`devmachine doctor` and `devmachine machine doctor` both check every
+workspace alias by asking `ssh -G <alias>` — a local lookup, never a
+connection — and warn when what it resolves to does not match what
+`devmachine aliases` would write, with the same fix.
+
+Manage `~/.ssh/config` yourself and pull the generated block in with
+`Include` instead? Say no to the question, or set `ssh_aliases: false`,
+and write the block to a file of your own with `devmachine aliases
+--write --path <file>`. The doctor check still passes, because it asks
+`ssh` to resolve the alias rather than reading a fixed file — it does
+not care which file the answer came from.
 
 ## The public address
 
