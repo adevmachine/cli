@@ -1,0 +1,21 @@
+docs/examples/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_ff6ab4c9ec9085 5,20,34,41,48,91,134-135,150,157
+docs/examples/ruby-on-rails.md
+  s_a0cbf6c120c4f8::t_ff6ab4c9ec9085 17,31,43,96,109,119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bd5145363673bf1fa4847d46e15f3b54030d8a16",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
