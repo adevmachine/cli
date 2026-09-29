@@ -727,15 +727,12 @@ func TestDoctorOnASelfMachineRunsNoSSHChecks(t *testing.T) {
 }
 
 // aliasesEnvironment builds a machine plus workspace configuration and a
-// throwaway $HOME, so the check can read and write ~/.ssh/config without
-// ever touching the real one.
-func aliasesEnvironment(t *testing.T) (dir string, sshConfig string) {
+// throwaway $HOME, so a test never depends on the real ~/.ssh/config.
+func aliasesEnvironment(t *testing.T, body string) string {
 	t.Helper()
-	dir = configDir(t, machineWith+"workspaces:\n  - name: alice\n")
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	sshConfig = filepath.Join(home, ".ssh", "config")
-	return dir, sshConfig
+	dir := configDir(t, machineWith+body)
+	t.Setenv("HOME", t.TempDir())
+	return dir
 }
 
 func fullMachineClient() fakeClient {
@@ -745,8 +742,44 @@ func fullMachineClient() fakeClient {
 	}}
 }
 
-func TestSSHAliasesCheckWarnsWhenNeverWritten(t *testing.T) {
-	dir, _ := aliasesEnvironment(t)
+// matchingSSHResolve returns a fake `ssh -G` resolver that answers exactly
+// what List(cfg) says every alias should resolve to.
+func matchingSSHResolve(t *testing.T, cfg config.Config) sshResolver {
+	t.Helper()
+	found, err := aliases.List(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := make(map[string]aliases.Alias, len(found))
+	for _, a := range found {
+		by[a.Name] = a
+	}
+	return func(alias string) (map[string]string, error) {
+		a, ok := by[alias]
+		if !ok {
+			return nil, fmt.Errorf("Could not resolve hostname %s: nodename nor servname provided", alias)
+		}
+		return map[string]string{
+			"hostname":     a.Host,
+			"user":         a.User,
+			"port":         strconv.Itoa(a.Port),
+			"hostkeyalias": a.HostKeyAlias,
+		}, nil
+	}
+}
+
+func withSSHResolve(t *testing.T, resolve sshResolver) {
+	t.Helper()
+	was := sshResolve
+	sshResolve = resolve
+	t.Cleanup(func() { sshResolve = was })
+}
+
+func TestSSHAliasesCheckWarnsWhenAliasDoesNotResolve(t *testing.T) {
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	withSSHResolve(t, func(string) (map[string]string, error) {
+		return nil, errors.New("Could not resolve hostname alice-devmachine: nodename nor servname provided")
+	})
 
 	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
 
@@ -756,24 +789,17 @@ func TestSSHAliasesCheckWarnsWhenNeverWritten(t *testing.T) {
 	}
 	// A warning is not a failure: the rest of the machine still works.
 	if !OK(checks) {
-		t.Fatal("a missing alias block failed the whole run")
+		t.Fatal("a missing alias failed the whole run")
 	}
 }
 
-func TestSSHAliasesCheckPassesWhenTheBlockMatches(t *testing.T) {
-	dir, sshConfig := aliasesEnvironment(t)
-
+func TestSSHAliasesCheckPassesWhenEveryAliasResolves(t *testing.T) {
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
 	cfg, err := config.Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	block, err := aliases.Render(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := aliases.Write(sshConfig, block); err != nil {
-		t.Fatal(err)
-	}
+	withSSHResolve(t, matchingSSHResolve(t, cfg))
 
 	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
 
@@ -782,29 +808,59 @@ func TestSSHAliasesCheckPassesWhenTheBlockMatches(t *testing.T) {
 	}
 }
 
-func TestSSHAliasesCheckWarnsWhenStale(t *testing.T) {
-	dir, sshConfig := aliasesEnvironment(t)
-
-	if err := aliases.Write(sshConfig, "Host stale-devmachine\n    HostName 203.0.113.99\n"); err != nil {
+func TestSSHAliasesCheckWarnsOnAMismatch(t *testing.T) {
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
 		t.Fatal(err)
 	}
+	match := matchingSSHResolve(t, cfg)
+	withSSHResolve(t, func(alias string) (map[string]string, error) {
+		fields, err := match(alias)
+		if err != nil {
+			return nil, err
+		}
+		fields["hostname"] = "203.0.113.99"
+		return fields, nil
+	})
 
 	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
 
 	got := find(t, checks, CheckSSHAliases)
-	if got.Status != StatusWarn || !strings.Contains(got.Detail, "stale") {
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "hostname 203.0.113.99") {
 		t.Fatalf("got %#v", got)
 	}
 }
 
 func TestSSHAliasesCheckPassesWithNoWorkspace(t *testing.T) {
-	dir := configDir(t, machineWith)
-	t.Setenv("HOME", t.TempDir())
+	dir := aliasesEnvironment(t, "")
 
 	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
 
 	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
 		t.Fatalf("got %#v", got)
+	}
+}
+
+// TestSSHAliasesCheckPassesWhenManagedElsewhere covers a person who keeps
+// ~/.ssh/config themselves and pulls the generated block in from another file
+// with `Include`. `ssh_aliases: false` means devmachine never wrote the
+// managed block itself, but the alias still has to resolve correctly.
+func TestSSHAliasesCheckPassesWhenManagedElsewhere(t *testing.T) {
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSHAliases {
+		t.Fatal("ssh_aliases defaulted to true; this test needs it off")
+	}
+	withSSHResolve(t, matchingSSHResolve(t, cfg))
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
+		t.Fatalf("got %#v; ssh_aliases: false should not be warned about when it still resolves", got)
 	}
 }
 

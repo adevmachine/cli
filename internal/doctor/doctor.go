@@ -6,7 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/aliases"
@@ -159,46 +160,99 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 	return append(checks, dnsChecks(ctx, dir, m.Name, baseOf(m), client)...)
 }
 
-// sshAliasesCheck reports whether ~/.ssh/config's managed block exists and
-// still matches what `devmachine aliases` would write for the configuration
-// today.
+// sshResolve runs `ssh -G <alias>` and parses its output into lowercase
+// key/value pairs. `ssh -G` only resolves the configuration; it never opens a
+// connection, so this is safe to run whether or not the alias is any good.
 //
-// It is a warning, never a failure: a stale or missing block means `ssh
+// It is a seam: a test supplies a fake so the check never shells out to a
+// real ssh binary or depends on any actual SSH configuration file.
+var sshResolve sshResolver = func(alias string) (map[string]string, error) {
+	out, err := exec.Command("ssh", "-G", alias).Output()
+	if err != nil {
+		return nil, err
+	}
+	return parseSSHDashG(string(out)), nil
+}
+
+type sshResolver func(alias string) (map[string]string, error)
+
+func parseSSHDashG(out string) map[string]string {
+	fields := make(map[string]string)
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		key, value, found := strings.Cut(line, " ")
+		if !found {
+			continue
+		}
+		fields[strings.ToLower(key)] = value
+	}
+	return fields
+}
+
+// sshAliasesCheck reports whether every workspace alias resolves to what
+// `devmachine aliases` would write for the configuration today — whatever
+// file it actually lives in.
+//
+// It asks `ssh -G <alias>` rather than reading a fixed file, because a person
+// who manages ~/.ssh/config themselves can pull the generated block in from
+// elsewhere with `Include`. That makes the check work the same way whether
+// devmachine owns the file (`ssh_aliases: true`) or only wrote it once on
+// request.
+//
+// It is a warning, never a failure: a stale or missing alias means `ssh
 // <workspace>-devmachine` does not work from another terminal, not that the
 // machine itself is broken.
 func sshAliasesCheck(cfg config.Config) Check {
-	if len(cfg.Workspaces) == 0 {
+	found, err := aliases.List(cfg)
+	if err != nil {
+		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
+	}
+	if len(found) == 0 {
 		return Check{Name: CheckSSHAliases, Status: StatusPass, Detail: "no workspace configured"}
 	}
 
-	want, err := aliases.Render(cfg)
-	if err != nil {
-		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
+	var problems []string
+	for _, a := range found {
+		if msg := aliasMismatch(a); msg != "" {
+			problems = append(problems, msg)
+		}
 	}
-	path, err := aliases.DefaultPath()
+	if len(problems) == 0 {
+		return Check{Name: CheckSSHAliases, Status: StatusPass}
+	}
+	return Check{Name: CheckSSHAliases, Status: StatusWarn,
+		Detail: strings.Join(problems, "; ") + "; run `devmachine aliases --write`, or fix the file it is included from"}
+}
+
+// aliasMismatch reports what is wrong with one alias's resolved SSH
+// configuration, or "" when it resolves exactly as `devmachine aliases`
+// would write it.
+func aliasMismatch(a aliases.Alias) string {
+	resolved, err := sshResolve(a.Name)
 	if err != nil {
-		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
+		return fmt.Sprintf("%s does not resolve (%v)", a.Name, err)
 	}
 
-	fix := "run `devmachine aliases --write`"
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: "not written yet: " + fix}
+	var mismatches []string
+	if got := resolved["hostname"]; got != a.Host {
+		mismatches = append(mismatches, fmt.Sprintf("hostname %s, expected %s", got, a.Host))
 	}
-
-	current := string(body)
-	start := strings.Index(current, aliases.Begin)
-	stop := strings.LastIndex(current, aliases.End)
-	if start < 0 || stop <= start {
-		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: "not written yet: " + fix}
+	if got := resolved["user"]; got != a.User {
+		mismatches = append(mismatches, fmt.Sprintf("user %s, expected %s", got, a.User))
 	}
-
-	existing := current[start+len(aliases.Begin) : stop]
-	if strings.TrimSpace(existing) != strings.TrimSpace(want) {
-		return Check{Name: CheckSSHAliases, Status: StatusWarn,
-			Detail: "stale: a workspace changed since the last `devmachine aliases --write`"}
+	if got := resolved["port"]; got != strconv.Itoa(a.Port) {
+		mismatches = append(mismatches, fmt.Sprintf("port %s, expected %d", got, a.Port))
 	}
-	return Check{Name: CheckSSHAliases, Status: StatusPass}
+	if got := resolved["hostkeyalias"]; got != a.HostKeyAlias {
+		mismatches = append(mismatches, fmt.Sprintf("hostkeyalias %s, expected %s", got, a.HostKeyAlias))
+	}
+	if len(mismatches) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s: %s", a.Name, strings.Join(mismatches, ", "))
 }
 
 // selfChecks is doctor's whole surface for a self machine: no SSH checks —
