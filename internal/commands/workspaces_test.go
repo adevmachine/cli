@@ -581,3 +581,12 @@ func TestWorkspaceDefaultsRefusesContradictoryFlags(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestWorkspacesEditRefusesToRemoveTheAccount(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [workspace, dev]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--rm", "workspace", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "creates the account") {
+		t.Fatalf("got %v, want a refusal that says why", err)
+	}
+}

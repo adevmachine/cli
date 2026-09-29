@@ -73,6 +73,14 @@ workspaces:
     user: bob-dev
 ```
 
+The `workspace` package creates the account: its home, which nobody else can
+read, the keys you log in with, its groups and its git identity. Every
+workspace gets it, first, whether its list names it or not, so a package
+that forgets to wait for the account can never run before the account
+exists. It cannot be removed; `devmachine workspaces rm` removes the whole
+workspace instead. Its settings, such as `workspace.groups` and
+`workspace.git_email`, work like any other package's.
+
 ## Making and removing a workspace
 
 ```

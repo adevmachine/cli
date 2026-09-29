@@ -172,7 +172,7 @@ func (w Workspace) LinuxUser() string {
 //
 // It is a seed, not a rule: it is written into the person's own file, where
 // they can change it, and nothing reads it again afterwards.
-var DefaultWorkspacePackages = []string{"workspace", "dev", "zsh", "mise"}
+var DefaultWorkspacePackages = []string{"dev", "zsh", "mise"}
 
 // Defaults are the choices something new gets when nothing says otherwise.
 //

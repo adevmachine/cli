@@ -578,6 +578,11 @@ func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspac
 	}
 	was := machineNameOf(cfg, w)
 
+	for _, p := range e.remove {
+		if err := refuseRemovingAccount(p); err != nil {
+			return err
+		}
+	}
 	changes, err := applyWorkspaceEdit(cfg, &w, e)
 	if err != nil {
 		return err

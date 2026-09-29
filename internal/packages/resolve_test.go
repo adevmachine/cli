@@ -310,3 +310,24 @@ func TestResolveMachineRefusesRoutesWithoutCaddy(t *testing.T) {
 		t.Fatalf("routes without caddy must be refused and name both, got %v", err)
 	}
 }
+
+func TestResolveGivesEveryWorkspaceItsAccountFirst(t *testing.T) {
+	store := storeWith(t, map[string]string{
+		"workspace":         "format: 1\nname: workspace\nscope: workspace\nsummary: the account\n",
+		"devmachine-skills": "format: 1\nname: devmachine-skills\nscope: workspace\nsummary: skills\n",
+	})
+	machine := config.Machine{Name: "main"}
+	cfg := config.Config{
+		Machines:   []config.Machine{machine},
+		Workspaces: []config.Workspace{{Name: "alice", Packages: []string{"devmachine-skills"}}},
+	}
+
+	plan, err := ResolveMachine(store, cfg, machine, "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := names(plan.Workspaces[0].Ordered)
+	if len(got) != 2 || got[0] != "workspace" {
+		t.Fatalf("got %v, want the workspace package first", got)
+	}
+}

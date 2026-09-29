@@ -101,6 +101,19 @@ func (s *Store) Get(name string) (Found, error) {
 	return Found{}, fmt.Errorf("no package named %q. Available: %s", name, strings.Join(names, ", "))
 }
 
+// Has says whether any source holds a package of this name.
+func (s *Store) Has(name string) bool {
+	for _, candidate := range s.sources() {
+		if candidate.dir == "" {
+			continue
+		}
+		if _, err := os.Stat(ManifestPath(filepath.Join(candidate.dir, name))); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // GetRelease returns the pinned published copy even when a local package has
 // the same name. It is used for reserved first-party content whose identity
 // must not be changed by an overlay.

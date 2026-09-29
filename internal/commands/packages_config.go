@@ -114,6 +114,18 @@ func newPackagesEditCmd(opts *options, add bool) *cobra.Command {
 	return c
 }
 
+// refuseRemovingAccount keeps the one package every workspace needs. Taking it
+// out of the list would change nothing, since the plan adds it back, so saying
+// no is the honest answer.
+func refuseRemovingAccount(name string) error {
+	if name != packages.AccountPackage {
+		return nil
+	}
+	return fmt.Errorf(
+		"every workspace has the %s package, because it creates the account: it cannot be removed. "+
+			"To remove the workspace itself, use `devmachine workspaces rm`", name)
+}
+
 func editPackage(cmd *cobra.Command, opts *options, name, workspace string, add, check, yes bool) error {
 	dir, _, err := config.Dir(opts.configDir)
 	if err != nil {
@@ -126,6 +138,11 @@ func editPackage(cmd *cobra.Command, opts *options, name, workspace string, add,
 	target, err := resolvePackageTarget(cfg, opts.machine, workspace)
 	if err != nil {
 		return err
+	}
+	if !add && workspace != "" {
+		if err := refuseRemovingAccount(name); err != nil {
+			return err
+		}
 	}
 
 	current, write := listFor(&cfg, target)

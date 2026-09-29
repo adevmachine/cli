@@ -57,17 +57,17 @@ machines:
 workspaces:
   - name: alice
     machine: main
-    packages: [workspace, dev, zsh, mise]
+    packages: [dev, zsh, mise]
   - name: bob
     machine: sandbox
     user: bob-dev          # optional; the name is used by default
-    packages: [workspace, dev]
+    packages: [dev]
     credentials:
       gh: own              # this one signs in to its own account
 
 # What a new workspace gets when no flag says otherwise. `setup` sets this.
 defaults:
-  workspace: [workspace, dev, zsh, mise]
+  workspace: [dev, zsh, mise]
 
 # Whether a login is shared across the machine. A workspace may override it.
 credentials:
@@ -89,7 +89,7 @@ overrides one, on a machine (as shown above) or on a workspace, written
 ```yaml
 workspaces:
   - name: alice
-    packages: [workspace, dev, zsh, claude-plugins]
+    packages: [dev, zsh, claude-plugins]
     settings:
       claude-plugins.marketplace: example.com/their-plugins
       claude-plugins.plugins: [their-plugin]

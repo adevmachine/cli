@@ -432,3 +432,12 @@ print(json.dumps({"commands": [{"name": "zones", "summary": "x", "args": ""}]}))
 		t.Fatalf("got %#v", got)
 	}
 }
+
+func TestPackagesRmRefusesToRemoveTheAccount(t *testing.T) {
+	dir := configWithPackagesInstalled(t)
+
+	_, err := execute(t, "--config", dir, "packages", "rm", "workspace", "--workspace", "alice", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "creates the account") {
+		t.Fatalf("got %v, want a refusal that says why", err)
+	}
+}
