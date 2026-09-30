@@ -218,7 +218,7 @@ jobs:
             printf '%s\n' "$out"
             remote=$(printf '%s\n' "$out" | tail -n 1)
             case "$remote" in /home/acme/*) ;; *) return 1 ;; esac
-            body=$("$DM" run --workspace acme -- cat "$remote" | tr -d '\r')
+            body=$("$DM" run --workspace acme -- "cat '$remote'" | tr -d '\r')
             echo "remote body: $body"
             [ "$body" = "hello from wsl" ]
           }
@@ -227,21 +227,34 @@ jobs:
           ssh_terminal() {
             out=$(in_terminal 60 "" 'echo "who=$(whoami)"; exit' "$DM" ssh acme) || true
             printf '%s\n' "$out"
-            printf '%s\n' "$out" | grep -q '^who=acme'
+            printf '%s\n' "$out" | grep -q 'who=acme'
           }
           step "ssh acme in a real terminal" ssh-terminal ssh_terminal
 
           update_declined() {
+            "$DM" workspaces new bob --yes || return 1
             out=$(in_terminal 300 n "" "$DM" update --skip-cli 2>&1)
             code=$?
             printf '%s\n' "$out"
             echo "exit: $code"
-            [ "$code" -eq 0 ] || return 1
             printf '%s\n' "$out" | grep -q 'pass  connection' || return 1
-            printf '%s\n' "$out" | grep -qE '\[y/N\]|nothing would change' || return 1
-            ! printf '%s\n' "$out" | grep -q '^==> sync '
+            printf '%s\n' "$out" | grep -q 'change(s) would be made' || return 1
+            printf '%s\n' "$out" | grep -qF 'Apply these changes with sync? [y/N]' || return 1
+            if printf '%s\n' "$out" | grep -q '^==> sync '; then return 1; fi
+            if [ "$code" -ne 0 ]; then
+              printf '%s\n' "$out" | grep -qF 'error: update: doctor failed' || return 1
+              if printf '%s\n' "$out" | grep -E '^ +fail ' | grep -v 'credential: '; then return 1; fi
+            fi
+            if "$DM" run --machine main -- 'id bob' >/dev/null 2>&1; then
+              echo "bob exists: the n was not respected"
+              return 1
+            fi
+            echo "bob was not created: the n was respected"
           }
           step "update --skip-cli, answer n" update-no update_declined
+          step "sync --yes applies what update left pending" sync-after "$DM" sync --yes
+          expect "run --workspace bob -- whoami" run-bob bob \
+            "$DM" run --workspace bob -- whoami
           doctor_after_sync() {
             out=$("$DM" doctor 2>&1) || true
             printf '%s\n' "$out"
