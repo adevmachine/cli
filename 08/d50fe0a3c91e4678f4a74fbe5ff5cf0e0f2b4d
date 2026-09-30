@@ -1,0 +1,107 @@
+SURFACE.txt
+  s_a0cbf6c120c4f8::t_dbe005a1b68443 45
+docs/concepts/machines-and-workspaces.md
+  s_a0cbf6c120c4f8::t_89e726bd25e743 109,118,120,125-128
+docs/concepts/private-networks.md
+  s_a0cbf6c120c4f8::t_65d38a3a212b60 27-30,49-52,74-89,107-109,130,135-136
+docs/concepts/reaching-your-server.md
+  s_a0cbf6c120c4f8::t_efbdc294edf04c 23-28,76-77,101-104,109-110,122-126
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_a5bde5fd5cdba6 31-33
+docs/guides/headscale.md
+  s_a0cbf6c120c4f8::t_d753b504a1afce 86,92-93,95-100,102-104,107-108,111-116,118-119,125,129-154,163-164,167-172,174-175
+docs/guides/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_29ff56eed39bda 78-79
+docs/how-it-works/addresses-and-fallback.md
+  s_a0cbf6c120c4f8::t_a0fb90cafbdc76 19,21-25,27-51,57-84,87-121
+docs/index.md
+  s_a0cbf6c120c4f8::t_76dc0be61ef018 85-86,121-122
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_02147832e26a7f 284-285,290,293,313-322,331-402,424-425,657,671-690
+docs/reference/network-package-contract.md
+  s_a0cbf6c120c4f8::t_d978dc87c08245 1-70
+docs/reference/package-format.md
+  s_a0cbf6c120c4f8::t_f359872c663358 214-237,259-265
+docs/reference/settings.md
+  s_a0cbf6c120c4f8::t_ce2001b90e28a5 22,61,72-79,84
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_9b084492d6f489 142-145,147-197
+internal/aliases/aliases.go
+  s_a0cbf6c120c4f8::t_f996582a584c9d 12,14,58-83,87-91,119,125-147,164-187,202-203,217-219
+internal/aliases/aliases_test.go
+  s_a0cbf6c120c4f8::t_568ae9e0acc3bd 224,239,264,274,288,318,328,364,381,393,419,432,445,461,471,541
+internal/aliases/proxy_test.go
+  s_a0cbf6c120c4f8::t_97980ad42daa34 1-157
+internal/aliases/testdata/literal.golden
+  s_a0cbf6c120c4f8::t_37965ae57f94a6 1-31
+internal/aliases/testdata/proxy.golden
+  s_a0cbf6c120c4f8::t_b52ac7116762ec 1-32
+internal/commands/aliases.go
+  s_a0cbf6c120c4f8::t_a46d17c31406ca 12-15,31,71-76,105-106,110,173-176
+internal/commands/aliases_test.go
+  s_a0cbf6c120c4f8::t_571fbaec9d5276 188-220
+internal/commands/credentials.go
+  s_a0cbf6c120c4f8::t_48d8f33b48b2b3 55,81
+internal/commands/login.go
+  s_a0cbf6c120c4f8::t_ba16e294582d42 20,28-31,46-52,57-59,85,96-99,106,110,116,119-120,122-127,148-149,151,153,157,161
+internal/commands/machine.go
+  s_a0cbf6c120c4f8::t_8a6c7014082e87 94
+internal/commands/main_test.go
+  s_a0cbf6c120c4f8::t_7eef1e02484f4b 35
+internal/commands/network.go
+  s_a0cbf6c120c4f8::t_78d70f10e8f0a5 1-163
+internal/commands/network_login.go
+  s_a0cbf6c120c4f8::t_67f85940eba7fa 1-101
+internal/commands/network_login_test.go
+  s_a0cbf6c120c4f8::t_3b8705707e0067 1-237
+internal/commands/network_test.go
+  s_a0cbf6c120c4f8::t_35bbf289840204 1-204
+internal/commands/root.go
+  s_a0cbf6c120c4f8::t_1810a78df3d37c 92-93
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_8858452d12ad37 280
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_77d35635be6ac1 72-73,135-140,288-289
+internal/config/config_test.go
+  s_a0cbf6c120c4f8::t_14e374732a4137 1719-1740
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_c7ec7deb4895c2 163-166,183-191,222,265-274
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_86a63b48672503 749,767,889-963
+internal/network/network.go
+  s_a0cbf6c120c4f8::t_ff5c085c2b0cf6 1-221
+internal/network/network_test.go
+  s_a0cbf6c120c4f8::t_207fb0b74ad22c 1-244
+internal/packages/manifest.go
+  s_a0cbf6c120c4f8::t_99da2a0153d40e 78-93,128
+internal/packages/network_test.go
+  s_a0cbf6c120c4f8::t_04bf59c2cf259e 1-187
+internal/packages/skeleton.go
+  s_a0cbf6c120c4f8::t_fe9a7d2b5d3987 46
+internal/packages/store.go
+  s_a0cbf6c120c4f8::t_09a335c463b7b0 58-76
+internal/packages/store_test.go
+  s_a0cbf6c120c4f8::t_0ea4b4a52c768b 179-212
+internal/packages/validate.go
+  s_a0cbf6c120c4f8::t_3e65bb6446bf42 119,230-243,246,248,250,253-308,313-326
+internal/remote/networks.go
+  s_a0cbf6c120c4f8::t_cb82c8825fdbea 1-189
+internal/remote/networks_test.go
+  s_a0cbf6c120c4f8::t_b790dbf883c4a9 1-265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "08d50fe0a3c91e4678f4a74fbe5ff5cf0e0f2b4d",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
