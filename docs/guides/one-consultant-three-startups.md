@@ -140,14 +140,13 @@ the right account when it asks.
 
 ```
 devmachine expose add globex 3000 --host globex.example.com --publish
-devmachine sync
 ```
 
 Caddy came with `setup` (it's in the `essentials` package) and serves every
 client's preview from its own domain — see
 [publishing](../concepts/publishing.md). If your machine was set up with
 `--no-essentials`, or before CLI v0.7.14, add it first: `devmachine packages
-add caddy`.
+add caddy` and `devmachine sync`.
 
 ## Why this works
 
@@ -194,8 +193,8 @@ port 3000 at globex.example.com.
 
 The agent creates the workspace, adds `claude-code` and `docker` (and
 `caddy` too, if `setup` ran with `--no-essentials`), puts `globex` in the
-`docker` group, runs `mise use -g node@22` over SSH, then `expose add` and
-`sync` — showing you the plan first. Signing in to GitHub and Claude Code
+`docker` group, runs `mise use -g node@22` over SSH, then `expose add` —
+showing you the plan of each `sync` first. Signing in to GitHub and Claude Code
 stays yours to do, since those are browser and device logins nobody else can
 finish for you.
 

@@ -2,12 +2,14 @@ package commands
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -62,6 +64,61 @@ type exposeClient struct {
 	zones   []string
 	upserts int
 	lastCmd string
+	// scripts is every script `expose` sent to apply a routes file, and
+	// verdict what the machine answers them; empty means it applied.
+	scripts []string
+	verdict string
+}
+
+var (
+	encodedContent = regexp.MustCompile(`printf '%s' '([A-Za-z0-9+/=]*)'`)
+	routesTarget   = regexp.MustCompile(`restore\(\) \{ rm -f '[^']+' '([^']+)'`)
+)
+
+// apply does to files what the script asks, as far as a test cares: the
+// content it carries lands in the routes file, or the file goes.
+func (c *exposeClient) apply(script string) (string, error) {
+	c.scripts = append(c.scripts, script)
+	verdict := c.verdict
+	if verdict == "" {
+		verdict = "devmachine-apply: applied"
+	}
+	if verdict != "devmachine-apply: applied" {
+		return verdict + "\n", nil
+	}
+	if c.files == nil {
+		c.files = map[string]string{}
+	}
+	name := filepath.Base(routesTarget.FindStringSubmatch(script)[1])
+	if strings.Contains(script, "base64 -d") {
+		m := encodedContent.FindStringSubmatch(script)
+		body, err := base64.StdEncoding.DecodeString(m[1])
+		if err != nil {
+			return "", err
+		}
+		c.files[name] = string(body)
+	} else {
+		delete(c.files, name)
+	}
+	return verdict + "\n", nil
+}
+
+// applied is the content the last script carried, or "" when it removed the
+// file.
+func (c *exposeClient) applied(t *testing.T) string {
+	t.Helper()
+	if len(c.scripts) == 0 {
+		t.Fatal("nothing was applied")
+	}
+	m := encodedContent.FindStringSubmatch(c.scripts[len(c.scripts)-1])
+	if m == nil {
+		return ""
+	}
+	body, err := base64.StdEncoding.DecodeString(m[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
 }
 
 func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
@@ -78,6 +135,9 @@ func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
 			if strings.Contains(command, name) {
 				return body, nil
 			}
+		}
+		if strings.Contains(command, "|| true") {
+			return "", nil
 		}
 		return "", fmt.Errorf("no such file: %s", command)
 	case strings.Contains(command, "rm -f "):
@@ -106,6 +166,9 @@ func (c *exposeClient) RunInput(ctx context.Context, command string, stdin io.Re
 	if err != nil {
 		return "", err
 	}
+	if command == expose.ApplyCommand {
+		return c.apply(string(body))
+	}
 	// writeSite's script is `mkdir -p <dir> && cat > <path> && systemctl reload caddy`.
 	if strings.Contains(command, "cat > ") {
 		if c.files == nil {
@@ -131,11 +194,22 @@ func (c *exposeClient) Close() error                                    { return
 
 func dialExpose(t *testing.T, client *exposeClient) {
 	t.Helper()
-	orig := dial
-	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
+	stub := func(context.Context, config.Machine, string) (remote.Client, string, error) {
 		return client, "203.0.113.10", nil
 	}
-	t.Cleanup(func() { dial = orig })
+	origDial, origMux := dial, dialMux
+	dial, dialMux = stub, stub
+	t.Cleanup(func() { dial, dialMux = origDial, origMux })
+}
+
+func machineDown(t *testing.T) {
+	t.Helper()
+	stub := func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("no route to host")
+	}
+	origDial, origMux := dial, dialMux
+	dial, dialMux = stub, stub
+	t.Cleanup(func() { dial, dialMux = origDial, origMux })
 }
 
 func TestExposeAddWarnsThatAnybodyCanReachIt(t *testing.T) {
@@ -269,11 +343,7 @@ func TestExposeListReportsEveryDisagreement(t *testing.T) {
 }
 
 func TestExposeListWithTheMachineDownStillListsTheConfiguration(t *testing.T) {
-	orig := dial
-	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
-		return nil, "", errors.New("no route to host")
-	}
-	t.Cleanup(func() { dial = orig })
+	machineDown(t)
 	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
 		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
 	writeCaddyPackage(t, dir)
@@ -299,17 +369,17 @@ func TestExposeListSaysNothingWhenBothSidesAreEmpty(t *testing.T) {
 	}
 }
 
-func TestExposeAddRecordsTheRouteAndTouchesNoMachine(t *testing.T) {
+func TestExposeAddNoApplyRecordsTheRouteAndTouchesNoMachine(t *testing.T) {
 	client := &exposeClient{}
 	dialExpose(t, client)
 	dir := configWithCaddy(t)
 
 	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
-		"--host", "app.example.com", "--publish")
+		"--host", "app.example.com", "--publish", "--no-apply")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(client.files) != 0 {
+	if len(client.files) != 0 || len(client.scripts) != 0 {
 		t.Fatalf("add wrote on the machine: %v", client.files)
 	}
 	cfg, err := config.Load(dir)
@@ -323,6 +393,134 @@ func TestExposeAddRecordsTheRouteAndTouchesNoMachine(t *testing.T) {
 	if !strings.Contains(out, "devmachine sync") {
 		t.Fatalf("the answer must say sync publishes it: %q", out)
 	}
+}
+
+func TestExposeAddAppliesTheRouteToCaddyWithoutASync(t *testing.T) {
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := expose.RenderWorkspace("alice", []expose.Site{{Host: "app.example.com", Port: 8080, Workspace: "alice"}})
+	if got := client.applied(t); got != want {
+		t.Fatalf("applied\n%s\nwant what sync writes\n%s", got, want)
+	}
+	if !strings.Contains(client.scripts[0], "'/etc/caddy/sites.d/alice-routes.caddy'") {
+		t.Fatalf("the script does not write alice's routes file:\n%s", client.scripts[0])
+	}
+	if !strings.Contains(out, "published: https://app.example.com -> alice:8080") {
+		t.Fatalf("%q", out)
+	}
+	if strings.Contains(out, "Run `devmachine sync`") {
+		t.Fatalf("a published route needs no sync: %q", out)
+	}
+
+	listed, err := execute(t, "--config", dir, "--format", "json", "expose", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(listed, `"status": "published"`) {
+		t.Fatalf("expose list after the fast path: %s", listed)
+	}
+}
+
+func TestExposeAddKeepsTheOtherRoutesOfTheWorkspace(t *testing.T) {
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: api.example.com, port: 8081}]\n")
+	writeCaddyPackage(t, dir)
+
+	if _, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish"); err != nil {
+		t.Fatal(err)
+	}
+	got := client.applied(t)
+	if !strings.Contains(got, "api.example.com {") || !strings.Contains(got, "app.example.com {") {
+		t.Fatalf("the file must carry every route of alice:\n%s", got)
+	}
+}
+
+func TestExposeAddThatCaddyRefusesStaysPending(t *testing.T) {
+	client := &exposeClient{verdict: "Error: ambiguous site definition: app.example.com\ndevmachine-apply: invalid"}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	_, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err == nil {
+		t.Fatal("a refused file must not read as published")
+	}
+	for _, want := range []string{"ambiguous site definition", "pending", "devmachine sync"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("missing %q in %v", want, err)
+		}
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); !ok {
+		t.Fatal("the route must stay recorded, to fix and sync")
+	}
+}
+
+func TestExposeAddOnAMachineWhoseCaddyIsNotInstalledYetStaysPending(t *testing.T) {
+	client := &exposeClient{verdict: "devmachine-apply: no-caddy"}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "pending") || !strings.Contains(out, "devmachine sync") {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestExposeAddJSONSaysWhetherItApplied(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got exposeResult
+	if err := json.Unmarshal([]byte(lastJSON(out)), &got); err != nil {
+		t.Fatal(err, out)
+	}
+	if !got.Applied || got.Status != "published" || got.Host != "app.example.com" || got.Workspace != "alice" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestExposeAddJSONWithTheMachineDownSaysPending(t *testing.T) {
+	machineDown(t)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got exposeResult
+	if err := json.Unmarshal([]byte(lastJSON(out)), &got); err != nil {
+		t.Fatal(err, out)
+	}
+	if got.Applied || got.Status != "pending" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+// lastJSON is the JSON document at the end of the combined output, after
+// whatever the command said on stderr.
+func lastJSON(out string) string {
+	return out[strings.LastIndex(out, "{\n"):]
 }
 
 func TestExposeAddStillPointsTheName(t *testing.T) {
@@ -342,11 +540,7 @@ func TestExposeAddStillPointsTheName(t *testing.T) {
 }
 
 func TestExposeAddRecordsEvenWhenTheMachineIsDown(t *testing.T) {
-	orig := dial
-	dial = func(context.Context, config.Machine, string) (remote.Client, string, error) {
-		return nil, "", errors.New("no route to host")
-	}
-	t.Cleanup(func() { dial = orig })
+	machineDown(t)
 	dir := configWithCaddy(t)
 
 	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
@@ -360,6 +554,9 @@ func TestExposeAddRecordsEvenWhenTheMachineIsDown(t *testing.T) {
 	}
 	if !strings.Contains(out, "203.0.113.10") {
 		t.Fatalf("the record to create by hand is missing: %q", out)
+	}
+	if !strings.Contains(out, "pending") || !strings.Contains(out, "devmachine sync") {
+		t.Fatalf("it must say the route waits for a sync: %q", out)
 	}
 }
 
@@ -378,7 +575,8 @@ func TestExposeAddRefusesWithoutCaddy(t *testing.T) {
 }
 
 func TestExposeAddCheckWritesNothing(t *testing.T) {
-	dialExpose(t, &exposeClient{})
+	client := &exposeClient{}
+	dialExpose(t, client)
 	dir := configWithCaddy(t)
 	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
 		"--host", "app.example.com", "--check")
@@ -392,10 +590,42 @@ func TestExposeAddCheckWritesNothing(t *testing.T) {
 	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
 		t.Fatal("--check recorded a route")
 	}
+	if len(client.scripts) != 0 {
+		t.Fatal("--check applied something")
+	}
 }
 
-func TestExposeRmForgetsTheRouteAndTouchesNoMachine(t *testing.T) {
-	client := &exposeClient{files: map[string]string{"alice-routes.caddy": "app.example.com {\n}\n"}}
+func TestExposeAddCheckShowsTheConfigurationAndTheCaddyFile(t *testing.T) {
+	client := &exposeClient{files: map[string]string{
+		"alice-routes.caddy": expose.RenderWorkspace("alice", []expose.Site{{Host: "api.example.com", Port: 8081}}),
+	}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: api.example.com, port: 8081}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"config.yml",
+		"+ {host: app.example.com, port: 8080}",
+		"/etc/caddy/sites.d/alice-routes.caddy",
+		" api.example.com {",
+		"+app.example.com {",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestExposeRmTakesTheRouteOffCaddyWithoutASync(t *testing.T) {
+	client := &exposeClient{files: map[string]string{
+		"alice-routes.caddy": expose.RenderWorkspace("alice", []expose.Site{{Host: "app.example.com", Port: 8080}}),
+	}}
 	dialExpose(t, client)
 	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
 		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
@@ -405,7 +635,72 @@ func TestExposeRmForgetsTheRouteAndTouchesNoMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(client.files) != 1 {
+	if got := client.applied(t); got != "" {
+		t.Fatalf("alice has no route left, yet the file carries:\n%s", got)
+	}
+	if _, ok := client.files["alice-routes.caddy"]; ok {
+		t.Fatal("the routes file is still on the machine")
+	}
+	if !strings.Contains(out, "no longer published") {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestExposeRmKeepsTheOtherRoutesOfTheWorkspace(t *testing.T) {
+	client := &exposeClient{}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}, {host: api.example.com, port: 8081}]\n")
+	writeCaddyPackage(t, dir)
+
+	if _, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	want := expose.RenderWorkspace("alice", []expose.Site{{Host: "api.example.com", Port: 8081, Workspace: "alice"}})
+	if got := client.applied(t); got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestExposeRmCheckShowsBothSidesAndChangesNothing(t *testing.T) {
+	client := &exposeClient{files: map[string]string{
+		"alice-routes.caddy": expose.RenderWorkspace("alice", []expose.Site{{Host: "app.example.com", Port: 8080}}),
+	}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"- {host: app.example.com, port: 8080}", "-app.example.com {", "removed"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if len(client.scripts) != 0 {
+		t.Fatal("--check applied something")
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); !ok {
+		t.Fatal("--check forgot the route")
+	}
+}
+
+func TestExposeRmNoApplyForgetsTheRouteAndTouchesNoMachine(t *testing.T) {
+	client := &exposeClient{files: map[string]string{"alice-routes.caddy": "app.example.com {\n}\n"}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes", "--no-apply")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(client.files) != 1 || len(client.scripts) != 0 {
 		t.Fatal("rm touched the machine")
 	}
 	cfg, _ := config.Load(dir)
@@ -414,6 +709,25 @@ func TestExposeRmForgetsTheRouteAndTouchesNoMachine(t *testing.T) {
 	}
 	if !strings.Contains(out, "devmachine sync") {
 		t.Fatalf("%q", out)
+	}
+}
+
+func TestExposeRmWithTheMachineDownSaysItIsStillServed(t *testing.T) {
+	machineDown(t)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "devmachine sync") {
+		t.Fatalf("%q", out)
+	}
+	cfg, _ := config.Load(dir)
+	if _, _, ok := cfg.RouteOwner("app.example.com"); ok {
+		t.Fatal("the route is still recorded")
 	}
 }
 

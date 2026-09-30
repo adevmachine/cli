@@ -536,31 +536,53 @@ first. A name is always the full name (or the zone itself for the apex).
 only you should reach, uses [`devmachine tunnel`](#tunnel) instead.
 
 ```
-devmachine expose add <workspace> <port> --host <host> [--check] [--publish]
+devmachine expose add <workspace> <port> --host <host> [--check] [--publish] [--no-apply]
 devmachine expose list
-devmachine expose rm <host> [--check] [--yes]
+devmachine expose rm <host> [--check] [--yes] [--no-apply]
 ```
 
 Publishes a workspace's port to the internet, over HTTPS, at a hostname
 you choose.
 
-`add` records the site in `config.yml`; `devmachine sync` writes the
-Caddy config. **Refuses if `caddy` is not on the machine.** It asks for
-confirmation first — the port becomes reachable by anyone who learns the
-hostname; see [tunnel](#tunnel) for what should not get a yes.
-`--publish` is the non-interactive way past that; `--check` previews. It
-also points the hostname at the machine, same as `dns add`. See [why a
-published site lives in the configuration](../how-it-works/published-sites.md).
+`add` records the site in `config.yml`, points the hostname at the
+machine (same as `dns add`), and then puts it on Caddy at once: it writes
+the workspace's routes file on the machine and reloads Caddy. That takes
+seconds, not a whole `sync` — and it is the very file `sync` writes, so the
+next `sync` has nothing to change. **Refuses if `caddy` is not on the
+machine.** It asks for confirmation first — the port becomes reachable by
+anyone who learns the hostname; see [tunnel](#tunnel) for what should not
+get a yes. `--publish` is the non-interactive way past that.
+
+- When Caddy refuses the new file, the old one stays, Caddy's own error is
+  printed, and the command fails. The route stays in `config.yml` as
+  `pending`: fix it and run `sync`.
+- When the machine cannot be reached, the route is recorded as `pending`
+  and the command still succeeds. The next `sync` publishes it.
+- `--no-apply` only records, the way `add` worked before: the next `sync`
+  publishes it.
+- `--check` changes nothing. It prints the line `config.yml` would gain
+  and the routes file as it is on the machine against what it would
+  become (`+` added, `-` removed).
+- With `--format json` it prints `host`, `port`, `workspace`, `applied`
+  (`true` once Caddy serves it) and `status` (`published` or `pending`),
+  with a `note` saying why when it is pending.
+
+See [why a published site lives in the configuration](../how-it-works/published-sites.md).
 
 `list` prints every host with its port, workspace, and one of four
 words: `published` (both agree), `pending`/`differs` (needs `sync`),
 `unmanaged` (only the machine has it — adopt with the `add` shown).
 Unreachable machine or missing `caddy`: rows print `unknown`.
 
-`rm` takes a host out of the configuration; the next `sync` removes it. A
-host the configuration does not know is refused, with how to adopt or
-remove it by hand. See [Publishing](../concepts/publishing.md) for the
-cases this question exists to catch.
+`rm` takes a host out of the configuration and off Caddy at once, the
+same way `add` puts it on: the workspace's routes file is written without
+it (or removed, with no route left) and Caddy reloads. With the machine
+out of reach it keeps serving the site until the next `sync`.
+`--no-apply` and `--check` work as for `add`; in JSON, `status` is
+`removed` or `pending`. A host the configuration does not know is
+refused, with how to adopt or remove it by hand. See
+[Publishing](../concepts/publishing.md) for the cases this question
+exists to catch.
 
 ## tunnel
 

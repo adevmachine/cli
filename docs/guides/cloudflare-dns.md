@@ -92,12 +92,12 @@ shows every record the provider holds for that zone right now.
 
 ```
 devmachine expose add acme 3000 --host app.example.com --publish
-devmachine sync
 ```
 
 With `cloudflare` installed, `expose add` creates the `A` record for
 `app.example.com` itself, instead of printing one for you to add by hand.
-`sync` writes the Caddy route and gets the certificate.
+It then writes the Caddy route on the machine and reloads Caddy, which
+gets the certificate — no `sync` needed.
 
 ### 6. Check it from outside
 
@@ -127,7 +127,7 @@ and create a scoped **Edit zone DNS** token for your zone — that page needs
 your own Cloudflare login, so the agent cannot do it. It then runs `secrets
 set cloudflare` in a terminal it opens for you to paste the token into,
 runs `credentials push`, and finally `expose add acme 3000 --host
-app.example.com --publish`, asking you to approve the `sync` that follows.
+app.example.com --publish`.
 
 **Check it:** `curl https://app.example.com` returns your app's response
 with a valid certificate, and `devmachine dns status app.example.com`

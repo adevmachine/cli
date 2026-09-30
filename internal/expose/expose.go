@@ -93,3 +93,17 @@ func Parse(content string) []Site {
 	}
 	return out
 }
+
+// FileChange is what one routes file in caddy's sites directory must become.
+type FileChange struct {
+	// Path is the file in the sites directory.
+	Path string
+	// Content is nil when the file goes away.
+	Content []byte
+	// Stale are files removed with it: the one-host files the old `expose`
+	// wrote for a host this file now owns, since Caddy refuses a host twice.
+	Stale []string
+	Owner string
+	Group string
+	Mode  string
+}

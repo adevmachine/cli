@@ -66,10 +66,10 @@ Back on your own computer:
 
 ```
 devmachine expose add acme 3000 --host app.example.com --publish
-devmachine sync
 ```
 
-`sync` writes the Caddy route and gets the certificate for the host. If no
+`expose add` writes the Caddy route on the machine and reloads Caddy, which
+gets the certificate for the host — no `sync` needed. If no
 DNS provider package is installed, `expose add` prints the record to create
 by hand at your registrar instead of writing it for you.
 
@@ -84,8 +84,8 @@ listening on port 3000, and expose it at app.example.com.
 ```
 
 The agent runs the same commands: writes `server.js` over SSH, starts it,
-then runs `expose add` and `sync` (adding `caddy` first only if it's missing
-from the machine). You still approve `sync` when it asks, and if `setup` has
+then runs `expose add` (adding `caddy` and syncing first only if it's missing
+from the machine). You still approve a `sync` when it asks, and if `setup` has
 not run yet, you check the fingerprint yourself — the agent cannot do that
 part.
 

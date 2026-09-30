@@ -161,7 +161,6 @@ container.
 
 ```
 devmachine expose add whatsapp 8080 --host wa.example.com --publish
-devmachine sync
 ```
 
 ### 5. A second machine, a second workspace
@@ -176,7 +175,6 @@ devmachine secrets set whatsapp-eu/wuzapi_admin_token
 devmachine credentials push --machine backup
 devmachine sync --machine backup
 devmachine expose add whatsapp-eu 8080 --host wa-eu.example.com --publish --machine backup
-devmachine sync --machine backup
 ```
 
 This is what "shared between machines" means: `wuzapi` lives once, in

@@ -341,8 +341,10 @@ Two more lines that are not errors, but change what a command does:
 
 ## A certificate never arrives after `expose add`
 
-**What it means:** The site only reaches the server on the next `sync`. Once
-it has, Caddy (the reverse proxy) only gets a certificate for a name that
+**What it means:** First check `devmachine expose list`: a `pending` site
+never reached Caddy (the machine was out of reach, or `--no-apply` was
+used), and `devmachine sync` publishes it. A `published` site is on Caddy,
+and Caddy (the reverse proxy) only gets a certificate for a name that
 already points at the server. Two common causes:
 
 - **The name does not resolve yet.** DNS can take a few minutes to catch up,
@@ -357,6 +359,34 @@ already points at the server. Two common causes:
 ```
 devmachine run --machine <name> -- 'systemctl reload caddy'
 ```
+
+## `expose add` says "caddy refused the new … routes file, so the old one stays"
+
+**What it means:** The route is in `config.yml`, but `caddy validate`
+refused the whole configuration with the new file in place, so nothing on
+the machine changed and Caddy serves what it served before. The lines
+after the message are Caddy's own words. Two common causes:
+
+- **Another file in `sites.d` already names the host.** Caddy refuses one
+  host in two files. `devmachine expose list` shows it as `unmanaged`;
+  remove that file, or drop this route and adopt the other one.
+- **The configuration was already broken** by a file that has nothing to do
+  with this route — something written by hand, or by a package. Caddy
+  checks everything, so any broken file stops the new one.
+
+**What to do:** Fix what Caddy names, then run `devmachine sync` — the
+route is still recorded as `pending`. `devmachine expose rm <host>` drops
+it instead.
+
+## `expose add` says the route is pending
+
+**What it means:** The route is in `config.yml`, and the machine does not
+serve it yet. The message says why: the machine could not be reached, or
+`caddy` is in the configuration but not installed there yet. It is not an
+error, so the command still succeeds.
+
+**What to do:** `devmachine sync` when the machine is back, or once more to
+install `caddy`.
 
 ## `expose add` served, and the response is "Blocked request"
 

@@ -662,33 +662,32 @@ func routeTasks(plan packages.MachinePlan, base string, siteChanges []string) st
 	if plan.SitesDir == "" {
 		return ""
 	}
-	byWorkspace := routesByWorkspace(plan)
-
-	var written, absent []string
-	for _, w := range plan.Workspaces {
-		name := w.Target.Name
-		if len(byWorkspace[name]) == 0 {
-			absent = append(absent, path.Join(plan.SitesDir, expose.WorkspaceFileName(name)))
+	files := routeFiles(plan)
+	var written []int
+	var absent []string
+	for i, f := range files {
+		if f.Content == nil {
+			absent = append(absent, f.Path)
 			continue
 		}
-		written = append(written, name)
+		written = append(written, i)
 	}
-	sort.Strings(written)
-	for _, name := range written {
-		for _, s := range byWorkspace[name] {
-			absent = append(absent, path.Join(plan.SitesDir, expose.FileName(s)))
-		}
+	sort.Slice(written, func(a, b int) bool {
+		return plan.Workspaces[written[a]].Target.Name < plan.Workspaces[written[b]].Target.Name
+	})
+	for _, i := range written {
+		absent = append(absent, files[i].Stale...)
 	}
 
 	var out strings.Builder
 	if len(written) > 0 {
 		out.WriteString("    - name: routes from the configuration\n      copy:\n")
 		out.WriteString("        src: \"{{ item.src }}\"\n        dest: \"{{ item.dest }}\"\n")
-		out.WriteString("        owner: root\n        group: root\n        mode: \"0644\"\n      loop:\n")
-		for _, name := range written {
+		fmt.Fprintf(&out, "        owner: %s\n        group: %s\n        mode: %q\n      loop:\n",
+			routeFileOwner, routeFileGroup, routeFileMode)
+		for _, i := range written {
 			fmt.Fprintf(&out, "        - {src: %q, dest: %q}\n",
-				path.Join(base, "routes", name+".caddy"),
-				path.Join(plan.SitesDir, expose.WorkspaceFileName(name)))
+				path.Join(base, "routes", plan.Workspaces[i].Target.Name+".caddy"), files[i].Path)
 		}
 		out.WriteString("      register: devmachine_routes_written\n      tags: [routes]\n\n")
 	}

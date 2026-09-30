@@ -165,7 +165,8 @@ type Workspace struct {
 	// configuration's.
 	Credentials map[string]string `yaml:"credentials,omitempty"`
 	// Routes are the sites `expose` published for this workspace. sync writes
-	// them; nothing else does.
+	// them, and `expose` writes the same file at once when it can reach the
+	// machine.
 	Routes []Route `yaml:"routes,omitempty"`
 }
 

@@ -87,9 +87,9 @@ really means.
 
 - **Show an app at a URL** — anything listening on a port, a dev server or a
   Docker container. Add a reverse proxy once with
-  `devmachine packages add caddy`, then
-  `devmachine expose add acme 3000 --host app.example.com` and
-  `devmachine sync`. To reach it only from your own computer, with no public
+  `devmachine packages add caddy` and `devmachine sync`, then
+  `devmachine expose add acme 3000 --host app.example.com` puts it on Caddy
+  in seconds. To reach it only from your own computer, with no public
   URL, use `devmachine tunnel acme 3000` instead. See
   [publishing](concepts/publishing.md).
 - **Keep your configuration in git:** `devmachine setup git`. See

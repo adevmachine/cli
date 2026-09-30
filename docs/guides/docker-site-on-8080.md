@@ -77,8 +77,9 @@ Back on your own computer:
 
 ```
 devmachine expose add acme 8080 --host site.example.com --publish
-devmachine sync
 ```
+
+It is on Caddy in seconds; no `sync` needed for the route.
 
 ## With your agent
 
@@ -93,8 +94,8 @@ publishing on 127.0.0.1:8080, and expose it at site.example.com.
 If your machine is missing from the config, or you have more than one, the
 agent asks which one to use. It adds `docker` (and `caddy` too, if `setup`
 ran with `--no-essentials`), puts `acme` in the `docker` group, starts the
-container over SSH, then runs `expose add` and `sync`. You still approve
-`sync` when it asks, and putting a workspace in the `docker` group is worth
+container over SSH, then runs `expose add`. You still approve the
+`sync` for the packages when it asks, and putting a workspace in the `docker` group is worth
 reading before you say yes — it is a lot of trust for one container.
 
 **Check it:** `curl https://site.example.com` serves the nginx welcome

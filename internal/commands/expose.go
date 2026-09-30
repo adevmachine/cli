@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,17 +35,22 @@ func newExposeCmd(opts *options) *cobra.Command {
 	return cmd
 }
 
+// machinePlan resolves what the machine is asked to run, the way sync does.
+func machinePlan(ctx context.Context, dir string, cfg config.Config, machine config.Machine) (packages.MachinePlan, error) {
+	store, err := openStore(ctx, dir, cfg.Packages)
+	if err != nil {
+		return packages.MachinePlan{}, err
+	}
+	return packages.ResolveMachine(store, cfg, machine, version)
+}
+
 // caddySitesDir asks the machine's plan for the caddy package's `sites.d`
 // extension point.
 //
 // `expose` never guesses the path: sites.d belongs to caddy, and caddy might
 // not be on this machine at all.
 func caddySitesDir(ctx context.Context, dir string, cfg config.Config, machine config.Machine) (string, error) {
-	store, err := openStore(ctx, dir, cfg.Packages)
-	if err != nil {
-		return "", err
-	}
-	plan, err := packages.ResolveMachine(store, cfg, machine, version)
+	plan, err := machinePlan(ctx, dir, cfg, machine)
 	if err != nil {
 		return "", err
 	}
@@ -55,18 +62,136 @@ func caddySitesDir(ctx context.Context, dir string, cfg config.Config, machine c
 	return plan.SitesDir, nil
 }
 
+// exposeResult is what `expose add` and `expose rm` print with --format json.
+type exposeResult struct {
+	Host      string `json:"host"`
+	Port      int    `json:"port,omitempty"`
+	Workspace string `json:"workspace"`
+	// Applied says Caddy on the machine already serves the change.
+	Applied bool `json:"applied"`
+	// Status is `published` or `removed` once applied, and `pending` while
+	// only the configuration has the change.
+	Status string `json:"status"`
+	Note   string `json:"note,omitempty"`
+}
+
+// routesChange is the routes file the workspace's share of cfg makes, the
+// same one sync would write.
+func routesChange(ctx context.Context, dir string, cfg config.Config, machine config.Machine, workspace string) (expose.FileChange, error) {
+	plan, err := machinePlan(ctx, dir, cfg, machine)
+	if err != nil {
+		return expose.FileChange{}, err
+	}
+	return provision.WorkspaceRoutes(plan, workspace)
+}
+
+// errNotApplied says the configuration has the change and the machine does
+// not: the command still succeeded at recording it.
+type errNotApplied struct{ reason string }
+
+func (e errNotApplied) Error() string { return e.reason }
+
+// applyRoutes puts the workspace's routes file on the machine and reloads
+// Caddy, without running the machine's play: the file is rendered by the same
+// code sync uses, so a later sync finds nothing to change.
+//
+// An errNotApplied means nothing on the machine changed and a sync will do
+// it; any other error means Caddy was asked and refused.
+func applyRoutes(ctx context.Context, client remote.Client, dir string, machine config.Machine, workspace string) error {
+	if client == nil {
+		return errNotApplied{fmt.Sprintf("%s could not be reached", machine.Name)}
+	}
+	if machine.Self {
+		return errNotApplied{fmt.Sprintf("%s is this computer, where only sync writes Caddy's files", machine.Name)}
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	change, err := routesChange(ctx, dir, cfg, machine, workspace)
+	if err != nil {
+		return errNotApplied{err.Error()}
+	}
+	out, err := client.RunInput(ctx, expose.ApplyCommand, strings.NewReader(expose.ApplyScript(change, expose.Caddyfile)))
+	if err != nil {
+		return fmt.Errorf("writing %s on %s: %w %s", change.Path, machine.Name, err, strings.TrimSpace(out))
+	}
+	outcome, detail, err := expose.ParseApply(out)
+	if err != nil {
+		return err
+	}
+	switch outcome {
+	case expose.Applied, expose.Unchanged:
+		return nil
+	case expose.NoCaddy:
+		return errNotApplied{fmt.Sprintf("Caddy is not installed on %s yet", machine.Name)}
+	case expose.Invalid:
+		return fmt.Errorf("caddy refused the new %s, so the old one stays:\n%s", change.Path, detail)
+	default:
+		return fmt.Errorf("caddy did not reload, so the old %s is back:\n%s", change.Path, detail)
+	}
+}
+
+// previewRoutes prints the Caddy file a change would write next to the one on
+// the machine, reading it but changing nothing.
+func previewRoutes(ctx context.Context, out io.Writer, dir string, cfg config.Config, machine config.Machine, workspace string) error {
+	change, err := routesChange(ctx, dir, cfg, machine, workspace)
+	if err != nil {
+		return err
+	}
+	current := ""
+	if client, _, err := dialMux(ctx, machine, ""); err != nil {
+		fmt.Fprintf(out, "%s could not be reached (%v): showing the file against an empty one\n", machine.Name, err)
+	} else {
+		defer client.Close()
+		if current, err = client.Run(ctx, fmt.Sprintf("cat %s 2>/dev/null || true", quoteForShell(change.Path))); err != nil {
+			return fmt.Errorf("reading %s on %s: %w", change.Path, machine.Name, err)
+		}
+	}
+	fmt.Fprintf(out, "%s on %s:\n", change.Path, machine.Name)
+	if change.Content == nil {
+		fmt.Fprintln(out, "(removed: the workspace has no route left)")
+	}
+	fmt.Fprint(out, expose.Diff(current, string(change.Content)))
+	for _, stale := range change.Stale {
+		fmt.Fprintf(out, "%s is removed if it is there: the old `expose` wrote it for a host this file now owns\n", stale)
+	}
+	return nil
+}
+
+func withRoute(cfg config.Config, workspace string, r config.Route) config.Config {
+	cfg.Workspaces = slices.Clone(cfg.Workspaces)
+	for i := range cfg.Workspaces {
+		if cfg.Workspaces[i].Name == workspace {
+			cfg.Workspaces[i].Routes = append(slices.Clone(cfg.Workspaces[i].Routes), r)
+		}
+	}
+	return cfg
+}
+
+func withoutRoute(cfg config.Config, host string) config.Config {
+	cfg.Workspaces = slices.Clone(cfg.Workspaces)
+	for i := range cfg.Workspaces {
+		cfg.Workspaces[i].Routes = slices.DeleteFunc(slices.Clone(cfg.Workspaces[i].Routes),
+			func(r config.Route) bool { return r.Host == host })
+	}
+	return cfg
+}
+
 func newExposeAddCmd(opts *options) *cobra.Command {
 	var host string
-	var check, yes, publish bool
+	var check, yes, publish, noApply bool
 
 	c := &cobra.Command{
 		Use:   "add <workspace> <port>",
-		Short: "Record a workspace's port as a public hostname; sync publishes it",
-		Long: "Records the route in the configuration. `devmachine sync` writes " +
-			"the Caddy block through the extension point the caddy package " +
-			"declares, and reloads Caddy. Before recording anything it asks — " +
-			"because whatever is behind the port becomes reachable by anybody " +
-			"who learns the hostname.",
+		Short: "Publish a workspace's port as a public hostname, on Caddy at once",
+		Long: "Records the route in the configuration, points the name at the " +
+			"machine, and writes the workspace's routes file on the machine and " +
+			"reloads Caddy — the same file sync writes, without running the " +
+			"whole machine's play. A machine that cannot be reached keeps the " +
+			"route pending until the next `devmachine sync`. Before recording " +
+			"anything it asks — because whatever is behind the port becomes " +
+			"reachable by anybody who learns the hostname.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workspace := args[0]
@@ -102,8 +227,15 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				"Publish %s:%d as https://%s, reachable by anybody who learns that hostname?",
 				workspace, port, host)
 			if check {
+				if owner, _, ok := cfg.RouteOwner(host); ok {
+					return fmt.Errorf("%s is already published by workspace %q: `devmachine expose rm %s` first", host, owner.Name, host)
+				}
 				cmd.Println("would " + question)
-				return nil
+				cmd.Printf("%s, workspace %s, routes:\n+ {host: %s, port: %d}\n", config.FileName, workspace, host, port)
+				if noApply {
+					return nil
+				}
+				return previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withRoute(cfg, workspace, config.Route{Host: host, Port: port}), tgt.machine, workspace)
 			}
 			if !publish {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), question)
@@ -121,8 +253,13 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			record(opts, tgt, fmt.Sprintf("expose add %s %d --host %s", workspace, port, host), true)
 			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): expose %s", host))
 
+			notes := cmd.OutOrStdout()
+			if opts.format == formatJSON {
+				notes = cmd.ErrOrStderr()
+			}
+
 			var client remote.Client
-			if c, _, err := dial(cmd.Context(), tgt.machine, ""); err == nil {
+			if c, _, err := dialMux(cmd.Context(), tgt.machine, ""); err == nil {
 				client = c
 				defer client.Close()
 			} else {
@@ -132,15 +269,39 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				return err
 			}
 
-			cmd.Printf("recorded https://%s -> %s:%d in the configuration. Run `devmachine sync` to publish it on %s.\n",
-				host, workspace, port, tgt.machine.Name)
-			return nil
+			result := exposeResult{Host: host, Port: port, Workspace: workspace, Status: "pending"}
+			var applyErr error
+			if noApply {
+				result.Note = "recorded only (--no-apply)"
+				fmt.Fprintf(notes, "recorded https://%s -> %s:%d in the configuration. Run `devmachine sync` to publish it on %s.\n",
+					host, workspace, port, tgt.machine.Name)
+			} else if applyErr = applyRoutes(cmd.Context(), client, dir, tgt.machine, workspace); applyErr == nil {
+				result.Applied, result.Status = true, "published"
+				fmt.Fprintf(notes, "published: https://%s -> %s:%d on %s. Caddy gets the certificate on the first "+
+					"request, which can take a few seconds.\n", host, workspace, port, tgt.machine.Name)
+			} else if pending := (errNotApplied{}); errors.As(applyErr, &pending) {
+				applyErr = nil
+				result.Note = pending.reason
+				fmt.Fprintf(notes, "recorded https://%s -> %s:%d, pending: %s. Run `devmachine sync` to publish it on %s.\n",
+					host, workspace, port, pending.reason, tgt.machine.Name)
+			} else {
+				result.Note = applyErr.Error()
+				applyErr = fmt.Errorf("%w\nhttps://%s is recorded in the configuration and pending: fix it and run `devmachine sync`",
+					applyErr, host)
+			}
+			if opts.format == formatJSON {
+				if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
+					return err
+				}
+			}
+			return applyErr
 		},
 	}
 	c.Flags().StringVar(&host, "host", "", "the public hostname this port answers to (required)")
-	c.Flags().BoolVar(&check, "check", false, "say what would happen, and change nothing")
+	c.Flags().BoolVar(&check, "check", false, "show the configuration and Caddy changes, and change nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "skip local-write questions; never publish")
 	c.Flags().BoolVar(&publish, "publish", false, "publish the site without asking")
+	c.Flags().BoolVar(&noApply, "no-apply", false, "only record the route; the next sync publishes it")
 	return c
 }
 
@@ -310,12 +471,16 @@ func newExposeListCmd(opts *options) *cobra.Command {
 }
 
 func newExposeRmCmd(opts *options) *cobra.Command {
-	var check, yes bool
+	var check, yes, noApply bool
 
 	c := &cobra.Command{
 		Use:   "rm <host>",
-		Short: "Stop publishing a site at the next sync",
-		Args:  cobra.ExactArgs(1),
+		Short: "Stop publishing a site, on Caddy at once",
+		Long: "Forgets the route in the configuration, then rewrites the " +
+			"workspace's routes file on the machine without it and reloads " +
+			"Caddy. A machine that cannot be reached keeps serving the site " +
+			"until the next `devmachine sync`.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := args[0]
 			if !config.UsableHost(host) {
@@ -337,7 +502,19 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 			question := fmt.Sprintf("Stop publishing https://%s ?", host)
 			if check {
 				cmd.Println("would " + question)
-				return nil
+				owner, route, ok := cfg.RouteOwner(host)
+				if !ok {
+					return nil
+				}
+				cmd.Printf("%s, workspace %s, routes:\n- {host: %s, port: %d}\n", config.FileName, owner.Name, host, route.Port)
+				if noApply {
+					return nil
+				}
+				if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
+					cmd.Printf("nothing to change on %s: %v\n", tgt.machine.Name, err)
+					return nil
+				}
+				return previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withoutRoute(cfg, host), tgt.machine, owner.Name)
 			}
 			if !yes {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), question)
@@ -363,12 +540,53 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 			record(opts, target{machine: tgt.machine, workspace: owner}, "expose rm "+host, true)
 			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): stop exposing %s", host))
 
-			cmd.Printf("%s is no longer in the configuration (it was %s's). Run `devmachine sync` to take it off %s.\n",
-				host, owner, tgt.machine.Name)
-			return nil
+			notes := cmd.OutOrStdout()
+			if opts.format == formatJSON {
+				notes = cmd.ErrOrStderr()
+			}
+			result := exposeResult{Host: host, Workspace: owner, Status: "pending"}
+			var applyErr error
+			switch {
+			case noApply:
+				result.Note = "recorded only (--no-apply)"
+				fmt.Fprintf(notes, "%s is no longer in the configuration (it was %s's). Run `devmachine sync` to take it off %s.\n",
+					host, owner, tgt.machine.Name)
+			default:
+				var client remote.Client
+				if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
+					applyErr = errNotApplied{err.Error()}
+				} else if c, _, err := dialMux(cmd.Context(), tgt.machine, ""); err != nil {
+					applyErr = errNotApplied{fmt.Sprintf("%s could not be reached (%v)", tgt.machine.Name, err)}
+				} else {
+					client = c
+					defer client.Close()
+					applyErr = applyRoutes(cmd.Context(), client, dir, tgt.machine, owner)
+				}
+				if applyErr == nil {
+					result.Applied, result.Status = true, "removed"
+					fmt.Fprintf(notes, "https://%s is no longer published: Caddy on %s dropped it (it was %s's).\n",
+						host, tgt.machine.Name, owner)
+				} else if pending := (errNotApplied{}); errors.As(applyErr, &pending) {
+					applyErr = nil
+					result.Note = pending.reason
+					fmt.Fprintf(notes, "%s is no longer in the configuration (it was %s's), but %s. "+
+						"Run `devmachine sync` to take it off %s.\n", host, owner, pending.reason, tgt.machine.Name)
+				} else {
+					result.Note = applyErr.Error()
+					applyErr = fmt.Errorf("%w\n%s is out of the configuration, and %s still serves it until `devmachine sync`",
+						applyErr, host, tgt.machine.Name)
+				}
+			}
+			if opts.format == formatJSON {
+				if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
+					return err
+				}
+			}
+			return applyErr
 		},
 	}
-	c.Flags().BoolVar(&check, "check", false, "say what would happen, and change nothing")
+	c.Flags().BoolVar(&check, "check", false, "show the configuration and Caddy changes, and change nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "remove without asking")
+	c.Flags().BoolVar(&noApply, "no-apply", false, "only forget the route; the next sync takes it off the machine")
 	return c
 }

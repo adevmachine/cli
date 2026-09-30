@@ -145,7 +145,6 @@ Back on your own computer:
 ```
 devmachine expose add agents 7777 --host api.agents.example.com --publish
 devmachine expose add agents 8810 --host console.agents.example.com --publish
-devmachine sync
 ```
 
 AgentOS is the one with real access to your agents, so leaving
@@ -168,7 +167,7 @@ api.agents.example.com and the control plane at console.agents.example.com.
 The agent adds `docker` (and `caddy` too, if `setup` ran with
 `--no-essentials`), puts `agents` in the `docker` group, installs `uv` and
 Agno over SSH, writes the AgentOS app, starts both processes, then runs
-`expose add` twice and `sync`. You still approve `sync` when it asks, pick
+`expose add` twice. You still approve `sync` when it asks, pick
 and type in the model API key yourself, and choose the `OS_SECURITY_KEY` and
 `CP_AUTH_TOKEN` values — the agent should not be generating the tokens that
 guard your own agents.
