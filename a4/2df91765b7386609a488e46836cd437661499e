@@ -1,0 +1,45 @@
+SURFACE.txt
+  s_a0cbf6c120c4f8::t_7ed1331bc92b0d 62
+docs/development.md
+  s_a0cbf6c120c4f8::t_5a848dbfa710e3 75
+docs/how-it-works/uploads.md
+  s_a0cbf6c120c4f8::t_9ee3cb995e85b4 1-42
+docs/index.md
+  s_a0cbf6c120c4f8::t_ce3919514a7758 105-106
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_89eed8ca2255ae 362-397,695
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_2ba20a970e0a13 642-666
+internal/commands/root.go
+  s_a0cbf6c120c4f8::t_4c0a6994675f50 85
+internal/commands/upload.go
+  s_a0cbf6c120c4f8::t_4ea60343789ab0 1-203
+internal/commands/upload_test.go
+  s_a0cbf6c120c4f8::t_7899614edc211e 1-285
+internal/upload/name_test.go
+  s_a0cbf6c120c4f8::t_e32e8595cd7b61 1-95
+internal/upload/send_test.go
+  s_a0cbf6c120c4f8::t_a84a5f6e6105ae 1-243
+internal/upload/upload.go
+  s_a0cbf6c120c4f8::t_833b1d9599554c 1-192
+scripts/accept/run.sh
+  s_a0cbf6c120c4f8::t_6245fbfb84e8c4 43
+scripts/accept/upload.sh
+  s_a0cbf6c120c4f8::t_3aa2fbca369c5b 1-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a42df91765b7386609a488e46836cd437661499e",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
