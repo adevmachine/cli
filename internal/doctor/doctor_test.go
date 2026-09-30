@@ -479,16 +479,38 @@ func TestACredentialThatIsThereIsItsOwnPassingCheck(t *testing.T) {
 	}
 }
 
-func TestAMissingCredentialFailsAndSaysHowToFixIt(t *testing.T) {
+func TestAMissingCredentialWarnsAndSaysHowToFixIt(t *testing.T) {
 	wanted := []credentials.Declared{login("claude", "alice", "alice")}
 	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(working("alice/claude\tno\n")), wanted)
 
 	got := find(t, checks, "credential: alice/claude")
-	if got.Status != StatusFail {
-		t.Fatalf("credential = %q, want fail", got.Status)
+	if got.Status != StatusWarn {
+		t.Fatalf("credential = %q, want warn", got.Status)
+	}
+	if !OK(checks) {
+		t.Fatal("a missing login must not fail the machine")
 	}
 	if !strings.Contains(got.Detail, "devmachine login claude --workspace alice") {
 		t.Fatalf("the detail does not say how to fix it: %q", got.Detail)
+	}
+}
+
+type credentialLookupFails struct{ fakeClient }
+
+func (credentialLookupFails) RunInput(context.Context, string, io.Reader) (string, error) {
+	return "", errors.New("permission denied")
+}
+
+func TestACredentialNobodyCouldLookForWarns(t *testing.T) {
+	wanted := []credentials.Declared{login("gh", "", "")}
+	checks := Run(context.Background(), configDir(t, machineWith), "", dialling(credentialLookupFails{working("")}), wanted)
+
+	got := find(t, checks, "credential: gh")
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "permission denied") {
+		t.Fatalf("credential: gh = %q (%s), want a warning that says why", got.Status, got.Detail)
+	}
+	if !OK(checks) {
+		t.Fatal("a credential lookup that failed must not fail the machine")
 	}
 }
 
@@ -509,7 +531,7 @@ func TestAMissingSecretSaysToStoreItAndPushIt(t *testing.T) {
 
 func TestACredentialWithNowhereToLookIsNotReportedMissing(t *testing.T) {
 	// "I cannot tell" and "it is not there" are different things, and only one
-	// of them is a failure.
+	// of them is a warning.
 	wanted := []credentials.Declared{{
 		Credential: packages.Credential{Name: "gh", Kind: packages.KindManual, Command: "gh auth login"},
 		Package:    "gh-login",
@@ -665,12 +687,15 @@ func TestDoctorNamesTheZonesAProviderHolds(t *testing.T) {
 	}
 }
 
-func TestDoctorFailsAProviderWhoseTokenIsGone(t *testing.T) {
+func TestDoctorWarnsAboutAProviderWhoseTokenIsGone(t *testing.T) {
 	client := dnsAwareClient{fakeClient: working(""), fails: map[string]string{"hostinger": "unauthenticated"}}
 	checks := Run(context.Background(), dirWithBrokenProvider(t), "", dialling(client), nil)
 	c := find(t, checks, "dns: hostinger")
-	if c.Status != StatusFail {
+	if c.Status != StatusWarn {
 		t.Fatalf("got %#v", c)
+	}
+	if !OK(checks) {
+		t.Fatal("a DNS provider that cannot be asked must not fail the machine")
 	}
 	if !strings.Contains(c.Detail, "secrets set") {
 		t.Fatalf("the detail does not say how to fix it: %#v", c)

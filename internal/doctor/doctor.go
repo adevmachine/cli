@@ -467,6 +467,10 @@ func remoteChecks(ctx context.Context, client remote.Client) []Check {
 
 // credentialChecks reports one check per declared credential.
 //
+// A missing credential is a warning, never a failure: the machine still works,
+// and only the tool that needs the login does not. A failure is kept for what
+// makes the machine itself unusable.
+//
 // A machine whose packages declare nothing has nothing to report, and reports
 // nothing: an empty list is not a failure.
 func credentialChecks(ctx context.Context, client remote.Client, wanted []credentials.Declared) []Check {
@@ -478,7 +482,7 @@ func credentialChecks(ctx context.Context, client remote.Client, wanted []creden
 	if err != nil {
 		var out []Check
 		for _, d := range wanted {
-			out = append(out, Check{Name: CredentialCheck(d), Status: StatusFail, Detail: err.Error()})
+			out = append(out, Check{Name: CredentialCheck(d), Status: StatusWarn, Detail: err.Error()})
 		}
 		return out
 	}
@@ -495,7 +499,7 @@ func credentialChecks(ctx context.Context, client remote.Client, wanted []creden
 			check.Status = StatusPass
 			check.Detail = credentials.Place(d)
 		default:
-			check.Status = StatusFail
+			check.Status = StatusWarn
 			check.Detail = credentialFix(d)
 		}
 		out = append(out, check)
@@ -504,7 +508,7 @@ func credentialChecks(ctx context.Context, client remote.Client, wanted []creden
 }
 
 // credentialFix is the command that makes a missing credential arrive. A
-// failure that does not say what to do next is half a report.
+// warning that does not say what to do next is half a report.
 func credentialFix(d credentials.Declared) string {
 	if d.Kind == packages.KindManual {
 		return "missing: run `" + credentials.LoginCommand(d) + "`"
@@ -518,19 +522,22 @@ func dnsCheckName(provider string) string { return CheckDNS + ": " + provider }
 // dnsChecks reports one check per installed DNS provider: whether it can
 // still be asked, and the zones it holds when it can.
 //
+// A provider that cannot be asked is a warning: it is a credential problem,
+// and only `expose` and `dns` need it.
+//
 // A machine with no DNS provider installed reports nothing here — not
 // installing one is a choice, not a fault.
 func dnsChecks(ctx context.Context, dir, machine, base string, client remote.Client) []Check {
 	providers, err := dns.Installed(dir, machine, base, client)
 	if err != nil {
-		return []Check{{Name: CheckDNS, Status: StatusFail, Detail: err.Error()}}
+		return []Check{{Name: CheckDNS, Status: StatusWarn, Detail: err.Error()}}
 	}
 
 	var out []Check
 	for _, p := range providers {
 		zones, err := p.Zones(ctx)
 		if err != nil {
-			out = append(out, Check{Name: dnsCheckName(p.Name()), Status: StatusFail, Detail: dnsFix(err)})
+			out = append(out, Check{Name: dnsCheckName(p.Name()), Status: StatusWarn, Detail: dnsFix(err)})
 			continue
 		}
 		out = append(out, Check{Name: dnsCheckName(p.Name()), Status: StatusPass, Detail: strings.Join(zones, ", ")})
@@ -538,14 +545,15 @@ func dnsChecks(ctx context.Context, dir, machine, base string, client remote.Cli
 	return out
 }
 
-// dnsFix is what a failed DNS check tells somebody to do about it. A stale
+// dnsFix is what a DNS warning tells somebody to do about it. A stale
 // token found while creating a subdomain is a token found too late; this is
 // meant to be found here first.
 func dnsFix(err error) string {
 	return fmt.Sprintf("%v (run `devmachine secrets set` for its credential, then `devmachine credentials push`)", err)
 }
 
-// OK reports whether every check passed or was skipped.
+// OK reports whether no check failed. A warning is OK: it is worth fixing,
+// but the machine still works.
 func OK(checks []Check) bool {
 	for _, c := range checks {
 		if c.Status == StatusFail {

@@ -57,11 +57,32 @@ to use only your own packages, and `update` does not undo it.
 
 ## An unreachable machine is not a reason to stop
 
-`doctor` runs on every machine. A failed check is printed and counted, and
-the run goes on — one broken credential should not stop the other machines
-from being checked. A machine `doctor` could not reach (configuration, host
-key or connection failed) skips its sync check, since there is nothing to
-compare against.
+`doctor` runs on every machine. Warnings and failed checks are printed and
+counted, and the run goes on — one broken credential should not stop the
+other machines from being checked. A machine `doctor` could not reach
+(configuration, host key or connection failed) skips its sync check, since
+there is nothing to compare against, and the summary lists it as `skipped
+(unreachable)`.
+
+What `doctor` finds never changes `update`'s exit code. `update`'s job is
+its own steps: the CLI, the pin, the skills and the sync. If a missing login
+on one machine made `update` exit non-zero, a script could not tell "the
+update failed" from "the update worked and a login is missing". The summary
+line says what doctor found (`doctor  2 warning(s)`, `doctor  machine far
+unreachable`), and `devmachine doctor` keeps its own exit code for scripts
+that care.
+
+## Warn or fail
+
+`doctor` fails a check only when the machine is unusable: the configuration
+is invalid, the host key is unknown or changed, the machine cannot be
+reached, or an essential is missing (a supported operating system, Ansible,
+and on a self machine a bundle folder `sync` can write). Each of those stops
+`sync` itself.
+
+A missing login or secret, and a DNS provider whose token stopped working, is
+a `warn`. The machine still works; only the tool that needs the login does
+not, and the detail says the command that fixes it.
 
 ## Old is a warning, and offline is a skip
 

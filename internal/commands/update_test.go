@@ -358,8 +358,8 @@ func TestUpdateSkipsTheSyncOfAnUnreachableMachine(t *testing.T) {
 	terminal(t, false)
 
 	out, err := execute(t, "--config", dir, "update")
-	if err == nil {
-		t.Fatalf("a failed doctor must show in the exit code:\n%s", out)
+	if err != nil {
+		t.Fatalf("an unreachable machine alone must not fail update: %v\n%s", err, out)
 	}
 	if !slices.Equal(w.runs.checked(), []string{"main"}) {
 		t.Fatalf("checked %q; far is unreachable", w.runs.checked())
@@ -370,7 +370,60 @@ func TestUpdateSkipsTheSyncOfAnUnreachableMachine(t *testing.T) {
 	if !strings.Contains(out, " sync --machine main") {
 		t.Fatalf("with two machines the command must name one:\n%s", out)
 	}
-	assertSummary(t, out, "doctor", "failed")
+	assertSummary(t, out, "doctor", "machine far unreachable")
+	assertSummary(t, out, "sync", "far skipped (unreachable)")
+}
+
+func TestUpdateNeverCallsTheOnlyMachineUpToDateWhenItIsUnreachable(t *testing.T) {
+	w := newUpdateWorld(t, "v17", "v17", 0)
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("connection refused")
+	}))
+
+	out, err := execute(t, "--config", w.dir, "update")
+	if err != nil {
+		t.Fatalf("an unreachable machine alone must not fail update: %v\n%s", err, out)
+	}
+	if len(w.runs.runs) != 0 {
+		t.Fatalf("ran Ansible against an unreachable machine: %+v", w.runs.runs)
+	}
+	if !strings.Contains(out, "fail  connection") {
+		t.Fatalf("the failed connection is not shown:\n%s", out)
+	}
+	assertSummary(t, out, "doctor", "machine main unreachable")
+	assertSummary(t, out, "sync", "skipped")
+	assertSummary(t, out, "sync", "main skipped (unreachable)")
+	if strings.Contains(summaryLine(t, out, "sync"), "every machine matches") {
+		t.Fatalf("an unchecked machine was called up to date:\n%s", out)
+	}
+}
+
+func TestUpdateCountsDoctorWarningsWithoutFailing(t *testing.T) {
+	w := newUpdateWorld(t, "v17", "v17", 0)
+	body, err := os.ReadFile(filepath.Join(w.dir, "config.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	withLogin := strings.Replace(string(body), "packages: v17\n", "    packages: [gh-login]\npackages: v17\n", 1)
+	if err := os.WriteFile(filepath.Join(w.dir, "config.yml"), []byte(withLogin), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeCredentialPackage(t, w.dir, "gh-login", packages.ScopeMachine,
+		"  - name: gh\n    kind: manual\n    scope: machine\n"+
+			"    command: gh auth login\n    stored_at: ~/.config/gh/hosts.yml\n")
+	writeCommandFile(t, filepath.Join(packages.LocalDir(w.dir), "gh-login", "tasks", "main.yml"), "---\n[]\n")
+
+	out, err := execute(t, "--config", w.dir, "update")
+	if err != nil {
+		t.Fatalf("a doctor warning must not fail update: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "warn  credential: gh") || !strings.Contains(out, "devmachine login gh") {
+		t.Fatalf("the warning and its fix are not shown:\n%s", out)
+	}
+	assertSummary(t, out, "doctor", "1 warning(s)")
+	if !slices.Equal(w.runs.checked(), []string{"main"}) {
+		t.Fatalf("a warning kept the sync check from running: %q", w.runs.checked())
+	}
 }
 
 func TestUpdateMachineFlagActsOnOneMachine(t *testing.T) {

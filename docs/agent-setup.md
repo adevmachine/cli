@@ -74,7 +74,8 @@ Once they answer, `setup` sets up a key, checks it works, turns off password
 logins, and locks in the latest set of packages.
 
 When they say it finished, run `devmachine doctor`. Every line should pass or
-warn; fix a warning about SSH aliases with `devmachine aliases --write`.
+warn; fix a warning about SSH aliases with `devmachine aliases --write`, and a
+missing credential with the `devmachine login` command it names.
 
 ## 4. Create the workspace
 

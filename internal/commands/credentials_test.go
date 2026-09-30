@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/doctor"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/remote"
@@ -433,13 +435,61 @@ func TestDoctorReportsEachCredentialAndHowToFixIt(t *testing.T) {
 	)
 
 	out, err := execute(t, "--config", dir, "doctor")
-	if err == nil {
-		t.Fatal("a machine missing every credential should not pass")
+	if err != nil {
+		t.Fatalf("a missing credential is a warning, and a warning exits 0: %v\n%s", err, out)
 	}
 	for _, want := range []string{"credential: gh", "credential: alice/claude", "devmachine login gh"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("the report leaves out %q:\n%s", want, out)
 		}
+	}
+	if line := lineWith(t, out, "credential: gh"); !strings.HasPrefix(line, "warn") {
+		t.Fatalf("a missing login is not a warning: %q", line)
+	}
+}
+
+func TestDoctorJSONCallsAMachineMissingOnlyCredentialsOK(t *testing.T) {
+	dir := configWithCredentials(t, "probe-doctor-json")
+	answering(t,
+		"ID=ubuntu",
+		"gh\tno",
+		"alice/claude\tyes",
+		"alice/probe-doctor-json\tyes",
+	)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "doctor")
+	if err != nil {
+		t.Fatalf("doctor returned %v:\n%s", err, out)
+	}
+	var got struct {
+		Checks []doctor.Check `json:"checks"`
+		OK     bool           `json:"ok"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output was not JSON: %v (%q)", err, out)
+	}
+	if !got.OK {
+		t.Fatalf("ok = false for a machine that only misses a login:\n%s", out)
+	}
+	for _, c := range got.Checks {
+		if c.Name == "credential: gh" && c.Status != doctor.StatusWarn {
+			t.Fatalf("credential: gh = %q, want warn", c.Status)
+		}
+	}
+}
+
+func TestDoctorExitsNonZeroWhenTheMachineIsUnreachable(t *testing.T) {
+	dir := configWithTrustedKey(t, "")
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nil, "", errors.New("connection refused")
+	}))
+
+	out, err := execute(t, "--config", dir, "doctor")
+	if err == nil {
+		t.Fatalf("an unreachable machine exited 0:\n%s", out)
+	}
+	if line := lineWith(t, out, "connection"); !strings.HasPrefix(line, "fail") {
+		t.Fatalf("the connection is not a failure: %q", line)
 	}
 }
 

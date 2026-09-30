@@ -361,20 +361,25 @@ func (u *updater) skillsStep(ctx context.Context) stepResult {
 	return stepResult{name, stepUpdated, fmt.Sprintf("%d filesystem change(s)", changed)}
 }
 
-// doctorStep runs doctor on every machine it acts on. A failed check is shown
-// and does not stop the run; an unreachable machine only loses its sync
-// check, since there is nothing to check it against.
+// doctorStep runs doctor on every machine it acts on. What doctor finds is
+// shown and never fails update: a warning or a failed check is about a
+// machine, not about update's own steps. An unreachable machine only loses its
+// sync check, since there is nothing to check it against.
 func (u *updater) doctorStep(ctx context.Context) stepResult {
 	const name = "doctor"
 	u.reachable = map[string]bool{}
 	if problem := u.configProblem(name); problem != nil {
+		if problem.status == stepFailed {
+			return stepResult{name, stepSkipped, "the configuration is not usable"}
+		}
 		return *problem
 	}
 	if len(u.machines) == 0 {
 		return stepResult{name, stepSkipped, "no machine is configured"}
 	}
 
-	var failures []string
+	var unreachable, failures []string
+	warnings := 0
 	for _, m := range u.machines {
 		machineOpts := *u.opts
 		machineOpts.machine = m.Name
@@ -392,17 +397,28 @@ func (u *updater) doctorStep(ctx context.Context) stepResult {
 		failed := 0
 		for _, c := range checks {
 			u.say(fmt.Sprintf("    %-4s  %-*s  %s", c.Status, width, c.Name, c.Detail))
-			if c.Status == doctor.StatusFail {
+			switch c.Status {
+			case doctor.StatusWarn:
+				warnings++
+			case doctor.StatusFail:
 				failed++
 			}
 		}
 		u.reachable[m.Name] = reachable(m, checks)
-		if failed > 0 {
-			failures = append(failures, fmt.Sprintf("%d on %s", failed, m.Name))
+		switch {
+		case !u.reachable[m.Name]:
+			unreachable = append(unreachable, "machine "+m.Name+" unreachable")
+		case failed > 0:
+			failures = append(failures, fmt.Sprintf("%d failed check(s) on %s", failed, m.Name))
 		}
 	}
-	if len(failures) > 0 {
-		return stepResult{name, stepFailed, "failed checks: " + strings.Join(failures, ", ")}
+
+	findings := append(unreachable, failures...)
+	if warnings > 0 {
+		findings = append(findings, fmt.Sprintf("%d warning(s)", warnings))
+	}
+	if len(findings) > 0 {
+		return stepResult{name, strings.Join(findings, "; "), ""}
 	}
 	return stepResult{name, stepOK, fmt.Sprintf("%d machine(s)", len(u.machines))}
 }
@@ -439,10 +455,11 @@ func (u *updater) syncStep(ctx context.Context) stepResult {
 		return stepResult{name, stepSkipped, "no machine is configured"}
 	}
 
-	var pending, failed []string
+	var pending, failed, unreachable []string
 	for _, m := range u.machines {
 		if !u.reachable[m.Name] {
 			u.say("  " + m.Name + ": unreachable, so its sync check is skipped")
+			unreachable = append(unreachable, m.Name+" skipped (unreachable)")
 			continue
 		}
 		changes, err := u.checkMachine(ctx, m.Name)
@@ -456,9 +473,21 @@ func (u *updater) syncStep(ctx context.Context) stepResult {
 		}
 	}
 
+	withUnreachable := func(r stepResult) stepResult {
+		if len(unreachable) > 0 {
+			r.detail = strings.Join(append([]string{r.detail}, unreachable...), "; ")
+		}
+		return r
+	}
+
 	if len(pending) == 0 {
-		if len(failed) > 0 {
-			return stepResult{name, stepFailed, "the check failed on " + strings.Join(failed, ", ")}
+		switch {
+		case len(failed) > 0:
+			return withUnreachable(stepResult{name, stepFailed, "the check failed on " + strings.Join(failed, ", ")})
+		case len(unreachable) == len(u.machines):
+			return stepResult{name, stepSkipped, strings.Join(unreachable, "; ")}
+		case len(unreachable) > 0:
+			return withUnreachable(stepResult{name, stepNothing, "every reachable machine matches the configuration"})
 		}
 		return stepResult{name, stepNothing, "every machine matches the configuration"}
 	}
@@ -476,7 +505,7 @@ func (u *updater) syncStep(ctx context.Context) stepResult {
 			commands = append(commands, "`"+command+"`")
 			u.say("    " + command)
 		}
-		return stepResult{name, stepSkipped, "not applied; run " + strings.Join(commands, ", ")}
+		return withUnreachable(stepResult{name, stepSkipped, "not applied; run " + strings.Join(commands, ", ")})
 	}
 
 	var applied []string
@@ -489,9 +518,9 @@ func (u *updater) syncStep(ctx context.Context) stepResult {
 		applied = append(applied, m)
 	}
 	if len(failed) > 0 {
-		return stepResult{name, stepFailed, "failed on " + strings.Join(failed, ", ")}
+		return withUnreachable(stepResult{name, stepFailed, "failed on " + strings.Join(failed, ", ")})
 	}
-	return stepResult{name, stepUpdated, "applied to " + strings.Join(applied, ", ")}
+	return withUnreachable(stepResult{name, stepUpdated, "applied to " + strings.Join(applied, ", ")})
 }
 
 // checkMachine runs a dry run on one machine and prints what it would change.

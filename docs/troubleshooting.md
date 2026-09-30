@@ -789,6 +789,26 @@ another `devmachine` earlier on your `PATH` is the one that ran.
 you do not use, then `brew update && brew upgrade mydevmachine/tap/devmachine`
 or the install script.
 
+## `doctor` says `warn  credential: gh  missing`
+
+**What it means:** A package on the machine needs a login or a secret that
+is not there yet. The machine works; only the tool that needs the login does
+not. It is a `warn`, not a `fail`, so `doctor` still exits `0`.
+
+**What to do:** Run the command in the detail: `devmachine login <credential>`
+for a login, or `devmachine secrets set <name>` then `devmachine credentials
+push` for a secret.
+
+## `update` summary says `doctor  machine X unreachable`, and update exited 0
+
+**What it means:** `doctor` could not reach machine X (configuration, host key
+or connection failed), so `update` skipped its sync check; the sync line says
+`X skipped (unreachable)`. That is about the machine, not about `update`, so
+it does not change `update`'s exit code.
+
+**What to do:** Run `devmachine doctor --machine X` to see which check failed,
+fix it, then run `devmachine update` again or `devmachine sync --machine X`.
+
 ## `doctor` says `skip  cli  could not find the latest release`
 
 **What it means:** GitHub could not be asked: you are offline, or GitHub
