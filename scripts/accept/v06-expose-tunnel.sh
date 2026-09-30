@@ -43,6 +43,8 @@ trap cleanup_v06 EXIT INT TERM
 
 die() {
   echo "$1" >&2
+  last=$(ls -t "$SCENARIO_LOG_DIR"/*.log 2>/dev/null | head -1)
+  [ -n "$last" ] && { echo "--- last lines of $(basename "$last")" >&2; tail -40 "$last" >&2; }
   exit 1
 }
 
