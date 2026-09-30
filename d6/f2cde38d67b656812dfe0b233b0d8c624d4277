@@ -1,0 +1,33 @@
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_4d6b75f036c152 80-83,86
+  s_a0cbf6c120c4f8::t_959d2104f013c2 119-149,152-154
+  s_a0cbf6c120c4f8::t_170a0ce81f1da0 8
+  s_a0cbf6c120c4f8::t_1108d5b208c325 155
+internal/provision/ansible_test.go
+  s_a0cbf6c120c4f8::t_8d1e9163dc48a8 808-849
+  s_a0cbf6c120c4f8::t_9b317730119d27 4,8
+  s_a0cbf6c120c4f8::t_c53a36690af1bb 850
+internal/provision/ansible_runner.go
+  s_a0cbf6c120c4f8::t_441085f557f6a1 97,111-137
+  s_a0cbf6c120c4f8::t_f8f018ee961c8d 64-67
+internal/provision/ansible_runner_test.go
+  s_a0cbf6c120c4f8::t_86d80bf3721b64 9
+  s_a0cbf6c120c4f8::t_5722c589d6f530 322-357
+  s_a0cbf6c120c4f8::t_0ef12641821459 358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d6f2cde38d67b656812dfe0b233b0d8c624d4277",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
