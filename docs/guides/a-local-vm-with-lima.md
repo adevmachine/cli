@@ -1,3 +1,16 @@
+---
+description: "Try devmachine on a virtual machine on your own computer before you pay for a server."
+category: Get started
+minutes: 15
+level: Beginner
+needs:
+  - "A Mac or Linux computer"
+  - "Lima"
+related:
+  - your-first-devmachine.md
+  - keep-sessions-running.md
+  - ssh-or-mosh.md
+---
 # Try it on your own computer first
 
 Run a virtual machine on your computer and use it exactly like a VPS: set it

@@ -25,32 +25,33 @@ computer, while you wait for a real one.
 - [Upgrade](upgrade.md) — keep the CLI, the packages and the skills up to
   date.
 
-## Examples
+## Guides
 
-Real setups, done in a few steps. Start at [the list](examples/index.md).
+Real setups, done in a few steps, by hand or with your agent. Start at [the
+list](guides/index.md).
 
-- [Your first devmachine, explained](examples/your-first-devmachine.md)
-- [Try it on your own computer first](examples/a-local-vm-with-lima.md)
-- [Express site with TLS](examples/express-site-with-tls.md)
-- [Docker site on 8080](examples/docker-site-on-8080.md)
-- [Claude Code, controlled from your phone](examples/claude-code-remote-control.md)
-- [Start Claude from your phone](examples/start-claude-from-your-phone.md)
-- [OpenClaw, in its own sandbox](examples/openclaw-in-its-own-sandbox.md)
-- [Keep your sessions running](examples/keep-sessions-running.md)
-- [A Claude that never sleeps](examples/claude-that-never-sleeps.md)
-- [One consultant, three startups](examples/one-consultant-three-startups.md)
-- [Hermes Agent, in its own sandbox](examples/hermes-agent-in-its-own-sandbox.md)
-- [Agno AgentOS with a control plane](examples/agno-agentos-with-control-plane.md)
-- [wuzapi as your own package](examples/wuzapi-as-your-own-package.md)
-- [Log in with your 1Password SSH key](examples/log-in-with-1password.md)
-- [Pi as your coding agent](examples/pi-coding-agent.md)
-- [SSH or mosh?](examples/ssh-or-mosh.md)
-- [Claude 24/7 in Telegram](examples/claude-24-7-in-telegram.md)
-- [Logins and secrets](examples/logins-and-secrets.md)
-- [Point your domain with Cloudflare](examples/cloudflare-dns.md)
-- [Contribute to a Ruby on Rails project](examples/ruby-on-rails.md)
-- [Your own Tailscale with Headscale](examples/headscale.md)
-- [One set of skills for every workspace](examples/shared-skills-for-every-workspace.md)
+- [Your first devmachine, explained](guides/your-first-devmachine.md)
+- [Try it on your own computer first](guides/a-local-vm-with-lima.md)
+- [Express site with TLS](guides/express-site-with-tls.md)
+- [Docker site on 8080](guides/docker-site-on-8080.md)
+- [Claude Code, controlled from your phone](guides/claude-code-remote-control.md)
+- [Start Claude from your phone](guides/start-claude-from-your-phone.md)
+- [OpenClaw, in its own sandbox](guides/openclaw-in-its-own-sandbox.md)
+- [Keep your sessions running](guides/keep-sessions-running.md)
+- [A Claude that never sleeps](guides/claude-that-never-sleeps.md)
+- [One consultant, three startups](guides/one-consultant-three-startups.md)
+- [Hermes Agent, in its own sandbox](guides/hermes-agent-in-its-own-sandbox.md)
+- [Agno AgentOS with a control plane](guides/agno-agentos-with-control-plane.md)
+- [wuzapi as your own package](guides/wuzapi-as-your-own-package.md)
+- [Log in with your 1Password SSH key](guides/log-in-with-1password.md)
+- [Pi as your coding agent](guides/pi-coding-agent.md)
+- [SSH or mosh?](guides/ssh-or-mosh.md)
+- [Claude 24/7 in Telegram](guides/claude-24-7-in-telegram.md)
+- [Logins and secrets](guides/logins-and-secrets.md)
+- [Point your domain with Cloudflare](guides/cloudflare-dns.md)
+- [Contribute to a Ruby on Rails project](guides/ruby-on-rails.md)
+- [Your own Tailscale with Headscale](guides/headscale.md)
+- [One set of skills for every workspace](guides/shared-skills-for-every-workspace.md)
 
 ## Concepts
 

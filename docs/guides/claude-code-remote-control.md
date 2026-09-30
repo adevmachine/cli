@@ -1,3 +1,16 @@
+---
+description: "Start Claude Code on your server and drive the same session from the Claude app on your phone."
+category: Agents
+minutes: 10
+level: Beginner
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "The Claude app on your phone"
+related:
+  - start-claude-from-your-phone.md
+  - claude-that-never-sleeps.md
+  - keep-sessions-running.md
+---
 # Claude Code, controlled from your phone
 
 Run Claude Code in a workspace and open the session from the Claude iPhone

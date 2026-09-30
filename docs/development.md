@@ -122,6 +122,12 @@ describes. Specifically:
   with what it really means — not just what it says.
 - Every new page is linked from [the index](index.md). A page nothing links to
   does not exist.
+- A guide in `guides/` starts with frontmatter: `description`, `category`
+  (Get started, Workspaces, Agents, Web apps, Networking or Security),
+  `minutes`, `level` (Beginner, Intermediate or Advanced), `needs` and
+  `related` (two or three other guides). The website builds its cards and
+  chips from it, and `scripts/check-docs.sh` checks it. Copy the block from
+  any guide.
 
 The reason for the second rule: the hard-won parts of this project are not the
 code, they are the reasons. Why one key is offered and never the whole agent,

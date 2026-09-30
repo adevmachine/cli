@@ -1,3 +1,16 @@
+---
+description: "Turn on Remote Control with /rc and reach a running Claude Code session from your phone or Claude Desktop."
+category: Agents
+minutes: 10
+level: Beginner
+needs:
+  - "A workspace with claude-code"
+  - "A Claude Pro, Max, Team or Enterprise plan"
+related:
+  - start-claude-from-your-phone.md
+  - claude-code-remote-control.md
+  - keep-sessions-running.md
+---
 # A Claude that never sleeps
 
 Start Claude Code on a workspace, turn on Remote Control with one command
@@ -5,7 +18,7 @@ typed inside the session, and open the same conversation from the Claude app
 on your phone or from Claude Desktop — while it keeps running on the server,
 inside tmux, even after you close your laptop.
 
-This example uses nothing but the `claude-code` package and the `/rc`
+This guide uses nothing but the `claude-code` package and the `/rc`
 command Claude Code already ships with. For a version that reconnects itself
 after a crash or a reboot with no command to type, see the note at the
 bottom.

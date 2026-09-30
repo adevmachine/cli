@@ -1,3 +1,16 @@
+---
+description: "One server, one sandbox per client: separate stacks, logins and agents that never mix."
+category: Workspaces
+minutes: 30
+level: Intermediate
+needs:
+  - "A VPS with 12 GB of RAM"
+  - "GitHub and Claude accounts per client"
+related:
+  - logins-and-secrets.md
+  - shared-skills-for-every-workspace.md
+  - ruby-on-rails.md
+---
 # One consultant, three startups
 
 A freelance developer works for three clients at once: Acme, a Django shop;

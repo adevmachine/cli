@@ -1,3 +1,15 @@
+---
+description: "When to use ssh and when to use mosh, and the one firewall setting mosh needs."
+category: Networking
+minutes: 10
+level: Beginner
+needs:
+  - "A workspace"
+related:
+  - keep-sessions-running.md
+  - headscale.md
+  - log-in-with-1password.md
+---
 # SSH or mosh?
 
 `devmachine ssh` and `devmachine mosh` both open a terminal on your

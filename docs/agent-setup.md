@@ -106,5 +106,5 @@ terminal or editor. If they asked for a coding agent, they run `claude`
 there once to sign in.
 
 Offer what they may want next, each in one short line:
-[examples](examples/index.md) — a site with its own domain and HTTPS, a
+[guides](guides/index.md) — a site with its own domain and HTTPS, a
 Docker app, Claude Code opened from the phone, an agent in its own workspace.

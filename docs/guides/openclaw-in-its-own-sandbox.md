@@ -1,3 +1,15 @@
+---
+description: "Run the OpenClaw agent around the clock in a workspace of its own, away from your laptop."
+category: Agents
+minutes: 10
+level: Beginner
+needs:
+  - "A Debian or Ubuntu VPS"
+related:
+  - hermes-agent-in-its-own-sandbox.md
+  - one-consultant-three-startups.md
+  - keep-sessions-running.md
+---
 # OpenClaw, in its own sandbox
 
 Give [OpenClaw](https://openclaw.ai/) a machine to act on, not your laptop.

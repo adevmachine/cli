@@ -1,9 +1,22 @@
+---
+description: "Write a WhatsApp API once as your own package, then run it on two machines."
+category: Web apps
+minutes: 30
+level: Advanced
+needs:
+  - "One or two Debian or Ubuntu VPS"
+  - "A domain"
+related:
+  - docker-site-on-8080.md
+  - shared-skills-for-every-workspace.md
+  - cloudflare-dns.md
+---
 # wuzapi, as your own package
 
 [wuzapi](https://github.com/asternic/wuzapi) is a WhatsApp REST API: one
 container, one admin token, and every number you connect gets its own
 session. Instead of installing it by hand on every machine that needs it,
-this example writes it as a [package](../concepts/packages.md) — one file
+this guide writes it as a [package](../concepts/packages.md) — one file
 kept in your own configuration, that any machine or workspace can add.
 
 **You need:** two Debian or Ubuntu VPS (or one, if you skip the second

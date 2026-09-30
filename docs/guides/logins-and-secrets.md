@@ -1,8 +1,21 @@
+---
+description: "See what a workspace is missing, then sign in and hand over tokens with credentials, login and secrets."
+category: Security
+minutes: 20
+level: Beginner
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "A Cloudflare account, for the last part"
+related:
+  - cloudflare-dns.md
+  - one-consultant-three-startups.md
+  - log-in-with-1password.md
+---
 # Logins and secrets
 
 Every tool in a workspace needs something to prove who it is: GitHub needs
 you signed in, Claude Code needs your account, a DNS provider needs an API
-token. This example walks through all three cases on one machine, using
+token. This guide walks through all three cases on one machine, using
 `devmachine credentials list` to see what is missing and what fixes it.
 
 **You need:** a Debian or Ubuntu VPS, and a Cloudflare account with a domain

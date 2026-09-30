@@ -25,7 +25,7 @@ existed, or edited by hand — falls back to asking the agent for
 everything it holds, which is the risk a many-key agent (a password
 manager's, say) can run into. Add `agent_key:` to it by hand, set to the
 line `ssh-add -L` prints for the key you want. See [logging in with your
-1Password SSH key](../examples/log-in-with-1password.md).
+1Password SSH key](../guides/log-in-with-1password.md).
 
 If the agent no longer holds the recorded key — locked, or a different
 `SSH_AUTH_SOCK` — devmachine says so by fingerprint rather than trying

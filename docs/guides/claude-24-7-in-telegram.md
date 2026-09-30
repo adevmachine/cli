@@ -1,3 +1,17 @@
+---
+description: "Message Claude Code from Telegram while it runs on your server around the clock."
+category: Agents
+minutes: 20
+level: Intermediate
+needs:
+  - "A workspace with claude-code"
+  - "A Claude plan or API key"
+  - "A Telegram account"
+related:
+  - claude-that-never-sleeps.md
+  - start-claude-from-your-phone.md
+  - keep-sessions-running.md
+---
 # Claude 24/7 in Telegram
 
 Text your own Claude Code session from Telegram, any time, from your phone.

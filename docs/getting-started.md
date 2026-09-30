@@ -95,4 +95,4 @@ really means.
 - **Keep your configuration in git:** `devmachine setup git`. See
   [versioning your configuration](how-it-works/versioning-your-configuration.md).
 
-Real setups, step by step: [examples](examples/index.md).
+Real setups, step by step: [guides](guides/index.md).

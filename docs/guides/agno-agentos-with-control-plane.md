@@ -1,3 +1,16 @@
+---
+description: "Serve Agno AgentOS and its control plane dashboard, each at its own subdomain with HTTPS."
+category: Agents
+minutes: 30
+level: Advanced
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "A domain"
+related:
+  - hermes-agent-in-its-own-sandbox.md
+  - express-site-with-tls.md
+  - cloudflare-dns.md
+---
 # Agno AgentOS with a control plane
 
 Run [Agno AgentOS](https://docs.agno.com/agent-platform/overview), the
@@ -85,7 +98,7 @@ python my_os.py
 `OS_SECURITY_KEY` turns on the shared-token check: every request needs
 `Authorization: Bearer <key>`, or it gets a 401. AgentOS's own docs say to
 use its JWT-based authorization instead for a production deployment — this
-example uses the security key because it is the simpler one, and the
+guide uses the security key because it is the simpler one, and the
 control plane only needs the one token anyway. Leave the terminal running:
 the SSH login is already inside tmux, so it keeps going after you log out —
 `devmachine ssh agents` puts you back. AgentOS listens on port `7777` by

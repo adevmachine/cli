@@ -1,8 +1,20 @@
+---
+description: "Close the laptop, and Claude Code keeps working on the server inside tmux."
+category: Workspaces
+minutes: 5
+level: Beginner
+needs:
+  - "A workspace"
+related:
+  - ssh-or-mosh.md
+  - claude-that-never-sleeps.md
+  - your-first-devmachine.md
+---
 # Keep your sessions running
 
 Every SSH login to a devmachine workspace lands inside a tmux session. Start
 Claude Code there, close your laptop or lose Wi-Fi, and it is still working
-when you reconnect. This example shows it with Claude Code, but it works the
+when you reconnect. This guide shows it with Claude Code, but it works the
 same for any long task.
 
 **You need:** nothing beyond [Getting started](../getting-started.md).

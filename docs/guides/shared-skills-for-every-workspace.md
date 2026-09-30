@@ -1,3 +1,15 @@
+---
+description: "Write an agent skill once as a package, and every workspace gets it on the next sync."
+category: Workspaces
+minutes: 20
+level: Intermediate
+needs:
+  - "A machine already set up"
+related:
+  - pi-coding-agent.md
+  - one-consultant-three-startups.md
+  - wuzapi-as-your-own-package.md
+---
 # One set of skills for every workspace
 
 Write a skill once and every workspace that uses your team's package gets
@@ -5,7 +17,7 @@ it. Change the skill, sync, and the change lands everywhere — no copying
 files into each workspace by hand, and no drift between one workspace's
 copy and another's.
 
-This example builds a package called `team-skills` with two skills,
+This guide builds a package called `team-skills` with two skills,
 `write-tests` and `deploy-preview`, and puts it on two workspaces, `acme`
 and `globex`. It also installs the same skills on your own computer, so
 your coding agent there knows them too.

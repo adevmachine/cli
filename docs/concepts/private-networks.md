@@ -106,7 +106,7 @@ every time.
 | | What it is | Good for | Watch out for |
 | --- | --- | --- | --- |
 | **Tailscale** | Hosted, WireGuard-based mesh network | Fastest to set up, works almost anywhere, devmachine resolves `tailscale:<name>` for you | Your traffic's control plane is Tailscale's servers (the data itself is peer-to-peer) |
-| **Headscale** | Self-hosted, open source Tailscale control server | Full control, no third party in the loop | You run and maintain the control server yourself — see [Your own Tailscale with Headscale](../examples/headscale.md) |
+| **Headscale** | Self-hosted, open source Tailscale control server | Full control, no third party in the loop | You run and maintain the control server yourself — see [Your own Tailscale with Headscale](../guides/headscale.md) |
 | **Plain WireGuard** | The protocol Tailscale is built on, configured by hand | No account, no control server, total control | You manage keys and routing yourself — no automatic discovery |
 | **ZeroTier** | Another hosted mesh network, similar shape to Tailscale | An alternative if you already use it | Not resolved automatically by devmachine — add the address to `hosts:` directly |
 | **Provider private network** | A VPC or private network your VPS provider offers | Often free, no extra software | Usually only reaches other servers from the same provider, not your laptop |

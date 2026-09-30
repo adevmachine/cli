@@ -1,3 +1,16 @@
+---
+description: "Run your own Tailscale control server with Headscale and put your devmachine on it."
+category: Networking
+minutes: 45
+level: Advanced
+needs:
+  - "A second small server, or your devmachine"
+  - "Your devmachine reachable over SSH"
+related:
+  - ssh-or-mosh.md
+  - log-in-with-1password.md
+  - cloudflare-dns.md
+---
 # Your own Tailscale with Headscale
 
 **Not yet tested end to end on a devmachine.** The steps below follow
@@ -8,7 +21,7 @@ this page.
 [Headscale](https://headscale.net) is an open source, self-hosted
 replacement for Tailscale's control server. You get the same private
 network, the same `tailscale` client on every device, but you run the
-server that coordinates it — no third party in the loop. This example puts
+server that coordinates it — no third party in the loop. This guide puts
 Headscale on a small server, joins your devmachine server to it, and joins
 your own computer too.
 
@@ -28,7 +41,7 @@ devmachine sync
 
 Already have a machine? Skip `setup`. Already have the workspace? Skip the
 last two. See [getting started](../getting-started.md) for what each command
-does. This example does not need a new workspace — it only touches the
+does. This guide does not need a new workspace — it only touches the
 machine — but the block above is the standard starting point if you have
 neither yet.
 

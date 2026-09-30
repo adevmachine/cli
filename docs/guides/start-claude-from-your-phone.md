@@ -1,3 +1,15 @@
+---
+description: "Keep a Claude Code session waiting on your server, so your phone can open it with no SSH step."
+category: Agents
+minutes: 10
+level: Intermediate
+needs:
+  - "Claude Code signed in on a workspace"
+related:
+  - claude-code-remote-control.md
+  - claude-that-never-sleeps.md
+  - claude-24-7-in-telegram.md
+---
 # Start Claude from your phone
 
 Keep a Claude Code Remote Control session up on a workspace, so you can open

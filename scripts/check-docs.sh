@@ -41,6 +41,30 @@ while IFS= read -r page; do
   fi
 done < <(find docs -name '*.md' | sort)
 
+# Every guide carries the frontmatter the site builds its cards from, and each
+# guide it points to as "related" exists.
+frontmatter_of() {
+  awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1' "$1"
+}
+
+while IFS= read -r guide; do
+  [ "$(basename "$guide")" = "index.md" ] && continue
+  front=$(frontmatter_of "$guide")
+  for key in description category minutes level needs related; do
+    if ! printf '%s\n' "$front" | grep -q "^$key:"; then
+      echo "missing $key in the frontmatter of $guide"
+      problems=1
+    fi
+  done
+  while IFS= read -r target; do
+    [ -z "$target" ] && continue
+    if [ ! -e "docs/guides/$target" ]; then
+      echo "broken related guide in $guide: $target"
+      problems=1
+    fi
+  done < <(printf '%s\n' "$front" | awk '/^related:/ { on = 1; next } /^[a-z]/ { on = 0 } on && /^  - / { print $2 }')
+done < <(find docs/guides -name '*.md' | sort)
+
 if [ "$problems" -ne 0 ]; then
   echo
   echo "The manual does not hold together."

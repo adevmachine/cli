@@ -1,9 +1,21 @@
+---
+description: "Install the Pi coding agent in a workspace and use it for everyday work on your server."
+category: Agents
+minutes: 10
+level: Beginner
+needs:
+  - "A workspace"
+related:
+  - hermes-agent-in-its-own-sandbox.md
+  - keep-sessions-running.md
+  - shared-skills-for-every-workspace.md
+---
 # Pi as your coding agent
 
 [Pi](https://pi.dev) is an open-source terminal coding agent. It works like
 Claude Code or Codex: you point it at a project folder and it reads, edits
 and runs code for you, switching between many AI providers as you like.
-This example installs Pi in a workspace so it runs on your server, not your
+This guide installs Pi in a workspace so it runs on your server, not your
 laptop, and keeps working after you close the terminal.
 
 **You need:** a workspace — see [getting started](../getting-started.md).

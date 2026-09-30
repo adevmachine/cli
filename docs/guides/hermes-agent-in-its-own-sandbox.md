@@ -1,3 +1,15 @@
+---
+description: "Run Nous Research's Hermes Agent always on, in a sandbox of its own."
+category: Agents
+minutes: 10
+level: Beginner
+needs:
+  - "A machine from Getting started"
+related:
+  - openclaw-in-its-own-sandbox.md
+  - pi-coding-agent.md
+  - agno-agentos-with-control-plane.md
+---
 # Hermes Agent, in its own sandbox
 
 Run [Hermes Agent](https://github.com/NousResearch/hermes-agent), Nous

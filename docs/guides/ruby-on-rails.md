@@ -1,8 +1,21 @@
+---
+description: "Fork an open source Rails project into a workspace, run its tests and view its dev server privately."
+category: Workspaces
+minutes: 30
+level: Intermediate
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "A GitHub account"
+related:
+  - one-consultant-three-startups.md
+  - keep-sessions-running.md
+  - shared-skills-for-every-workspace.md
+---
 # Contribute to a Ruby on Rails project
 
 A workspace set up to build and test a real open source Rails app:
 [RubyUI](https://github.com/ruby-ui/ruby_ui), a component library with a
-Rails docs site. This example forks it, installs Ruby with mise, runs its
+Rails docs site. This guide forks it, installs Ruby with mise, runs its
 test suite, and starts its dev server — viewed privately with `devmachine
 tunnel`, with Claude Code on hand to help.
 

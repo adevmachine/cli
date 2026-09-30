@@ -1,3 +1,17 @@
+---
+description: "Keep devmachine's SSH key in 1Password and approve each use with Touch ID."
+category: Security
+minutes: 15
+level: Intermediate
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "1Password 8"
+  - "An SSH key in 1Password"
+related:
+  - your-first-devmachine.md
+  - logins-and-secrets.md
+  - ssh-or-mosh.md
+---
 # Log in with your 1Password SSH key
 
 Keep the key devmachine logs in with inside 1Password, instead of a file on

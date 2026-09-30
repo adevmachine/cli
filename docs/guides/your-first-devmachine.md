@@ -1,3 +1,16 @@
+---
+description: "Install devmachine, connect a server and open your first workspace, one command at a time."
+category: Get started
+minutes: 15
+level: Beginner
+needs:
+  - "A Debian or Ubuntu VPS"
+  - "A Mac or Linux computer"
+related:
+  - a-local-vm-with-lima.md
+  - keep-sessions-running.md
+  - express-site-with-tls.md
+---
 # Your first devmachine, explained
 
 The first commands, one at a time: what each asks and what it does. At the
