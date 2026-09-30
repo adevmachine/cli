@@ -1,0 +1,79 @@
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_6039eb5984a670 109
+docs/concepts/agent-skills.md
+  s_a0cbf6c120c4f8::t_5056be5b4c48b8 17
+docs/concepts/private-networks.md
+  s_a0cbf6c120c4f8::t_06990dd1d4d872 109
+docs/development.md
+  s_a0cbf6c120c4f8::t_6a81481c02d150 125-130
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_5e97b7eb0e48c5 98
+docs/guides/a-local-vm-with-lima.md
+  s_a0cbf6c120c4f8::t_3858408837c253 1-13
+docs/guides/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_5fde506366adc8 1-13,101
+docs/guides/claude-24-7-in-telegram.md
+  s_a0cbf6c120c4f8::t_6588bc0b9782e6 1-14
+docs/guides/claude-code-remote-control.md
+  s_a0cbf6c120c4f8::t_f5e59c8ab27ea1 1-13
+docs/guides/claude-that-never-sleeps.md
+  s_a0cbf6c120c4f8::t_295889496f7a93 1-13,21
+docs/guides/cloudflare-dns.md
+  s_a0cbf6c120c4f8::t_a392bb4f32df80 1-13,18
+docs/guides/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_34a50d0fe3296d 1-13
+docs/guides/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_0a97d0457b19e8 1-13
+docs/guides/headscale.md
+  s_a0cbf6c120c4f8::t_fc7c055451fc59 1-13,24,44
+docs/guides/hermes-agent-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_f4a030c3744a64 1-12
+docs/guides/index.md
+  s_a0cbf6c120c4f8::t_83efa37a6ace04 1,3-7,14-15,18-34,45-46,49-62,67-75
+docs/guides/keep-sessions-running.md
+  s_a0cbf6c120c4f8::t_5609a7f3d94b1c 1-12,17
+docs/guides/log-in-with-1password.md
+  s_a0cbf6c120c4f8::t_04c8ee340dbb4c 1-14
+docs/guides/logins-and-secrets.md
+  s_a0cbf6c120c4f8::t_ca652b5a6e1ee2 1-13,18
+docs/guides/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_bd9b43159a2753 1-13
+docs/guides/openclaw-in-its-own-sandbox.md
+  s_a0cbf6c120c4f8::t_8d5564e77cdf14 1-12
+docs/guides/pi-coding-agent.md
+  s_a0cbf6c120c4f8::t_cc719c77600b2f 1-12,18
+docs/guides/ruby-on-rails.md
+  s_a0cbf6c120c4f8::t_dbf8d548ec84c3 1-13,18
+docs/guides/shared-skills-for-every-workspace.md
+  s_a0cbf6c120c4f8::t_ca7636867df000 1-12,20
+docs/guides/ssh-or-mosh.md
+  s_a0cbf6c120c4f8::t_607b206f4df6ed 1-12
+docs/guides/start-claude-from-your-phone.md
+  s_a0cbf6c120c4f8::t_4f025790d3c64d 1-12
+docs/guides/wuzapi-as-your-own-package.md
+  s_a0cbf6c120c4f8::t_5520a90ff5dc34 1-13,19
+docs/guides/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_df7d34e2c3047e 1-13
+docs/how-it-works/ssh.md
+  s_a0cbf6c120c4f8::t_c0c538615faa63 28
+docs/index.md
+  s_a0cbf6c120c4f8::t_70e88269cf656b 28,30-31,33-54
+scripts/check-docs.sh
+  s_a0cbf6c120c4f8::t_5522764c03c841 44-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8c4c302614af77e547bdb34f0f7f9a75b6a45fe8",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
