@@ -34,11 +34,35 @@ type entry struct {
 	Value string `json:"value,omitempty"`
 }
 
+// KeychainEnv turned to "off" keeps every secret out of the OS keychain and in
+// the fallback file. Tests and the acceptance suite set it so a run never
+// writes to, or prompts about, the developer's own login keychain.
+const KeychainEnv = "DEVMACHINE_KEYCHAIN"
+
+var errKeychainOff = errors.New(KeychainEnv + "=off keeps secrets out of the OS keychain")
+
+func keychainOff() bool { return os.Getenv(KeychainEnv) == "off" }
+
 // Seams, so the tests never touch the real keychain.
 var (
-	realKeyringSet    = keyring.Set
-	realKeyringGet    = keyring.Get
-	realKeyringDelete = keyring.Delete
+	realKeyringSet = func(service, name, value string) error {
+		if keychainOff() {
+			return errKeychainOff
+		}
+		return keyring.Set(service, name, value)
+	}
+	realKeyringGet = func(service, name string) (string, error) {
+		if keychainOff() {
+			return "", errKeychainOff
+		}
+		return keyring.Get(service, name)
+	}
+	realKeyringDelete = func(service, name string) error {
+		if keychainOff() {
+			return errKeychainOff
+		}
+		return keyring.Delete(service, name)
+	}
 
 	keyringSet    = realKeyringSet
 	keyringGet    = realKeyringGet

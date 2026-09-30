@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/mydevmachine/devmachine/internal/secrets"
 )
 
 // No test reaches the network by accident: a test that needs a release says
@@ -14,6 +16,7 @@ func TestMain(m *testing.M) {
 	latestPackagesRelease = func(context.Context) (string, error) {
 		return "", errors.New("tests do not reach GitHub")
 	}
+	os.Setenv(secrets.KeychainEnv, "off")
 	if err := isolateGitConfig(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

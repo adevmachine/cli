@@ -79,6 +79,12 @@ default, including when a scenario fails. For investigation only,
 `KEEP_ACCEPT_VM=1 make accept` retains its disposable acceptance VM; delete it
 when the investigation is over.
 
+The Go tests and the harness set `DEVMACHINE_KEYCHAIN=off`, so neither
+ever writes to, or prompts about, the developer's own keychain. A test
+that reaches the real keychain is a bug: with `HOME` pointed at a
+temporary folder, macOS answers with a "Keychain Not Found" dialog that
+offers to reset the login keychain.
+
 The harness must never target a real machine. It may create, use, and delete
 only its own uniquely named disposable acceptance VMs; do not point it at a
 server, an existing local VM, or any shared infrastructure.

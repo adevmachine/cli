@@ -483,6 +483,12 @@ Stores values packages need that are not logins — API keys, tokens.
 `set` with no value asks without echoing, so it never reaches your shell
 history. `list` prints names only.
 
+Values go to the OS keychain when there is one, and otherwise to
+`secrets.json` in the configuration folder, readable only by you.
+`DEVMACHINE_KEYCHAIN=off` skips the keychain and always uses the file —
+the tests and the acceptance suite set it, so a run never writes to, or
+prompts about, your own keychain.
+
 `example` lists which `<NAME>=` a machine's packages need, no values,
 always to stdout — never to a file, since `.env.example` sits one typo
 from `.env`.

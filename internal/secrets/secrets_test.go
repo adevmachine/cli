@@ -229,3 +229,19 @@ func TestListJoinsTheKeyringAndTheFileWithoutRepeating(t *testing.T) {
 		t.Fatalf("got %q, want the keyring's value", got)
 	}
 }
+
+func TestKeychainOffStoresTheValueInTheFile(t *testing.T) {
+	t.Setenv(KeychainEnv, "off")
+	dir := t.TempDir()
+
+	if err := Set(dir, "probe", "one"); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := fileLoad(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored["probe"].Value != "one" {
+		t.Fatalf("the value did not land in %s: %+v", fallbackFile, stored["probe"])
+	}
+}

@@ -22,8 +22,8 @@ SCENARIO_LOG_DIR="$SCENARIO_DIR/logs"
 mkdir -p "$SCENARIO_LOG_DIR"
 export DEVMACHINE_CONFIG
 
-# The OS keychain is shared by every configuration directory, so every name
-# this scenario stores is removed again, even when it fails half way.
+# Every name this scenario stores is removed again, even when it fails half
+# way.
 SECRET_NAMES="API_KEY APP_TOKEN NEW_ONE LEAK"
 
 cleanup_secrets() {

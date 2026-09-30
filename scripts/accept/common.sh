@@ -3,6 +3,9 @@
 # Shared assertions and safety guards for the release acceptance scenarios.
 # Keep this file compatible with the Bash shipped by macOS (3.2).
 
+# A scenario never writes to, or prompts about, the developer's own keychain.
+export DEVMACHINE_KEYCHAIN=off
+
 accept_reset() {
   ACCEPT_CHECKS=0
   ACCEPT_FAILURES=0
