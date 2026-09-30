@@ -1,0 +1,19 @@
+scripts/accept/v06-expose-tunnel.sh
+  s_a0cbf6c120c4f8::t_abf58406a37555 179-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3dbcd16fb6b1eb0327b93da1f5127d9cb15459d4",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
