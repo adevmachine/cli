@@ -7,7 +7,6 @@ name: wsl
 on:
   push:
     branches: [da-wsl-ci]
-    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -101,6 +100,7 @@ jobs:
 
       - name: Unit tests inside WSL
         run: |
+          export DEVMACHINE_KEYCHAIN=off
           export PATH="$HOME/sdk/go/bin:$PATH"
           git config --global user.email "ci@example.com"
           git config --global user.name "ci"
@@ -115,12 +115,14 @@ jobs:
         run: |
           curl -fsSL https://mydevmachine.sh/install.sh | sh
           "$HOME/.local/bin/devmachine" version
+          "$HOME/.local/bin/devmachine" help >/dev/null
 
       - name: Set up a machine, a workspace, and use it
         run: |
           LOGS="$PWD/wsl-logs"
           mkdir -p "$LOGS"
           DM="$HOME/bin/devmachine"
+          export DEVMACHINE_KEYCHAIN=off
           export DEVMACHINE_CONFIG
           DEVMACHINE_CONFIG=$(mktemp -d)
           HARDEN=
@@ -180,6 +182,66 @@ jobs:
           expect "ssh acme (commands on stdin)" ssh-whoami acme \
             ssh_whoami
           step "stats" stats "$DM" stats
+
+          cat > "$HOME/in_terminal.py" <<'PY'
+          import os, pty, sys
+          answer, script = sys.argv[1], sys.argv[2]
+          pid, fd = pty.fork()
+          if pid == 0:
+              os.execv(sys.argv[3], sys.argv[3:])
+          seen, sent = b"", False
+          while True:
+              try:
+                  chunk = os.read(fd, 4096)
+              except OSError:
+                  break
+              if not chunk:
+                  break
+              seen += chunk
+              if answer and not sent and b"[y/N]" in seen:
+                  os.write(fd, answer.encode() + b"\n")
+                  sent = True
+              if script and not sent:
+                  os.write(fd, script.encode() + b"\n")
+                  sent = True
+          sys.stdout.write(seen.decode(errors="replace").replace("\r\n", "\n"))
+          _, status = os.waitpid(pid, 0)
+          sys.exit(os.waitstatus_to_exitcode(status))
+          PY
+          in_terminal() {
+            timeout "$1" python3 "$HOME/in_terminal.py" "${@:2}"
+          }
+
+          printf 'hello from wsl\n' > "$LOGS/report.txt"
+          upload_file() {
+            out=$("$DM" upload "$LOGS/report.txt" --workspace acme 2>&1) || { printf '%s\n' "$out"; return 1; }
+            printf '%s\n' "$out"
+            remote=$(printf '%s\n' "$out" | tail -n 1)
+            case "$remote" in /home/acme/*) ;; *) return 1 ;; esac
+            body=$("$DM" run --workspace acme -- cat "$remote" | tr -d '\r')
+            echo "remote body: $body"
+            [ "$body" = "hello from wsl" ]
+          }
+          step "upload a file into acme" upload upload_file
+
+          ssh_terminal() {
+            out=$(in_terminal 60 "" 'echo "who=$(whoami)"; exit' "$DM" ssh acme) || true
+            printf '%s\n' "$out"
+            printf '%s\n' "$out" | grep -q '^who=acme'
+          }
+          step "ssh acme in a real terminal" ssh-terminal ssh_terminal
+
+          update_declined() {
+            out=$(in_terminal 300 n "" "$DM" update --skip-cli 2>&1)
+            code=$?
+            printf '%s\n' "$out"
+            echo "exit: $code"
+            [ "$code" -eq 0 ] || return 1
+            printf '%s\n' "$out" | grep -q 'pass  connection' || return 1
+            printf '%s\n' "$out" | grep -qE '\[y/N\]|nothing would change' || return 1
+            ! printf '%s\n' "$out" | grep -q '^==> sync '
+          }
+          step "update --skip-cli, answer n" update-no update_declined
           doctor_after_sync() {
             out=$("$DM" doctor 2>&1) || true
             printf '%s\n' "$out"
