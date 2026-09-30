@@ -1,0 +1,35 @@
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_ca926dff456c22 77-78
+docs/how-it-works/updating.md
+  s_a0cbf6c120c4f8::t_5c86d6da482671 60-85
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_40f932ed59be88 111-125,819-820,834-842
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_8bf8c2cf18d4d4 792-811
+internal/commands/credentials_test.go
+  s_a0cbf6c120c4f8::t_94aa123f395053 6,15,438-439,446-493
+internal/commands/update.go
+  s_a0cbf6c120c4f8::t_12ff7ded51e80e 364-367,372-374,381-382,400-403,408-412,415-421,458,462,476-482,484-490,508,521,523
+internal/commands/update_test.go
+  s_a0cbf6c120c4f8::t_f23b10058c77a6 361-362,373-426
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_8c477bb5f6eb78 470-473,485,502,511,525-527,533,540,548,555-556
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_8efc57c37c3af2 482,487-491,498-516,534,690,694,697-699
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9dd21406c2f5f9ff7ea8724c51a93a25c230a518",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
