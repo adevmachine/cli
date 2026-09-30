@@ -1,0 +1,21 @@
+scripts/accept/update.sh
+  s_a0cbf6c120c4f8::t_60579d273bef68 1-155
+scripts/accept/run.sh
+  s_a0cbf6c120c4f8::t_f6535d8cec4cc9 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7ec67a2e05d36a263897fa8e18d75e4e5f1c021e",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
