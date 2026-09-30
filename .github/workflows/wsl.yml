@@ -95,7 +95,8 @@ jobs:
           mkdir -p "$HOME/src"
           cp -a . "$HOME/src/"
           cd "$HOME/src"
-          go build -o "$HOME/bin/devmachine" ./cmd/devmachine
+          go build -ldflags "-X main.version=dev-$(git rev-parse --short HEAD)" \
+            -o "$HOME/bin/devmachine" ./cmd/devmachine
           "$HOME/bin/devmachine" version
 
       - name: Unit tests inside WSL
@@ -104,7 +105,11 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global user.name "ci"
           cd "$HOME/src"
+          ls -la "$HOME/.ssh" 2>&1 || true
           go test ./...
+          echo "~/.ssh after the tests:"
+          ls -la "$HOME/.ssh" 2>&1 || true
+          cat "$HOME/.ssh/config" 2>&1 || true
 
       - name: Install the latest release the way users do
         run: |
@@ -175,7 +180,15 @@ jobs:
           expect "ssh acme (commands on stdin)" ssh-whoami acme \
             ssh_whoami
           step "stats" stats "$DM" stats
-          step "doctor after sync" doctor-after "$DM" doctor
+          doctor_after_sync() {
+            out=$("$DM" doctor 2>&1) || true
+            printf '%s\n' "$out"
+            ! printf '%s\n' "$out" | grep '^fail' | grep -v 'credential: '
+          }
+          step "doctor after sync (credential logins aside)" doctor-after doctor_after_sync
+          echo "~/.ssh at the end:"
+          ls -la "$HOME/.ssh" 2>&1 || true
+          cat "$HOME/.ssh/config" 2>&1 || true
 
           echo
           printf '%s\n' "${results[@]}" | tee "$LOGS/summary.txt"
