@@ -746,7 +746,7 @@ func fullMachineClient() fakeClient {
 // what List(cfg) says every alias should resolve to.
 func matchingSSHResolve(t *testing.T, cfg config.Config) sshResolver {
 	t.Helper()
-	found, err := aliases.List(cfg)
+	found, err := aliases.List(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -764,6 +764,7 @@ func matchingSSHResolve(t *testing.T, cfg config.Config) sshResolver {
 			"user":         a.User,
 			"port":         strconv.Itoa(a.Port),
 			"hostkeyalias": a.HostKeyAlias,
+			"proxycommand": a.ProxyCommand,
 		}, nil
 	}
 }
@@ -883,5 +884,80 @@ func TestDoctorOnASelfMachineFailsOutsideMacOS(t *testing.T) {
 	}
 	if find(t, checks, CheckAnsible).Status != StatusSkip {
 		t.Fatal("ansible was checked on an unsupported system")
+	}
+}
+
+func withAliasCLI(t *testing.T, path string) {
+	t.Helper()
+	was := aliasCLI
+	aliasCLI = func() string { return path }
+	t.Cleanup(func() { aliasCLI = was })
+}
+
+func TestSSHAliasesCheckPassesWhenTheAliasConnectsThroughTheCLI(t *testing.T) {
+	withAliasCLI(t, "/opt/homebrew/bin/devmachine")
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withSSHResolve(t, matchingSSHResolve(t, cfg))
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckAsksToRewriteAnAliasWithAFixedAddress(t *testing.T) {
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	literal := matchingSSHResolve(t, cfg)
+	withAliasCLI(t, "/opt/homebrew/bin/devmachine")
+	withSSHResolve(t, func(alias string) (map[string]string, error) {
+		fields, err := literal(alias)
+		if err != nil {
+			return nil, err
+		}
+		fields["hostname"] = "main"
+		fields["proxycommand"] = "none"
+		return fields, nil
+	})
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	got := find(t, checks, CheckSSHAliases)
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "resolved when ssh connects") ||
+		!strings.Contains(got.Detail, "aliases --write") {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckNamesAProxyCommandThatPointsElsewhere(t *testing.T) {
+	withAliasCLI(t, "/opt/homebrew/bin/devmachine")
+	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := matchingSSHResolve(t, cfg)
+	withSSHResolve(t, func(alias string) (map[string]string, error) {
+		fields, err := match(alias)
+		if err != nil {
+			return nil, err
+		}
+		fields["proxycommand"] = "/usr/local/bin/devmachine ssh-proxy main %p"
+		return fields, nil
+	})
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	got := find(t, checks, CheckSSHAliases)
+	if got.Status != StatusWarn || !strings.Contains(got.Detail, "/usr/local/bin/devmachine") {
+		t.Fatalf("got %#v", got)
 	}
 }

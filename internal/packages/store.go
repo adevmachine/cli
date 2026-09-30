@@ -55,6 +55,25 @@ func Open(ctx context.Context, configDir, version string) (*Store, error) {
 	return s, nil
 }
 
+// OpenCached is Open without the network: the pinned release is used only
+// when it is already in the cache, which a sync always leaves behind.
+//
+// It is for work done on every connection, such as resolving an address,
+// where a download would stall the connection it is meant to help.
+func OpenCached(configDir, version string) *Store {
+	s := &Store{localDir: LocalDir(configDir)}
+	if version == "" {
+		return s
+	}
+	dir := CacheDir(configDir, version)
+	sum, err := os.ReadFile(filepath.Join(dir, checksumFile))
+	if err != nil {
+		return s
+	}
+	s.releaseDir, s.version, s.checksum = filepath.Join(dir, "packages"), version, strings.TrimSpace(string(sum))
+	return s
+}
+
 // Version is the release pin this store was opened at, empty when there is none.
 func (s *Store) Version() string { return s.version }
 

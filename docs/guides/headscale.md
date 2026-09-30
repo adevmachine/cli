@@ -83,21 +83,52 @@ generate a fresh one per device.
 
 ### 3. Join your devmachine server
 
-devmachine's `tailscale` package runs a plain `tailscale up` when you use
-`devmachine login tailscale` — it has no flag for a custom control server.
-So for Headscale, add the package to get the `tailscale` binary installed,
-then run the join yourself as admin, over SSH, with the login server flag:
+Add the `tailscale` package:
 
 ```
 devmachine packages add tailscale
-devmachine sync
-devmachine ssh
-sudo tailscale up --login-server https://your-headscale.example.com --authkey <the key from step 2>
 ```
 
-`devmachine ssh` with no workspace name opens a session on the machine
-itself, as its admin — the right place to run a command devmachine does not
-wrap.
+Then tell it where your Headscale server is. In `config.yml`, under your
+machine:
+
+```yaml
+machines:
+  - name: main
+    settings:
+      tailscale.login_server: https://net.example.com
+```
+
+`login_server` needs a packages release whose `tailscale` package declares
+it — see [settings](../reference/settings.md). An older release ignores it
+and joins Tailscale's own service. Then:
+
+```
+devmachine sync
+devmachine login tailscale
+```
+
+`login tailscale` runs the package's join on the server, as its admin, in a
+real terminal. With `login_server` set, it runs `tailscale up
+--login-server https://net.example.com` and first asks for a pre-auth key:
+paste the one from step 2. Leave it empty to sign in through a URL instead,
+which you then approve on the Headscale server with `headscale nodes
+register`.
+
+Once the server has joined, devmachine asks it for its name on your network
+and adds it to `config.yml`, above the public address:
+
+```yaml
+machines:
+  - name: main
+    hosts:
+      - tailscale:main
+      - 203.0.113.10
+```
+
+The key goes into a file only root can read on the server, for as long as
+`tailscale up` needs it, and never into a command line or your
+configuration.
 
 ### 4. Join your own computer
 
@@ -105,30 +136,22 @@ Install Tailscale from [tailscale.com/download](https://tailscale.com/download),
 then join the same Headscale server:
 
 ```
-tailscale up --login-server https://your-headscale.example.com --authkey <a fresh key>
+tailscale up --login-server https://net.example.com --authkey <a fresh key>
 ```
 
-### 5. Use the private address
+### 5. Check the private address
 
-Once both sides are joined, add the machine to `config.yml` with its
-Headscale-assigned address — `tailscale status` on your computer shows it,
-typically in the `100.64.0.0/10` range:
-
-```yaml
-machines:
-  - name: main
-    hosts:
-      - 100.64.0.5
-      - 203.0.113.10
+```
+devmachine resolve
 ```
 
-devmachine's `tailscale:<name>` shorthand asks the `tailscale` command to
-resolve the name, which works the same whether that command is talking to
-Tailscale's own service or to your Headscale server — see
-[addresses and fallback](../how-it-works/addresses-and-fallback.md). This
-page has not confirmed that shorthand against a real Headscale server, so
-the plain address above is the safer first step; try `tailscale:main` once
-you have confirmed it resolves.
+It lists the server's Headscale address, typically in the `100.64.0.0/10`
+range, from `tailscale:main`, before the public one. `tailscale:<name>` asks
+the `tailscale` command on your computer, which works the same whether it
+talks to Tailscale's own service or to your Headscale server — see
+[addresses and fallback](../how-it-works/addresses-and-fallback.md). When
+it lists the entry under `skipped`, the reason says why: most often
+Tailscale is not running on your computer, or it joined another network.
 
 ## With your agent
 
@@ -137,19 +160,19 @@ CLI) and say:
 
 ```text
 My devmachine server needs to join my Headscale server at
-https://your-headscale.example.com. Add the tailscale package, then join
-it as admin using the login server, not a normal Tailscale login.
+https://net.example.com. Add the tailscale package with that login server,
+sync, and run the login.
 ```
 
-The agent runs `packages add tailscale` and `sync`, then tells you it needs
-a pre-auth key from your Headscale server — generating one is your call,
-since it decides who gets on your network. Once you paste a key, the agent
-runs `tailscale up --login-server ... --authkey ...` over `devmachine ssh`.
-Joining your own computer to Headscale is yours to do: it needs the
-Tailscale app installed and signed in on your machine, not the server's.
+The agent adds the package and the `tailscale.login_server` setting, runs
+`sync`, and then hands `devmachine login tailscale` to you: it needs a
+terminal, and a pre-auth key from your Headscale server — generating one is
+your call, since it decides who gets on your network. Joining your own
+computer to Headscale is yours to do too: it needs the Tailscale app on your
+machine, not the server's.
 
-**Check it:** `tailscale status`, run on your computer, lists your
-devmachine server with a `100.64.x.x` address and shows it online.
+**Check it:** `devmachine resolve` lists `tailscale:main` first, with a
+`100.64.x.x` address.
 
 Source: [Headscale](https://headscale.net),
 [Headscale — Official releases](https://headscale.net/stable/setup/install/official/),

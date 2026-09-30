@@ -89,6 +89,8 @@ func NewRootCmd() *cobra.Command {
 		newUpdateCmd(opts),
 		newCredentialsCmd(opts),
 		newLoginCmd(opts),
+		newResolveCmd(opts),
+		newSSHProxyCmd(opts),
 	)
 	return root
 }

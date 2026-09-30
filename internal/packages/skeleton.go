@@ -43,6 +43,7 @@ var schemaFields = []SchemaField{
 	{"kind", false, `The contract an entrypoint answers. The only one so far is "dns".`},
 	{"entrypoint", false, "An executable in the package the CLI can call on the machine."},
 	{"commands", false, `What the entrypoint accepts: a list, or ["*"] for anything.`},
+	{"network", false, "A private network this machine package answers for: prefix, resolve, and optionally join and self_name."},
 }
 
 // Schema returns the format this CLI reads.

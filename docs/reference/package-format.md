@@ -211,6 +211,30 @@ commands: [zones, list, upsert, delete, help]
 Nothing calls an entrypoint in this version yet — it is validated now so
 the first real use cannot invent its own shape later.
 
+### `network`
+
+A machine package can answer for a private network's host entries:
+
+```yaml
+network:
+  prefix: tailscale        # hosts entries written tailscale:<name> belong here
+  resolve: bin/resolve     # runs on your computer: name in, IP addresses out
+  join: bin/join           # runs on the machine, for `devmachine login <package>`
+  self_name: bin/self-name # runs on the machine: prints its name on the network
+```
+
+- `prefix` is lower case letters, digits and dashes, starting with a
+  letter. It is what a `hosts` entry is written with: `<prefix>:<name>`.
+- `resolve` is required. `join` and `self_name` come together or not at
+  all: a login that joins has to learn the name it joined under.
+- Each script is a path inside the package, executable, and starts with
+  `#!/usr/bin/env python3`, like an entrypoint.
+- Only a `scope: machine` package can declare it: a network joins the
+  machine, not one account on it.
+
+What each script receives and must print is in
+[the network package contract](network-package-contract.md).
+
 ## The rules, and what each one says
 
 | Rule | The message |
@@ -232,7 +256,13 @@ the first real use cannot invent its own shape later.
 | a `machine` login is not `shareable` | ``credential "X" recommends `scope: machine`, so it needs `shareable: true` `` |
 | a `secret` or a `file` is `shareable` | ``credential "X" is a secret, so it cannot be `shareable` `` |
 | an entrypoint is not executable | `entrypoint "X" is not executable: chmod +x it` |
-| an entrypoint is not Python 3 | `an entrypoint is Python 3 and starts with #!/usr/bin/env python3` |
+| an entrypoint is not Python 3 | `entrypoint "X" starts with "Y": it is Python 3 and starts with #!/usr/bin/env python3` |
+| `network` on a workspace package | ``network` belongs to a machine package`` |
+| `network.prefix` missing or malformed | `network.prefix "X": use lower case letters, digits and dashes, starting with a letter` |
+| `network.resolve` missing | `network.resolve is required` |
+| `join` without `self_name`, or the reverse | `network.self_name is required beside network.join` |
+| a network script outside the package | `network.resolve "X" must stay inside the package` |
+| a network script missing, not executable or not Python 3 | the same messages as an entrypoint, naming the field |
 | `kind` or `commands` with no entrypoint | ``kind` and `commands` describe an `entrypoint`, and this package declares none`` |
 
 `devmachine packages validate` reports every problem at once, not just

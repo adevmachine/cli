@@ -1,0 +1,32 @@
+Host alice-devmachine
+    HostName main
+    User alice
+    Port 22
+    ProxyCommand /opt/homebrew/bin/devmachine --config /Users/alice/.config/devmachine ssh-proxy main %p
+    IdentityFile "/keys/main"
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+    StrictHostKeyChecking yes
+    UserKnownHostsFile "$DIR/known hosts"
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    CheckHostIP no
+    VerifyHostKeyDNS no
+    KnownHostsCommand none
+    HostKeyAlgorithms ssh-ed25519
+
+Host alice-devmachine-pub
+    HostName 203.0.113.10
+    User alice
+    Port 22
+    IdentityFile "/keys/main"
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+    StrictHostKeyChecking yes
+    UserKnownHostsFile "$DIR/known hosts"
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    CheckHostIP no
+    VerifyHostKeyDNS no
+    KnownHostsCommand none
+    HostKeyAlgorithms ssh-ed25519

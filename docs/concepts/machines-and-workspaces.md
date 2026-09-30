@@ -106,7 +106,7 @@ gone.
 
 ```
 devmachine aliases --write
-mosh acme-devmachine
+ssh acme-devmachine
 ```
 
 writes an SSH shortcut for every workspace into `~/.ssh/config`, inside a
@@ -115,11 +115,16 @@ marked block it can safely rewrite without touching anything else there:
 ```
 # >>> devmachine — generated, do not edit
 Host acme-devmachine
-    HostName 100.64.0.5
+    HostName main
     User acme
+    ProxyCommand /opt/homebrew/bin/devmachine ssh-proxy main %p
     HostKeyAlias main-devmachine
 # <<< devmachine
 ```
+
+`ProxyCommand` asks devmachine for the machine's address each time ssh
+connects, so the shortcut keeps working when a private network goes up or
+down.
 
 `HostKeyAlias` keeps SSH from complaining when the same machine is reached
 at two different addresses — it tells SSH the two addresses are the same

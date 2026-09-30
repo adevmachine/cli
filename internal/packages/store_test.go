@@ -176,3 +176,37 @@ func TestLocalDirIsUnderTheConfigurationDirectory(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestOpenCachedReadsAReleaseAlreadyFetched(t *testing.T) {
+	configDir := t.TempDir()
+	writePackageAt(t, filepath.Join(CacheDir(configDir, "v1"), "packages", "tailscale"),
+		"format: 1\nname: tailscale\nscope: machine\nsummary: The published tailscale.\n")
+	markCached(t, configDir, "v1")
+
+	found, err := OpenCached(configDir, "v1").Get("tailscale")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.Source != SourceRelease {
+		t.Fatalf("source is %q", found.Source)
+	}
+}
+
+func TestOpenCachedNeverFetchesAReleaseThatIsNotThere(t *testing.T) {
+	configDir := t.TempDir()
+	writePackageAt(t, filepath.Join(LocalDir(configDir), "acme-net"),
+		"format: 1\nname: acme-net\nscope: machine\nsummary: The operator's own network.\n")
+	releaseURL = func(string, string) string {
+		t.Fatal("OpenCached reached for the network")
+		return ""
+	}
+	t.Cleanup(func() { releaseURL = githubReleaseURL })
+
+	all, err := OpenCached(configDir, "v9").All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 1 || all[0].Manifest.Name != "acme-net" {
+		t.Fatalf("got %#v", all)
+	}
+}

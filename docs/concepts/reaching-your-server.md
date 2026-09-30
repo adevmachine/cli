@@ -20,6 +20,12 @@ date automatically, every time a workspace or a machine changes: after
 and at the end of `sync`. Everything outside the block, written by hand or by
 something else, is left alone.
 
+An alias holds no address. It asks devmachine for one each time ssh
+connects, so it keeps working when Tailscale goes on or off, and the file
+only changes when a workspace or a machine does. That needs `devmachine` on
+your `PATH`; without it, the alias holds the address that works now. See
+[SSH aliases that resolve when you connect](../how-it-works/addresses-and-fallback.md#ssh-aliases-that-resolve-when-you-connect).
+
 Said no at the time, or set up before this existed? Turn it on:
 
 ```
@@ -67,8 +73,8 @@ and it adds the `tailscale` package for you — the same as step 1 below.
    devmachine sync
    ```
 
-2. Sign the server in to your Tailscale account. This opens Tailscale's own
-   sign-in on the server; finish it in your browser:
+2. Sign the server in to your Tailscale account. This runs the package's
+   own sign-in on the server; finish it in your browser:
 
    ```
    devmachine login tailscale
@@ -92,11 +98,16 @@ and it adds the `tailscale` package for you — the same as step 1 below.
    where the new line goes. `<name>` is what `tailscale status` on the server
    lists for it.
 
+   Running your own control server with Headscale? Set
+   `tailscale.login_server` on the machine first — see
+   [Your own Tailscale with Headscale](../guides/headscale.md).
+
 3. Install Tailscale on your computer and sign in to the same account.
 
 devmachine tries the addresses in order and uses the first that answers. If
 Tailscale is off on your computer, it skips that line and uses the public
-address, so you are never locked out. See
+address, so you are never locked out. `devmachine resolve` shows the order,
+and why a line was skipped. See
 [addresses and fallback](../how-it-works/addresses-and-fallback.md).
 
 To send your computer's traffic through the server, set
@@ -107,6 +118,11 @@ To send your computer's traffic through the server, set
 devmachine does not need Tailscale. With any VPN that gives your server an
 address your computer can reach — WireGuard, ZeroTier, a provider's private
 network — add that address to `hosts:` the same way, first in the list.
+
+Tailscale support is itself a package, not part of the CLI. A package that
+declares a `network:` block gets the same treatment for its own prefix:
+`<prefix>:<name>` entries, `devmachine login <package>`, and fallback when the
+network is off. See [the network package contract](../reference/network-package-contract.md).
 
 ## Apps you do not want on the internet
 

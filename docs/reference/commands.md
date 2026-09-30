@@ -281,15 +281,16 @@ Real copy: `~/.agents/skills/<name>`. Claude's is a link:
 devmachine aliases [--write] [--path p] [--check] [--yes]
 ```
 
-Prints one SSH `Host` entry per workspace, so `ssh acme-devmachine` and
-`mosh acme-devmachine` work from an ordinary terminal.
+Prints one SSH `Host` entry per workspace, so `ssh acme-devmachine` works
+from an ordinary terminal, an editor or an app.
 
 ```
 # >>> devmachine — generated, do not edit
 Host acme-devmachine
-    HostName 100.64.0.5
+    HostName main
     User acme
     Port 22
+    ProxyCommand /opt/homebrew/bin/devmachine --config /home/you/.config/devmachine ssh-proxy main %p
     IdentityFile /home/you/.config/devmachine/keys/main
     IdentitiesOnly yes
     HostKeyAlias main-devmachine
@@ -309,10 +310,16 @@ asking first. **Only the text between the two markers is ever
 replaced** — the rest of the file may hold hosts devmachine knows
 nothing about.
 
-- `HostKeyAlias` is the same for every alias of one machine, so switching
-  addresses never trips `Host key verification failed`.
-- `HostName` is the first address that resolves, same as every other
-  command.
+- `ProxyCommand` runs [`ssh-proxy`](#ssh-proxy) when ssh connects, which
+  picks the first of the machine's addresses that answers at that moment.
+  The file holds no address, so a private network going up or down never
+  makes it stale. `HostName` is the machine's name, and nothing dials it.
+  The path is the `devmachine` on your `PATH`, written in full.
+- **When `devmachine` is not on your `PATH`,** the entry has no
+  `ProxyCommand`, and `HostName` is the first address that resolves now,
+  as in older versions. Run `aliases --write` again when that changes.
+- `HostKeyAlias` is the same for every alias of one machine, so ssh checks
+  the pinned key whichever address it came through.
 - `IdentitiesOnly yes` goes with `IdentityFile`, so ssh offers only this
   key and does not burn login attempts on others in your agent.
   `IdentityFile` points at `key:` when the machine has one, or at the
@@ -321,8 +328,78 @@ nothing about.
   With neither, there is no `IdentityFile`, and ssh offers everything the
   agent holds.
 
-A `-pub` alias is only written when a second address exists and the
-first did not already resolve to it.
+A `-pub` alias goes straight to the machine's first literal address,
+without `ProxyCommand`. With `ProxyCommand` it is written when the machine
+has more than one `hosts` entry; without, only when a second address exists
+and the first did not already resolve to it.
+
+`mosh acme-devmachine` needs `--experimental-remote-ip=remote` with the
+`ProxyCommand` form: mosh's default replaces the ProxyCommand with its own.
+See [SSH aliases that resolve when you connect](../how-it-works/addresses-and-fallback.md#ssh-aliases-that-resolve-when-you-connect).
+
+`--format json` adds `proxy_command` to each alias that has one.
+
+## resolve
+
+```
+devmachine resolve [--machine m] [--format json]
+```
+
+Prints the machine's addresses in the order every connection tries them,
+without connecting. A `<prefix>:<name>` entry is asked of the network package
+that declares the prefix, and a DNS name is looked up, so every address is an
+IP. An entry that gave no address is listed under `skipped`, with the reason.
+
+```
+ADDRESS                                  FROM                         PACKAGE
+100.64.0.5                               tailscale:main               tailscale
+203.0.113.10                             203.0.113.10                 -
+
+skipped:
+  tailscale:vps                tailscale is not running
+```
+
+The JSON is what the macOS app reads, and its shape is stable:
+
+```json
+{
+  "machine": "main",
+  "addresses": [
+    {"address": "100.64.0.5", "source": "tailscale:main", "package": "tailscale"},
+    {"address": "203.0.113.10", "source": "203.0.113.10", "package": ""}
+  ],
+  "dropped": [
+    {"source": "tailscale:vps", "reason": "tailscale is not running"}
+  ]
+}
+```
+
+- `addresses` is in try order. `address` is always an IP address.
+  `source` is the `hosts` entry it came from; `package` is the network
+  package that resolved it, empty for a literal entry. An entry that
+  gives several addresses appears once per address.
+- `dropped` is every entry that gave nothing, with why. Both lists are
+  `[]` when empty, never missing.
+- A `tailscale:` entry resolved by the deprecated built-in resolver
+  reports `"package": "tailscale"`.
+
+A mosh client needs an IP for its UDP connection: this is where to get it.
+Refused for a `self: true` machine, which has no address. See
+[addresses and fallback](../how-it-works/addresses-and-fallback.md).
+
+## ssh-proxy
+
+```
+devmachine ssh-proxy <machine> <port>
+```
+
+The `ProxyCommand` the SSH aliases run; hidden from `help`. It resolves the
+machine's addresses like `resolve`, connects to the first that accepts a TCP
+connection on `<port>`, and passes bytes between ssh (its standard input and
+output) and the machine until either side closes. Only the connection is
+retried on the next address — once one answers, the SSH handshake is under
+way there. When none answers it exits 1 with every address and why on
+standard error, which ssh shows as the reason the connection closed.
 
 ## stats
 
@@ -344,7 +421,8 @@ Opens an interactive session: a workspace's account if named, the
 machine's admin if not.
 
 Both run the real `ssh`/`mosh` program, so your terminal, agent and tmux
-behave normally. `mosh` survives a dropped or roaming connection and
+behave normally. Both connect to the first address [`resolve`](#resolve)
+lists. `mosh` survives a dropped or roaming connection and
 needs mosh on both sides. Both check `<config>/known_hosts` first.
 
 ## run
@@ -576,7 +654,7 @@ anything more is never necessary.
 ## login
 
 ```
-devmachine login <credential> [--workspace w] [--machine m]
+devmachine login <credential or network package> [--workspace w] [--machine m]
 ```
 
 Runs the login a package declared, in the account it belongs to, over a
@@ -590,14 +668,26 @@ spreads it to workspaces using that package. A `kind: secret` credential
 is refused — use `devmachine secrets set`, then `devmachine credentials
 push`.
 
-`login tailscale` does one thing more: once signed in, it asks the machine
-for its name on the tailnet (`tailscale status --json`) and, unless the
-machine's `hosts` already has a `tailscale:` entry, adds `tailscale:<name>`
-above the public address in `config.yml`, writing `hosts:` as a block
-list, one address per line, with any comment next to an address kept.
-The public address stays as a fallback. When the name cannot be read, it prints the machine's
-`hosts:` block to paste instead, with `- tailscale:<name>` first;
-`<name>` is what `tailscale status` on the machine lists for it. See [private networks](../concepts/private-networks.md).
+**A network package** — one whose `package.yml` has a
+[`network:` block](package-format.md#network) with `join` — is logged in to
+by its package name: `devmachine login tailscale`. Instead of a declared
+command, it runs the package's `join` script on the machine, as the admin,
+over `ssh -t`, with the machine's settings for that package (for example
+`tailscale.login_server`). Then it runs the package's `self_name` script
+and, unless the machine's `hosts` already has it, adds `<prefix>:<name>`
+above the other addresses in `config.yml`, writing `hosts:` as a block list,
+one address per line, with any comment next to an address kept. The public
+address stays as a fallback. When the name cannot be read, it prints the
+machine's `hosts:` block to paste instead, with `- <prefix>:<name>` first.
+The package must be synced first: `join` runs from where `sync` put it.
+`--workspace` is refused: a network joins the machine.
+
+With a packages release whose `tailscale` package has no `network:` block
+yet, `login tailscale` runs its declared `tailscale up`, then reads the name
+from `tailscale status --json` on the machine and adds `tailscale:<name>`
+the same way. This path is deprecated. See
+[private networks](../concepts/private-networks.md) and
+[the network package contract](network-package-contract.md).
 
 Same strict fingerprint check as every other command. See
 [SSH: logging in and knowing it is your server](../how-it-works/ssh.md).

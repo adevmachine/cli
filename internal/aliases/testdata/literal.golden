@@ -1,0 +1,31 @@
+Host alice-devmachine
+    HostName 100.64.0.5
+    User alice
+    Port 22
+    IdentityFile "/keys/main"
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+    StrictHostKeyChecking yes
+    UserKnownHostsFile "$DIR/known hosts"
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    CheckHostIP no
+    VerifyHostKeyDNS no
+    KnownHostsCommand none
+    HostKeyAlgorithms ssh-ed25519
+
+Host alice-devmachine-pub
+    HostName 203.0.113.10
+    User alice
+    Port 22
+    IdentityFile "/keys/main"
+    IdentitiesOnly yes
+    HostKeyAlias main-devmachine
+    StrictHostKeyChecking yes
+    UserKnownHostsFile "$DIR/known hosts"
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    CheckHostIP no
+    VerifyHostKeyDNS no
+    KnownHostsCommand none
+    HostKeyAlgorithms ssh-ed25519

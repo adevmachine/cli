@@ -17,7 +17,7 @@ func newLoginCmd(opts *options) *cobra.Command {
 	var workspace string
 
 	c := &cobra.Command{
-		Use:   "login <credential>",
+		Use:   "login <credential | network package>",
 		Short: "Sit through a login, in the place it has to happen",
 		Long: "Nobody automates a browser login, and this does not pretend " +
 			"to. It opens a real terminal where the credential belongs — the " +
@@ -25,7 +25,10 @@ func newLoginCmd(opts *options) *cobra.Command {
 			"declared.\n\n" +
 			"A machine credential is logged into once, and kept in " +
 			"/etc/devmachine/<name>/ so the next sync copies it into every " +
-			"workspace that asks for it.",
+			"workspace that asks for it.\n\n" +
+			"A network package, such as tailscale, is joined instead: its own " +
+			"join script runs on the machine with the machine's settings, then " +
+			"the machine's name on that network goes first in its hosts.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLogin(cmd, opts, args[0], workspace)
@@ -40,9 +43,19 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 	if err != nil {
 		return err
 	}
+	if provider, ok := joinable(found.plan, name); ok {
+		if workspace != "" {
+			return fmt.Errorf("%s joins the machine to a network, not one workspace: run `devmachine login %s` with no --workspace",
+				name, name)
+		}
+		return joinNetwork(cmd, opts, found, provider)
+	}
 	d, err := pickCredential(found.wanted, name, workspace)
 	if err != nil {
 		return err
+	}
+	if provider, ok := joinable(found.plan, d.Package); ok && d.Workspace == "" {
+		return joinNetwork(cmd, opts, found, provider)
 	}
 
 	tgt := target{machine: found.machine, user: d.LinuxUser, workspace: d.Workspace}
@@ -69,7 +82,7 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 		return nil
 	}
 	if d.Name == tailscalePackage {
-		return finishTailscaleLogin(cmd, opts, found.machine)
+		return finishTailscaleLogin(cmd, found.dir, found.machine)
 	}
 	return keepForTheWorkspaces(cmd, found.machine, d)
 }
@@ -80,39 +93,38 @@ func runLogin(cmd *cobra.Command, opts *options, name, workspace string) error {
 // `tailscale:<name>` host entry has to match.
 const tailscaleStatusCommand = "tailscale status --json"
 
-// finishTailscaleLogin is what makes `devmachine login tailscale` more than a
-// login: once the machine has signed in, it can say what it is called on the
-// tailnet, and that name is what turns into a private address in the
-// configuration — automatically, because asking somebody to copy a hostname
-// out of JSON is not a step anyone should have to do by hand.
-func finishTailscaleLogin(cmd *cobra.Command, opts *options, m config.Machine) error {
-	dir, _, err := config.Dir(opts.configDir)
-	if err != nil {
-		return err
-	}
-
+// finishTailscaleLogin is `devmachine login tailscale` for a packages release
+// whose tailscale package has no `network:` block yet. It is deprecated: a
+// release that declares the block goes through joinNetwork instead.
+func finishTailscaleLogin(cmd *cobra.Command, dir string, m config.Machine) error {
 	client, _, err := dial(cmd.Context(), m, "")
 	if err != nil {
 		return err
 	}
 	defer func() { _ = client.Close() }()
 
-	byHand := tailscaleHostsByHand(m)
-
+	hint := fmt.Sprintf("<name> is what `tailscale status` on %s lists for it.", m.Name)
 	out, err := client.Run(cmd.Context(), tailscaleStatusCommand)
 	if err != nil {
 		cmd.Printf("logged in, but could not read its tailnet name (%v).\n", err)
-		cmd.Print(byHand)
+		cmd.Print(networkHostsByHand(m, "tailscale", hint))
 		return nil
 	}
 	name, err := tailscaleSelfHostName(out)
 	if err != nil {
 		cmd.Printf("logged in, but could not read its tailnet name from `%s` (%v).\n", tailscaleStatusCommand, err)
-		cmd.Print(byHand)
+		cmd.Print(networkHostsByHand(m, "tailscale", hint))
 		return nil
 	}
+	return addNetworkHost(cmd, dir, m, "tailscale:"+name)
+}
 
-	entry := "tailscale:" + name
+// addNetworkHost is what makes logging into a network more than a login: once
+// the machine has signed in, it can say what it is called there, and that name
+// turns into a private address in the configuration — automatically, because
+// asking somebody to copy a name out of a status page is not a step anyone
+// should have to do by hand.
+func addNetworkHost(cmd *cobra.Command, dir string, m config.Machine, entry string) error {
 	for _, h := range m.Hosts {
 		if h.Address == entry {
 			cmd.Printf("logged in; %s is already in %s's hosts.\n", entry, m.Name)
@@ -133,20 +145,20 @@ func finishTailscaleLogin(cmd *cobra.Command, opts *options, m config.Machine) e
 	return nil
 }
 
-// tailscaleHostsByHand is what to paste into config.yml when the machine
-// could not say its tailnet name: the machine's own entry, with the new line
+// networkHostsByHand is what to paste into config.yml when the machine could
+// not say its name on the network: the machine's own entry, with the new line
 // where it goes, so nobody has to work out the indentation of a list item.
-func tailscaleHostsByHand(m config.Machine) string {
+func networkHostsByHand(m config.Machine, prefix, hint string) string {
 	var b strings.Builder
-	b.WriteString("To reach it over Tailscale too, add its tailnet name first under its hosts in config.yml:\n\n")
+	fmt.Fprintf(&b, "To reach it over %s too, add its name there first under its hosts in config.yml:\n\n", prefix)
 	b.WriteString("    machines:\n")
 	fmt.Fprintf(&b, "      - name: %s\n", m.Name)
 	b.WriteString("        hosts:\n")
-	b.WriteString("          - tailscale:<name>\n")
+	fmt.Fprintf(&b, "          - %s:<name>\n", prefix)
 	for _, h := range m.Hosts {
 		fmt.Fprintf(&b, "          - %s\n", h.Address)
 	}
-	fmt.Fprintf(&b, "\n<name> is what `tailscale status` on %s lists for it.\n", m.Name)
+	fmt.Fprintf(&b, "\n%s\n", hint)
 	return b.String()
 }
 

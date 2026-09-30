@@ -82,7 +82,8 @@ these when something behaves in a way that surprises you.
   the CLI shares one key and never your whole agent, and how it checks it is
   talking to the right server, every time.
 - [Addresses and fallback](how-it-works/addresses-and-fallback.md) — how a
-  server with more than one address is reached.
+  server with more than one address is reached, how a private network's
+  entry becomes an address, and why SSH aliases resolve when you connect.
 - [Choosing a target](how-it-works/choosing-a-target.md) — why a command asks
   which server, instead of guessing.
 - [Why nothing is embedded](how-it-works/why-nothing-is-embedded.md) — why
@@ -117,6 +118,8 @@ these when something behaves in a way that surprises you.
   `package.yml`.
 - [The DNS provider contract](reference/dns-provider-contract.md) — how to
   write a DNS provider.
+- [The network package contract](reference/network-package-contract.md) —
+  how to make a private network reachable through a package.
 - [Settings](reference/settings.md) — every option the built-in packages
   accept.
 

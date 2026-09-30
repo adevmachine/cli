@@ -91,7 +91,7 @@ func aliasesCheck(opts *options) machineCheck {
 	if err != nil {
 		return machineCheck{Name: "aliases", Status: machineWarn, Detail: "no configuration to check against"}
 	}
-	want, err := aliases.Render(cfg)
+	want, err := aliases.Render(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		return machineCheck{Name: "aliases", Status: machineWarn, Detail: err.Error()}
 	}

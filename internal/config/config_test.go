@@ -1716,3 +1716,25 @@ func TestSetMachineHostsWritesAFlowListAsABlockList(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", body, after)
 	}
 }
+
+func TestLoadTellsEachMachineWhereItsPackagesAre(t *testing.T) {
+	dir := writeConfig(t, "packages: v17\nmachines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := cfg.Machines[0]
+	if m.ConfigDir != dir || m.PackagesRelease != "v17" {
+		t.Fatalf("got config dir %q and release %q", m.ConfigDir, m.PackagesRelease)
+	}
+}
+
+func TestMachinePackagesLocationIsRuntimeOnly(t *testing.T) {
+	body, err := yaml.Marshal(Machine{Name: "main", ConfigDir: "/private/config", PackagesRelease: "v17"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "/private/config") || strings.Contains(string(body), "v17") {
+		t.Fatalf("runtime package location leaked into YAML:\n%s", body)
+	}
+}

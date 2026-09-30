@@ -221,7 +221,7 @@ func TestWriteTwiceLeavesOneBlock(t *testing.T) {
 }
 
 func TestRenderGivesEveryAliasTheSameHostKeyAlias(t *testing.T) {
-	block, err := Render(twoAddresses(t))
+	block, err := Render(twoAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestRenderGivesEveryAliasTheSameHostKeyAlias(t *testing.T) {
 func TestRenderPinsEveryHostKeySourceAndQuotesKnownHostsPath(t *testing.T) {
 	cfg := oneAddress(t)
 	pinMachine(t, &cfg.Machines[0], true)
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestRenderPinsEveryHostKeySourceAndQuotesKnownHostsPath(t *testing.T) {
 
 func TestRenderWritesAPubAliasOnlyWhenThereIsAFallback(t *testing.T) {
 	// Somebody with one address never sees a `-pub` alias.
-	block, err := Render(oneAddress(t))
+	block, err := Render(oneAddress(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestRenderWritesAPubAliasOnlyWhenThereIsAFallback(t *testing.T) {
 }
 
 func TestRenderPointsThePubAliasAtTheLiteralAddress(t *testing.T) {
-	block, err := Render(twoAddresses(t))
+	block, err := Render(twoAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestRenderPointsThePubAliasAtTheLiteralAddress(t *testing.T) {
 }
 
 func TestRenderWritesAPubAliasForTwoLiteralAddresses(t *testing.T) {
-	block, err := Render(twoLiteralAddresses(t))
+	block, err := Render(twoLiteralAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func TestRenderLeavesOutAPubAliasThatWouldRepeatThePrimaryForTwoLiteralAddresses
 	}
 	pinMachine(t, &cfg.Machines[0], false)
 
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestRenderLeavesOutAPubAliasThatWouldRepeatThePrimaryForTwoLiteralAddresses
 }
 
 func TestWriteBetweenTheMarkersIncludesThePubAlias(t *testing.T) {
-	block, err := Render(twoLiteralAddresses(t))
+	block, err := Render(twoLiteralAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestRenderLeavesOutAPubAliasThatWouldRepeatThePrimary(t *testing.T) {
 	}
 	pinMachine(t, &cfg.Machines[0], false)
 
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestRenderNamesTheWorkspaceUser(t *testing.T) {
 	}
 	pinMachine(t, &cfg.Machines[0], false)
 
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestRenderNamesTheWorkspaceUser(t *testing.T) {
 }
 
 func TestRenderOffersTheMachinesKeyAndOnlyThat(t *testing.T) {
-	block, err := Render(twoAddresses(t))
+	block, err := Render(twoAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestRenderOffersTheRecordedAgentKeyAndOnlyThat(t *testing.T) {
 	}
 	pinMachine(t, &cfg.Machines[0], false)
 
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestRenderOffersTheRecordedAgentKeyAndOnlyThat(t *testing.T) {
 }
 
 func TestRenderLeavesTheKeyToTheAgentWhenThereIsNoFile(t *testing.T) {
-	block, err := Render(oneAddress(t))
+	block, err := Render(oneAddress(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestRenderWithNoWorkspaceIsEmpty(t *testing.T) {
 	withResolver(t, map[string][]string{"main": {"203.0.113.10"}})
 	cfg := config.Config{Machines: []config.Machine{{Name: "main", Hosts: []config.Host{{Address: "203.0.113.10"}}, User: "root", Port: 22}}}
 
-	block, err := Render(cfg)
+	block, err := Render(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func TestRenderSaysWhichMachineHasNoAddressLeft(t *testing.T) {
 		Workspaces: []config.Workspace{{Name: "alice", Machine: "main"}},
 	}
 
-	_, err := Render(cfg)
+	_, err := Render(cfg, Options{})
 	if err == nil {
 		t.Fatal("it wrote an alias with nowhere to go")
 	}
@@ -468,7 +468,7 @@ func TestRenderSaysWhichMachineHasNoAddressLeft(t *testing.T) {
 }
 
 func TestListCarriesTheSameFactsAsTheBlock(t *testing.T) {
-	found, err := List(twoAddresses(t))
+	found, err := List(twoAddresses(t), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -538,7 +538,7 @@ func TestListSkipsAWorkspaceOnASelfMachine(t *testing.T) {
 			{Name: "alice", Machine: "mac"},
 		},
 	}
-	found, err := List(cfg)
+	found, err := List(cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

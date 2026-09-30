@@ -19,7 +19,7 @@ machines:
 Or without opening the file:
 
 ```
-devmachine workspaces edit acme --set zsh.tmux_config=false
+devmachine workspaces edit alice --set zsh.tmux_config=false
 ```
 
 A setting for a package the target does not install is refused. A typo in a
@@ -58,6 +58,7 @@ configuration says it is.
 | `dev.gh_version` | Which GitHub CLI release to install. It is a release asset rather than a distribution package because most distributions do not carry gh at all. | `2.63.2` |
 | `dev.home` | Where the account's home is. | `/home/<the account>` |
 | `dev.node_version` | Which Node mise installs globally. | `lts` |
+| `devmachine-app.github_hosts` | GitHub Enterprise hosts the context panel resolves pull requests on, each as `{host, proxy}` with `proxy` optional. github.com always works; this adds more. | `[]` |
 | `fail2ban.bantime` | How long a ban lasts, in seconds. | `3600` |
 | `fail2ban.ignoreip` | The addresses that are never banned, space separated. Loopback only by default: a wider range exempts everyone who shares it. | `127.0.0.1/8 ::1` |
 | `fail2ban.maxretry` | How many failures from one address before it is banned. | `5` |
@@ -68,10 +69,19 @@ configuration says it is.
 | `glab.home` | Where the account's home is. | `/home/<the account>` |
 | `glab.version` | Which GitLab CLI release to install. It is a release asset rather than a distribution package because no distribution carries glab. | `1.111.0` |
 | `hostinger.zones` | DNS zones this provider may manage. Set this when the token has DNS permission without Domains portfolio permission; an empty list asks the account portfolio instead. | `[]` |
+| `mac-brew.casks` | Homebrew casks to install. | `[]` |
+| `mac-brew.formulae` | Homebrew formulae to install. | `[]` |
+| `mac-brew.prefix` | Where Homebrew lives. /usr/local on an Intel Mac. | `/opt/homebrew` |
+| `mac-brew.taps` | Homebrew taps to add. | `[]` |
+| `mac-brew.trusted_casks` | Casks to trust, as full names `<tap>/<cask>`. Recent Homebrew refuses to load a cask from an unofficial tap until it is trusted, per item on purpose rather than per tap. | `[]` |
+| `mac-brew.trusted_formulae` | Formulae to trust, as full names `<tap>/<formula>`, for the same reason as trusted_casks. | `[]` |
+| `mac-mise.bin` | Where the mise binary is. | `~/.local/bin/mise` |
+| `mac-mise.tools` | Tools to install globally, as `mise use -g` takes them, e.g. `node@lts`. | `[]` |
 | `mise.home` | Where the account's home is. | `/home/<the account>` |
 | `sentry.home` | Where the account's home is. | `/home/<the account>` |
 | `ssh_hardening.service` | What systemd calls sshd. Empty means the name this distribution family uses, which is `ssh` on Debian and Ubuntu and `sshd` elsewhere. | *(empty)* |
 | `tailscale.exit_node` | Advertise this machine as an exit node. Off unless asked for. | `false` |
+| `tailscale.login_server` | The control server `devmachine login tailscale` joins. Empty means Tailscale's own; a URL means your own, such as Headscale. | *(empty)* |
 | `workspace.admin_home` | The home of the account the CLI provisions with. Whatever reaches that account over SSH is what reaches this workspace. | `/root` |
 | `workspace.git_email` | The address on this workspace's commits. | *(empty)* |
 | `workspace.git_name` | The name on this workspace's commits. | *(empty)* |

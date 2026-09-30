@@ -75,9 +75,8 @@ devmachine ssh acme
 You land inside tmux, so what you start keeps running after you close the
 terminal. See [keep your sessions running](keep-sessions-running.md).
 
-Said yes to SSH aliases? `ssh acme-devmachine` and `mosh acme-devmachine`
-reach the same workspace, from any terminal, editor or app that dials `ssh`
-directly.
+Said yes to SSH aliases? `ssh acme-devmachine` reaches the same workspace,
+from any terminal, editor or app that dials `ssh` directly.
 
 ## With your agent
 

@@ -116,6 +116,7 @@ func Validate(dir string) ([]Problem, error) {
 	problems = append(problems, validateEntrypoint(dir, m)...)
 	problems = append(problems, validateCredentials(m)...)
 	problems = append(problems, validateSkills(dir, m)...)
+	problems = append(problems, validateNetwork(dir, m)...)
 
 	for _, point := range sortedKeys(m.Extends) {
 		source := m.Extends[point]
@@ -226,26 +227,101 @@ func validateEntrypoint(dir string, m Manifest) []Problem {
 		}
 	}
 
-	path := filepath.Join(dir, m.Entrypoint)
-	info, err := os.Stat(path)
-	if err != nil {
-		at("entrypoint", fmt.Sprintf("entrypoint %q is not in the package", m.Entrypoint))
-		return problems
-	}
-	if info.Mode()&0o111 == 0 {
-		at("entrypoint", fmt.Sprintf("entrypoint %q is not executable: chmod +x it", m.Entrypoint))
-	}
-
-	// Ansible already requires Python on any machine this CLI provisions, so
-	// python3 is always there and an entrypoint with no dependencies cannot
-	// break on install. Checking the shebang makes that a rule the CLI
-	// enforces rather than one a contributor remembers.
-	if first, err := firstLine(path); err == nil && first != pythonShebang {
-		at("entrypoint", fmt.Sprintf(
-			"entrypoint %q starts with %q: an entrypoint is Python 3 and starts with %s",
-			m.Entrypoint, first, pythonShebang))
+	for _, what := range scriptProblems(dir, "entrypoint", m.Entrypoint) {
+		at("entrypoint", what)
 	}
 	return problems
+}
+
+// scriptProblems checks one executable a package ships.
+//
+// Ansible already requires Python on any machine this CLI provisions, so
+// python3 is always there and a script with no dependencies cannot break on
+// install. Checking the shebang makes that a rule the CLI enforces rather than
+// one a contributor remembers.
+func scriptProblems(dir, field, rel string) []string {
+	path := filepath.Join(dir, rel)
+	info, err := os.Stat(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s %q is not in the package", field, rel)}
+	}
+	var out []string
+	if info.Mode()&0o111 == 0 {
+		out = append(out, fmt.Sprintf("%s %q is not executable: chmod +x it", field, rel))
+	}
+	if first, err := firstLine(path); err == nil && first != pythonShebang {
+		out = append(out, fmt.Sprintf("%s %q starts with %q: it is Python 3 and starts with %s",
+			field, rel, first, pythonShebang))
+	}
+	return out
+}
+
+// networkPrefix is what can stand before the colon in a host entry without
+// reading as an address or a port.
+var networkPrefix = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// validateNetwork checks a package that answers for a private network's host
+// entries.
+func validateNetwork(dir string, m Manifest) []Problem {
+	if m.Network == nil {
+		return nil
+	}
+	var problems []Problem
+	at := func(what string) {
+		problems = append(problems, Problem{File: FileName, Line: m.Lines["network"], What: what})
+	}
+	n := m.Network
+
+	if m.Scope != ScopeMachine {
+		at("`network` belongs to a machine package: a network joins the machine, not one account on it")
+	}
+	switch {
+	case n.Prefix == "":
+		at("network.prefix is required: it is what a host entry is written with, as <prefix>:<name>")
+	case !networkPrefix.MatchString(n.Prefix):
+		at(fmt.Sprintf("network.prefix %q: use lower case letters, digits and dashes, starting with a letter", n.Prefix))
+	}
+	if n.Resolve == "" {
+		at("network.resolve is required: without it nothing turns a <prefix>:<name> entry into an address")
+	}
+	if n.Join != "" && n.SelfName == "" {
+		at("network.self_name is required beside network.join: it is how the login learns the name to add to hosts")
+	}
+	if n.SelfName != "" && n.Join == "" {
+		at("network.join is required beside network.self_name: a name to add only exists once the machine joined")
+	}
+
+	for _, script := range []struct{ field, rel string }{
+		{"network.resolve", n.Resolve},
+		{"network.join", n.Join},
+		{"network.self_name", n.SelfName},
+	} {
+		if script.rel == "" {
+			continue
+		}
+		if !insidePackage(script.rel) {
+			at(fmt.Sprintf("%s %q must stay inside the package", script.field, script.rel))
+			continue
+		}
+		for _, what := range scriptProblems(dir, script.field, script.rel) {
+			at(what)
+		}
+	}
+	return problems
+}
+
+// insidePackage reports whether a package-relative path stays inside the
+// package as written.
+func insidePackage(rel string) bool {
+	if filepath.IsAbs(rel) {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 const pythonShebang = "#!/usr/bin/env python3"

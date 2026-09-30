@@ -37,11 +37,6 @@ import (
 // only your computer.
 const SelfAddress = "your computer"
 
-// tailscalePrefix marks an address that something closer to the network has to
-// resolve. The CLI knows the prefix, not the product: a host entry is either a
-// literal or a name a resolver understands.
-const tailscalePrefix = "tailscale:"
-
 // dialTimeout is short because these addresses are tried in order: a long wait
 // on a dead path delays the fallback that works.
 const dialTimeout = 8 * time.Second
@@ -70,50 +65,6 @@ type Client interface {
 	// Upload extracts a gzipped tar into a directory on the machine.
 	Upload(ctx context.Context, dir string, tarball io.Reader) error
 	Close() error
-}
-
-// Literal reports whether a host entry is an address ssh can dial as written,
-// rather than a name something closer to the network has to resolve.
-func Literal(address string) bool {
-	return !strings.HasPrefix(address, tailscalePrefix)
-}
-
-// Resolve turns the configured hosts into addresses to try, in order.
-//
-// An address that cannot be resolved is dropped rather than fatal: the entries
-// after it are the fallbacks it exists for. Only an empty result is an error,
-// and it says what was dropped.
-func Resolve(m config.Machine) ([]string, error) {
-	var (
-		out     []string
-		dropped []string
-	)
-
-	for _, h := range m.Hosts {
-		name, isTailscale := strings.CutPrefix(h.Address, tailscalePrefix)
-		if !isTailscale {
-			out = append(out, h.Address)
-			continue
-		}
-		if _, err := lookPath("tailscale"); err != nil {
-			dropped = append(dropped, fmt.Sprintf("%s (tailscale is not installed)", h.Address))
-			continue
-		}
-		ip, err := tailscaleIP(name)
-		if err != nil {
-			dropped = append(dropped, fmt.Sprintf("%s (%v)", h.Address, err))
-			continue
-		}
-		out = append(out, ip)
-	}
-
-	if len(out) == 0 {
-		if len(dropped) > 0 {
-			return nil, fmt.Errorf("no address left to try: %s", strings.Join(dropped, "; "))
-		}
-		return nil, fmt.Errorf("machine %q has no address", m.Name)
-	}
-	return out, nil
 }
 
 func tailscaleIPFromStatus(name string) (string, error) {

@@ -52,6 +52,7 @@ type declared struct {
 	cfg     config.Config
 	machine config.Machine
 	wanted  []credentials.Declared
+	plan    packages.MachinePlan
 }
 
 // credentialsOnMachine reads the configuration and the packages, and returns
@@ -77,7 +78,7 @@ func credentialsOnMachine(ctx context.Context, opts *options) (declared, error) 
 	if err != nil {
 		return declared{}, err
 	}
-	return declared{dir: dir, cfg: cfg, machine: machine, wanted: credentials.Wanted(plan)}, nil
+	return declared{dir: dir, cfg: cfg, machine: machine, wanted: credentials.Wanted(plan), plan: plan}, nil
 }
 
 // workspaceTargetsOnMachine is every workspace secret target whose workspace

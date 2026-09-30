@@ -75,6 +75,22 @@ type Credential struct {
 	Path string `yaml:"path"`
 }
 
+// Network makes a package the answer for a private network's host entries.
+//
+// An entry written `<prefix>:<name>` in a machine's hosts belongs to the
+// package that declares that prefix. The core knows the prefix and the
+// scripts, never the product behind them.
+type Network struct {
+	Prefix string `yaml:"prefix"`
+	// Resolve runs on the person's computer: it gets the name as its one
+	// argument and prints the addresses, one per line.
+	Resolve string `yaml:"resolve"`
+	// Join and SelfName run on the machine, as its admin: the first signs
+	// it in, the second prints the name it answers to on the network.
+	Join     string `yaml:"join"`
+	SelfName string `yaml:"self_name"`
+}
+
 // SkillContribution names the package-relative directory whose direct
 // children are Agent Skills.
 type SkillContribution struct {
@@ -109,6 +125,7 @@ type Manifest struct {
 	Credentials   []Credential        `yaml:"credentials"`
 	RequiresFiles []string            `yaml:"requires_files"`
 	Skills        *SkillContribution  `yaml:"skills"`
+	Network       *Network            `yaml:"network"`
 
 	// Kind, Entrypoint and Commands make a package callable: the contract it
 	// answers, the executable to call on the machine, and what that executable

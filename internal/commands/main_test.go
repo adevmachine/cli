@@ -32,6 +32,7 @@ func TestMain(m *testing.M) {
 		return agentskills.Installer{}, errors.New("tests never read the real home")
 	}
 	os.Setenv(secrets.KeychainEnv, "off")
+	aliasCLI = func() string { return "" }
 	if err := isolateGitConfig(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

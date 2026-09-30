@@ -42,6 +42,7 @@ devmachine packages pin
 devmachine packages rm
 devmachine packages schema
 devmachine packages validate
+devmachine resolve
 devmachine run
 devmachine secrets
 devmachine secrets example

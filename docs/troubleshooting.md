@@ -139,12 +139,62 @@ devmachine from, and check they say what you expect.
 
 ## A `tailscale:` address is being ignored
 
-**What it means:** devmachine drops it when Tailscale is not installed, or
-does not know that name, and tries the next address instead. This is by
-design.
+**What it means:** devmachine drops a `<prefix>:<name>` entry when the network
+package says the network is not reachable from your computer — Tailscale is
+not installed, not running, or does not know that name — and tries the next
+address instead. This is by design.
 
-**What to do:** Run `tailscale status` and check the server is listed under
-the name you wrote.
+**What to do:** Run `devmachine resolve`. It lists every entry it skipped,
+with the reason the package gave. Then run `tailscale status` and check the
+server is listed under the name you wrote.
+
+## "no package declares the prefix"
+
+**What it means:** A `hosts` entry is written `<prefix>:<name>`, and no
+package in your pinned release or your own `packages/` folder declares that
+prefix in a `network:` block. The entry is skipped.
+
+**What to do:** Add the network package to the machine
+(`devmachine packages add <package>`) and `sync`, or check the prefix for a
+typo. For `tailscale:`, a packages release from before network packages
+still works: the CLI's built-in resolver answers when no package does.
+
+## "the X package's resolve did not answer within 5s"
+
+**What it means:** The package's `resolve` script, which runs on your
+computer, took too long, so its entry was skipped. The network's own
+command is probably stuck: for Tailscale, `tailscale status` hangs too.
+
+**What to do:** Run the network's own status command. Restart its app if
+that hangs as well.
+
+## "joining X did not finish … run `devmachine sync`"
+
+**What it means:** `devmachine login <package>` ran the package's `join`
+script on the machine, and it failed. The most common reason is that the
+package is not on the machine yet: `join` runs from where `sync` put it.
+Otherwise, the script's own output, above the error, says what went wrong.
+
+**What to do:** `devmachine sync`, then `devmachine login <package>` again.
+
+## `ssh <workspace>-devmachine` says "no address answered" or "Connection closed by UNKNOWN"
+
+**What it means:** The alias connects through `devmachine ssh-proxy`, and
+none of the machine's addresses accepted a connection. ssh shows the
+proxy's error, which lists every address and why.
+
+**What to do:** Run `devmachine resolve` to see which addresses were tried.
+If it says `devmachine: command not found` instead, the CLI moved since the
+alias was written: run `devmachine aliases --write` again.
+
+## `doctor` says an alias has "a fixed address, expected one resolved when ssh connects"
+
+**What it means:** The alias was written with the address itself, by an
+older version or while `devmachine` was not on your `PATH`. It works until
+that address stops working.
+
+**What to do:** `devmachine aliases --write`. See
+[SSH aliases that resolve when you connect](how-it-works/addresses-and-fallback.md#ssh-aliases-that-resolve-when-you-connect).
 
 ## A setting is accepted, but the package still uses its default
 

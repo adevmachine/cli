@@ -185,3 +185,36 @@ func TestAliasesSaysWhenThereIsNoWorkspace(t *testing.T) {
 		t.Fatalf("it should say how to get one: %q", out)
 	}
 }
+
+func TestAliasesWriteTheProxyFormWhenDevmachineIsOnThePath(t *testing.T) {
+	aliasCLI = func() string { return "/opt/homebrew/bin/devmachine" }
+	t.Cleanup(func() { aliasCLI = func() string { return "" } })
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	path := filepath.Join(t.TempDir(), "ssh_config")
+
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--path", path, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "    ProxyCommand /opt/homebrew/bin/devmachine --config " + dir + " ssh-proxy main %p\n"
+	if !strings.Contains(string(body), want) || !strings.Contains(string(body), "    HostName main\n") {
+		t.Fatalf("want %q in:\n%s", want, body)
+	}
+}
+
+func TestAliasesJSONCarriesTheProxyCommand(t *testing.T) {
+	aliasCLI = func() string { return "/opt/homebrew/bin/devmachine" }
+	t.Cleanup(func() { aliasCLI = func() string { return "" } })
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	out, err := execute(t, "--config", dir, "aliases", "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"proxy_command": "/opt/homebrew/bin/devmachine --config `) {
+		t.Fatalf("got %s", out)
+	}
+}

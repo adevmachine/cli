@@ -24,8 +24,10 @@ devmachine picks between several addresses.
 
 ## Tailscale, step by step
 
-[Tailscale](https://tailscale.com) is the private network devmachine has
-built-in support for.
+[Tailscale](https://tailscale.com) is supported through the `tailscale`
+package. The CLI itself knows no network: the package tells it how to turn
+`tailscale:<name>` into an address, how to join, and what the machine is
+called — see [the network package contract](../reference/network-package-contract.md).
 
 `setup` asks about Tailscale right after the essentials, and adding the
 package is all "yes" does — the sign-in and the private address still need
@@ -44,10 +46,10 @@ the two steps below.
    devmachine login tailscale
    ```
 
-   This opens `tailscale up` on the server, in a real terminal — you finish
-   the sign-in in your browser. Once it succeeds, devmachine asks the server
-   for its own name on the tailnet and adds it to `config.yml` for you, above
-   the public address:
+   This runs the package's `join` on the server, in a real terminal — it
+   calls `tailscale up`, and you finish the sign-in in your browser. Once it
+   succeeds, devmachine asks the server for its own name on the tailnet and
+   adds it to `config.yml` for you, above the public address:
 
    ```yaml
    machines:
@@ -69,7 +71,22 @@ the two steps below.
 
 devmachine tries `tailscale:main` first and falls back to the public address
 if Tailscale is not running on your computer — so turning Tailscale off
-never locks you out.
+never locks you out. `devmachine resolve` shows which address it will use
+and why it skipped one.
+
+### Your own control server
+
+Set `tailscale.login_server` to your Headscale server's URL before
+`devmachine login tailscale`, and the join uses it:
+
+```yaml
+machines:
+  - name: main
+    settings:
+      tailscale.login_server: https://net.example.com
+```
+
+See [Your own Tailscale with Headscale](../guides/headscale.md).
 
 ### Sending your traffic through the server
 
@@ -87,7 +104,9 @@ machines:
 devmachine sync
 ```
 
-An exit node also needs approving once in the
+The package's `join` also advertises the exit node when this is on, the next
+time you run `devmachine login tailscale`. An exit node also needs approving
+once in the
 [Tailscale admin console](https://login.tailscale.com/admin/machines) —
 Tailscale will not route traffic through a machine nobody approved for it,
 even if it is running the setting.
@@ -108,12 +127,13 @@ every time.
 | **Tailscale** | Hosted, WireGuard-based mesh network | Fastest to set up, works almost anywhere, devmachine resolves `tailscale:<name>` for you | Your traffic's control plane is Tailscale's servers (the data itself is peer-to-peer) |
 | **Headscale** | Self-hosted, open source Tailscale control server | Full control, no third party in the loop | You run and maintain the control server yourself — see [Your own Tailscale with Headscale](../guides/headscale.md) |
 | **Plain WireGuard** | The protocol Tailscale is built on, configured by hand | No account, no control server, total control | You manage keys and routing yourself — no automatic discovery |
-| **ZeroTier** | Another hosted mesh network, similar shape to Tailscale | An alternative if you already use it | Not resolved automatically by devmachine — add the address to `hosts:` directly |
+| **ZeroTier** | Another hosted mesh network, similar shape to Tailscale | An alternative if you already use it | No package for it yet — add the address to `hosts:` directly, or write a network package |
 | **Provider private network** | A VPC or private network your VPS provider offers | Often free, no extra software | Usually only reaches other servers from the same provider, not your laptop |
 
 Any of these works with devmachine the same way: once your server has an
 address your computer can reach, add it to `hosts:` — first in the list, so
-it is tried before the public one.
+it is tried before the public one. Or write a package with a `network:`
+block, and `<prefix>:<name>` entries work for it the way `tailscale:` does.
 
 Source: [Tailscale — Download](https://tailscale.com/download),
 [Tailscale — Exit nodes](https://tailscale.com/kb/1103/exit-nodes)

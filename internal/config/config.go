@@ -69,7 +69,8 @@ const (
 // Host is one address a machine answers on.
 //
 // An address is either a literal (an IP, or a name DNS resolves) or a
-// `tailscale:<machine>` entry, which something closer to the network resolves.
+// `<prefix>:<name>` entry, such as `tailscale:main`, which the network package
+// declaring that prefix resolves.
 // Parsing an address is not this package's job; keeping the order is.
 type Host struct {
 	Address string
@@ -131,6 +132,12 @@ type Machine struct {
 	// resolved the same way as KnownHostsFile, and empty whenever AgentKey
 	// is.
 	AgentKeyFile string `yaml:"-"`
+	// ConfigDir and PackagesRelease say where this machine's packages are
+	// read from, so resolving a `<prefix>:<name>` host entry can find the
+	// network package that answers for it. Runtime metadata, like
+	// KnownHostsFile.
+	ConfigDir       string `yaml:"-"`
+	PackagesRelease string `yaml:"-"`
 }
 
 // Route is one public hostname a workspace's port answers to. Caddy holds the
@@ -278,6 +285,8 @@ func Load(dir string) (Config, error) {
 
 	for i := range c.Machines {
 		c.Machines[i].KnownHostsFile = filepath.Join(dir, KnownHostsFileName)
+		c.Machines[i].ConfigDir = dir
+		c.Machines[i].PackagesRelease = c.Packages
 		if c.Machines[i].AgentKey != "" {
 			c.Machines[i].AgentKeyFile = keys.AgentFile(dir, c.Machines[i].Name)
 		}

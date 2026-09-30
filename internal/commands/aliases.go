@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// aliasCLI is the devmachine the aliases name as their ProxyCommand. It is a
+// seam, so what a test writes does not depend on the PATH it runs with.
+var aliasCLI = aliases.CLIPath
+
 // refreshAliases keeps ~/.ssh/config's managed block in step with the
 // configuration, for a person who already said yes once.
 //
@@ -24,7 +28,7 @@ func refreshAliases(cfg config.Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	block, err := aliases.Render(cfg)
+	block, err := aliases.Render(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		return err
 	}
@@ -64,7 +68,12 @@ func newAliasesCmd(opts *options) *cobra.Command {
 		Use:   "aliases",
 		Short: "The SSH host entries each workspace is reached by",
 		Long: "Prints one Host entry per workspace, so `ssh alice-devmachine` " +
-			"and `mosh alice-devmachine` work from an ordinary terminal.\n\n" +
+			"works from an ordinary terminal, an editor or an app.\n\n" +
+			"When devmachine is on your PATH, each entry connects through " +
+			"`devmachine ssh-proxy`, which picks the machine's address the moment " +
+			"ssh connects: a private network going up or down never leaves a " +
+			"stale address behind. Without it on PATH, the entry holds the " +
+			"address that works now, and needs writing again when that changes.\n\n" +
 			"--write puts them in your SSH configuration, between two markers. " +
 			"Everything outside those markers is left exactly as it was: that " +
 			"file holds hosts this CLI knows nothing about.",
@@ -93,11 +102,12 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 	if err != nil {
 		return err
 	}
-	found, err := aliases.List(cfg)
+	form := aliases.Options{CLI: aliasCLI()}
+	found, err := aliases.List(cfg, form)
 	if err != nil {
 		return err
 	}
-	block, err := aliases.Render(cfg)
+	block, err := aliases.Render(cfg, form)
 	if err != nil {
 		return err
 	}
@@ -160,6 +170,10 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 		cmd.Println("\nNothing was written.")
 	case written:
 		for _, a := range found {
+			if a.ProxyCommand != "" {
+				cmd.Printf("%-24s %s@%s:%d, at the address that answers when ssh connects\n", a.Name, a.User, a.Host, a.Port)
+				continue
+			}
 			cmd.Printf("%-24s %s@%s:%d\n", a.Name, a.User, a.Host, a.Port)
 		}
 		cmd.Printf("\nWritten into %s, between the devmachine markers.\n", path)

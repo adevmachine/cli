@@ -160,6 +160,10 @@ func RunWithScanner(ctx context.Context, dir, machine string, dial Dialer, scan 
 	return append(checks, dnsChecks(ctx, dir, m.Name, baseOf(m), client)...)
 }
 
+// aliasCLI is the devmachine `aliases --write` would name as the ProxyCommand
+// right now. It is a seam, so a test does not depend on its PATH.
+var aliasCLI = aliases.CLIPath
+
 // sshResolve runs `ssh -G <alias>` and parses its output into lowercase
 // key/value pairs. `ssh -G` only resolves the configuration; it never opens a
 // connection, so this is safe to run whether or not the alias is any good.
@@ -175,6 +179,15 @@ var sshResolve sshResolver = func(alias string) (map[string]string, error) {
 }
 
 type sshResolver func(alias string) (map[string]string, error)
+
+// proxyCommandOf is the ProxyCommand `ssh -G` reports, empty when there is
+// none: it prints "none" or leaves the line out, depending on the version.
+func proxyCommandOf(resolved map[string]string) string {
+	if got := strings.TrimSpace(resolved["proxycommand"]); got != "none" {
+		return got
+	}
+	return ""
+}
 
 func parseSSHDashG(out string) map[string]string {
 	fields := make(map[string]string)
@@ -206,7 +219,7 @@ func parseSSHDashG(out string) map[string]string {
 // <workspace>-devmachine` does not work from another terminal, not that the
 // machine itself is broken.
 func sshAliasesCheck(cfg config.Config) Check {
-	found, err := aliases.List(cfg)
+	found, err := aliases.List(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}
 	}
@@ -248,6 +261,16 @@ func aliasMismatch(a aliases.Alias) string {
 	}
 	if got := resolved["hostkeyalias"]; got != a.HostKeyAlias {
 		mismatches = append(mismatches, fmt.Sprintf("hostkeyalias %s, expected %s", got, a.HostKeyAlias))
+	}
+	if got := proxyCommandOf(resolved); got != a.ProxyCommand {
+		switch {
+		case a.ProxyCommand == "":
+			mismatches = append(mismatches, fmt.Sprintf("proxycommand %s, expected none", got))
+		case got == "":
+			mismatches = append(mismatches, "a fixed address, expected one resolved when ssh connects")
+		default:
+			mismatches = append(mismatches, fmt.Sprintf("proxycommand %s, expected %s", got, a.ProxyCommand))
+		}
 	}
 	if len(mismatches) == 0 {
 		return ""

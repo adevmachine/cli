@@ -277,7 +277,7 @@ func offerSSHAliases(r *bufio.Reader, out io.Writer, dir string, noAliases, yes 
 	if err != nil {
 		return err
 	}
-	block, err := aliases.Render(cfg)
+	block, err := aliases.Render(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		return err
 	}

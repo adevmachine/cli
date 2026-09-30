@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -53,10 +55,40 @@ type Alias struct {
 	HostKeyAlias       string `json:"host_key_alias"`
 	UserKnownHostsFile string `json:"user_known_hosts_file"`
 	HostKeyAlgorithms  string `json:"host_key_algorithms"`
+	// ProxyCommand is set in the proxy form: ssh asks the CLI for the
+	// machine's addresses each time it connects, and Host is then the
+	// machine's name rather than an address.
+	ProxyCommand string `json:"proxy_command,omitempty"`
+}
+
+// Options choose the form the aliases are written in.
+type Options struct {
+	// CLI is the devmachine executable ssh runs as the ProxyCommand. Empty
+	// writes the literal form: HostName is the address resolved now.
+	CLI string
+}
+
+// CLIPath is the devmachine on PATH, as an absolute path, or empty when there
+// is none. It is the path the proxy form writes, so ssh finds the CLI even
+// from an editor or an app that does not share the terminal's PATH.
+func CLIPath() string {
+	found, err := exec.LookPath("devmachine")
+	if err != nil {
+		return ""
+	}
+	abs, err := filepath.Abs(found)
+	if err != nil {
+		return ""
+	}
+	return abs
 }
 
 // List returns the aliases a configuration describes, workspace by workspace.
-func List(cfg config.Config) ([]Alias, error) {
+//
+// The proxy form resolves nothing now: the addresses are asked for when ssh
+// connects, so a network going up or down never leaves a stale address in
+// the file. The literal form writes the first address that works now.
+func List(cfg config.Config, opts Options) ([]Alias, error) {
 	var out []Alias
 
 	for _, w := range cfg.Workspaces {
@@ -69,10 +101,6 @@ func List(cfg config.Config) ([]Alias, error) {
 			// write. Validate already refuses a workspace on one; this is
 			// the defensive skip for whatever reaches here anyway.
 			continue
-		}
-		addresses, err := resolve(machine)
-		if err != nil || len(addresses) == 0 {
-			return nil, errNoAddress(machine.Name)
 		}
 		store, err := hostkeys.Open(machine.KnownHostsFile)
 		if err != nil {
@@ -88,12 +116,35 @@ func List(cfg config.Config) ([]Alias, error) {
 			identityFile = machine.AgentKeyFile
 		}
 		entry := Alias{
-			Name: w.Name + suffix, Host: addresses[0], User: w.LinuxUser(),
+			Name: w.Name + suffix, User: w.LinuxUser(),
 			Port: machine.Port, IdentityFile: identityFile,
 			HostKeyAlias:       hostkeys.Lookup(machine.Name, machine.Port),
 			UserKnownHostsFile: machine.KnownHostsFile,
 			HostKeyAlgorithms:  strings.Join(hostkeys.Algorithms(key), ","),
 		}
+
+		if opts.CLI != "" {
+			entry.Host = machine.Name
+			entry.ProxyCommand = proxyCommand(opts.CLI, machine)
+			out = append(out, entry)
+			// The proxy already falls back on its own, so `-pub` is only
+			// the way to skip the private network on purpose.
+			if len(machine.Hosts) > 1 {
+				if public := literalAddress(machine, ""); public != "" {
+					pub := entry
+					pub.Name = w.Name + suffix + "-pub"
+					pub.Host, pub.ProxyCommand = public, ""
+					out = append(out, pub)
+				}
+			}
+			continue
+		}
+
+		addresses, err := resolve(machine)
+		if err != nil || len(addresses) == 0 {
+			return nil, errNoAddress(machine.Name)
+		}
+		entry.Host = addresses[0]
 		out = append(out, entry)
 
 		// A `-pub` alias is the way back in when the first path is down, so
@@ -110,6 +161,30 @@ func List(cfg config.Config) ([]Alias, error) {
 	return out, nil
 }
 
+// proxyCommand is the line ssh runs through the shell: `%p` is ssh's own
+// port token, and a literal `%` anywhere else has to be written `%%`.
+func proxyCommand(cli string, m config.Machine) string {
+	words := []string{shellWord(cli)}
+	if m.ConfigDir != "" {
+		words = append(words, "--config", shellWord(m.ConfigDir))
+	}
+	words = append(words, "ssh-proxy", shellWord(m.Name), "%p")
+	for i, w := range words[:len(words)-1] {
+		words[i] = strings.ReplaceAll(w, "%", "%%")
+	}
+	return strings.Join(words, " ")
+}
+
+var plainWord = regexp.MustCompile(`^[A-Za-z0-9@%_+=:,./-]+$`)
+
+// shellWord quotes only what needs it, so the usual path reads as typed.
+func shellWord(s string) string {
+	if plainWord.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // literalAddress is the first host entry ssh can dial as written that is not
 // the primary address, so it names somewhere the `-pub` alias would actually
 // reach.
@@ -124,8 +199,8 @@ func literalAddress(m config.Machine, primary string) string {
 
 // Render returns the body of the managed block: the Host entries themselves,
 // without the markers Write puts around them.
-func Render(cfg config.Config) (string, error) {
-	found, err := List(cfg)
+func Render(cfg config.Config, opts Options) (string, error) {
+	found, err := List(cfg, opts)
 	if err != nil {
 		return "", err
 	}
@@ -139,6 +214,9 @@ func Render(cfg config.Config) (string, error) {
 		fmt.Fprintf(&b, "    HostName %s\n", a.Host)
 		fmt.Fprintf(&b, "    User %s\n", a.User)
 		fmt.Fprintf(&b, "    Port %d\n", a.Port)
+		if a.ProxyCommand != "" {
+			fmt.Fprintf(&b, "    ProxyCommand %s\n", a.ProxyCommand)
+		}
 		if a.IdentityFile != "" {
 			fmt.Fprintf(&b, "    IdentityFile %s\n", quoteSSHConfig(a.IdentityFile))
 			// Without this, ssh offers every key the agent holds first, and a
