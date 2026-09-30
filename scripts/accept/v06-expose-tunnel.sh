@@ -176,8 +176,17 @@ BLOCK=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
 contains "$BLOCK" "reverse_proxy 127.0.0.1:8080" "the block points at the port" || true
 contains "$BLOCK" "devmachine sync" "and says what wrote it" || true
 
-SERVED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
-  'curl -sk -o /dev/null -w "%{http_code}" --resolve app.example.com:443:127.0.0.1 https://app.example.com' 2>&1)
+# Caddy issues the site's local certificate on its own after the reload that
+# sync triggers, so the first requests can race it. Ask for a while before
+# judging, and keep the last answer for the log.
+SERVED=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  SERVED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+    'curl -sk -o /dev/null -w "%{http_code}" --resolve app.example.com:443:127.0.0.1 https://app.example.com' 2>&1)
+  [ "$SERVED" = "200" ] && break
+  sleep 2
+done
+printf '%s\n' "$SERVED" > "$SCENARIO_LOG_DIR/served.log"
 equals "$SERVED" "200" "Caddy proxies the host to the container" || true
 
 LIST=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
