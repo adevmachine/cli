@@ -1,0 +1,190 @@
+name: wsl
+
+# Runs the CLI inside WSL (Ubuntu 24.04 on Windows) against the same WSL
+# distribution acting as the server, so "does it work on Windows through WSL"
+# has an answer backed by a real run.
+
+on:
+  push:
+    branches: [da-wsl-ci]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  wsl:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: wsl-bash {0}
+    steps:
+      - name: Keep line endings as committed
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: Vampire/setup-wsl@v7
+        with:
+          distribution: Ubuntu-24.04
+          wsl-shell-user: alice
+          wsl-conf: |
+            [boot]
+            systemd=true
+          additional-packages: >-
+            openssh-server openssh-client sudo curl git ca-certificates
+            python3 python3-venv tar
+
+      - name: Report the WSL environment
+        shell: pwsh
+        run: wsl --version; wsl --list --verbose
+
+      - name: Make the distribution look like a freshly bought server
+        shell: wsl-bash -u root {0}
+        run: |
+          uname -a
+          cat /etc/os-release
+          if [ "$(ps -p 1 -o comm=)" = systemd ]; then
+            echo yes > /etc/ci-systemd
+          else
+            echo no > /etc/ci-systemd
+          fi
+          echo "systemd as PID 1: $(cat /etc/ci-systemd)"
+
+          mkdir -p /etc/ssh/sshd_config.d /run/sshd
+          cat > /etc/ssh/sshd_config.d/10-ci.conf <<'EOF'
+          Port 2222
+          PermitRootLogin yes
+          PasswordAuthentication yes
+          KbdInteractiveAuthentication no
+          EOF
+          echo 'root:devmachine' | chpasswd
+          ssh-keygen -A
+
+          if [ "$(cat /etc/ci-systemd)" = yes ]; then
+            systemctl disable --now ssh.socket || true
+            systemctl enable ssh.service
+            systemctl restart ssh.service
+            systemctl --no-pager status ssh.service
+          else
+            /usr/sbin/sshd -p 2222
+          fi
+          for i in $(seq 1 20); do
+            (exec 3<>/dev/tcp/127.0.0.1/2222) 2>/dev/null && break
+            sleep 1
+          done
+          (exec 3<>/dev/tcp/127.0.0.1/2222) && echo "sshd listens on 2222"
+
+      - name: Install Go and build this commit
+        run: |
+          series=$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' go.mod)
+          version=$(curl -fsSL 'https://go.dev/dl/?mode=json&include=all' | python3 -c "
+          import json, sys
+          series = sys.argv[1]
+          for r in json.load(sys.stdin):
+              if r['stable'] and (r['version'] == 'go' + series or r['version'].startswith('go' + series + '.')):
+                  print(r['version']); break
+          " "$series")
+          echo "Go $version for go.mod series $series"
+          mkdir -p "$HOME/sdk"
+          curl -fsSL "https://go.dev/dl/$version.linux-amd64.tar.gz" | tar -xz -C "$HOME/sdk"
+          export PATH="$HOME/sdk/go/bin:$PATH"
+          go version
+
+          rm -rf "$HOME/src"
+          mkdir -p "$HOME/src"
+          cp -a . "$HOME/src/"
+          cd "$HOME/src"
+          go build -o "$HOME/bin/devmachine" ./cmd/devmachine
+          "$HOME/bin/devmachine" version
+
+      - name: Unit tests inside WSL
+        run: |
+          export PATH="$HOME/sdk/go/bin:$PATH"
+          git config --global user.email "ci@example.com"
+          git config --global user.name "ci"
+          cd "$HOME/src"
+          go test ./...
+
+      - name: Install the latest release the way users do
+        run: |
+          curl -fsSL https://mydevmachine.sh/install.sh | sh
+          "$HOME/.local/bin/devmachine" version
+
+      - name: Set up a machine, a workspace, and use it
+        run: |
+          LOGS="$PWD/wsl-logs"
+          mkdir -p "$LOGS"
+          DM="$HOME/bin/devmachine"
+          export DEVMACHINE_CONFIG
+          DEVMACHINE_CONFIG=$(mktemp -d)
+          HARDEN=
+          if [ "$(cat /etc/ci-systemd)" = no ]; then
+            HARDEN=--no-harden
+          fi
+
+          {
+            echo "release CLI: $("$HOME/.local/bin/devmachine" version 2>&1)"
+            echo "built CLI:   $("$DM" version 2>&1)"
+            echo "systemd:     $(cat /etc/ci-systemd)"
+            echo "kernel:      $(uname -r)"
+          } | tee "$LOGS/versions.txt"
+
+          failures=0
+          results=()
+          record() {
+            results+=("$1  $2")
+            [ "$1" = PASS ] || failures=$((failures + 1))
+          }
+          step() {
+            name=$1 log=$2
+            shift 2
+            if "$@" >"$LOGS/$log.log" 2>&1; then
+              record PASS "$name"
+            else
+              record FAIL "$name (see $log.log)"
+            fi
+            sed 's/^/    /' "$LOGS/$log.log"
+          }
+          expect() {
+            name=$1 log=$2 want=$3
+            shift 3
+            got=$("$@" 2>"$LOGS/$log.err" | tr -d '\r' | tail -n 1) || true
+            printf '%s\n' "$got" >"$LOGS/$log.log"
+            if [ "$got" = "$want" ]; then
+              record PASS "$name"
+            else
+              record FAIL "$name (wanted '$want', got '$got'; see $log.err)"
+            fi
+          }
+
+          run_setup() {
+            printf '%s\n' main 127.0.0.1 root 2222 "" y 1 devmachine \
+              | "$DM" setup --no-essentials --no-aliases $HARDEN
+          }
+          ssh_whoami() {
+            printf 'whoami\n' | "$DM" ssh acme
+          }
+          step "setup takes the machine over" setup run_setup
+          cp "$DEVMACHINE_CONFIG/config.yml" "$LOGS/config.yml" 2>/dev/null || true
+          step "doctor" doctor "$DM" doctor
+          step "workspaces new acme" workspaces-new "$DM" workspaces new acme --yes
+          step "sync --yes" sync "$DM" sync --yes
+          expect "run --workspace acme -- whoami" run-whoami acme \
+            "$DM" run --workspace acme -- whoami
+          expect "ssh acme (commands on stdin)" ssh-whoami acme \
+            ssh_whoami
+          step "stats" stats "$DM" stats
+          step "doctor after sync" doctor-after "$DM" doctor
+
+          echo
+          printf '%s\n' "${results[@]}" | tee "$LOGS/summary.txt"
+          [ "$failures" -eq 0 ]
+
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wsl-logs
+          path: wsl-logs
+          if-no-files-found: warn
