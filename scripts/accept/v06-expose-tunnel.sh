@@ -166,39 +166,102 @@ NOCADDY=$(DEVMACHINE_CONFIG="$NOCADDY_DIR" "$DEVMACHINE_ACCEPT_BIN" expose add a
 printf '%s\n' "$NOCADDY" > "$SCENARIO_LOG_DIR/no-caddy.log"
 contains "$NOCADDY" "caddy is not on" "expose refuses without caddy, and names it" || true
 
+now_ms() {
+  python3 -c 'import time; print(int(time.time() * 1000))'
+}
+
+served_code() {
+  "$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+    "curl -sk -o /dev/null -w '%{http_code}' --resolve $1:443:127.0.0.1 https://$1" 2>&1
+}
+
+ADD_STARTED=$(now_ms)
 "$DEVMACHINE_ACCEPT_BIN" expose add alice 8080 --host app.example.com --publish \
   >"$SCENARIO_LOG_DIR/expose-add.log" 2>&1 || die "could not expose app.example.com"
-PENDING=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
-contains "$PENDING" "pending" "expose add records the route and touches no machine" || true
-"$DEVMACHINE_ACCEPT_BIN" sync --yes >"$SCENARIO_LOG_DIR/sync-routes.log" 2>&1 \
-  || die "could not sync the route"
+ADD_MS=$(( $(now_ms) - ADD_STARTED ))
+echo "  expose add took ${ADD_MS} ms"
+LIST=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
+contains "$LIST" "published" "expose add puts the route on Caddy without a sync" || true
+if [ "$ADD_MS" -lt 30000 ]; then
+  pass "expose add is done in seconds (${ADD_MS} ms)"
+else
+  fail "expose add is done in seconds (${ADD_MS} ms)" || true
+fi
 BLOCK=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
   'cat /etc/caddy/sites.d/alice-routes.caddy' 2>&1) \
   || die "could not read the Caddy site block"
 contains "$BLOCK" "reverse_proxy 127.0.0.1:8080" "the block points at the port" || true
 contains "$BLOCK" "devmachine sync" "and says what wrote it" || true
 
-# Caddy issues the site's local certificate on its own after the reload that
-# sync triggers, so the first requests can race it. Ask for a while before
-# judging, and keep the last answer for the log.
+# Caddy issues the site's local certificate on its own after the reload, so
+# the first requests can race it. Ask for a while before judging, and keep
+# the last answer for the log.
 SERVED=""
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-  SERVED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
-    'curl -sk -o /dev/null -w "%{http_code}" --resolve app.example.com:443:127.0.0.1 https://app.example.com' 2>&1)
+  SERVED=$(served_code app.example.com)
   [ "$SERVED" = "200" ] && break
   sleep 2
 done
 printf '%s\n' "$SERVED" > "$SCENARIO_LOG_DIR/served.log"
 equals "$SERVED" "200" "Caddy proxies the host to the container" || true
 
-LIST=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1)
-contains "$LIST" "published" "expose list shows it published" || true
+"$DEVMACHINE_ACCEPT_BIN" sync --check --yes >"$SCENARIO_LOG_DIR/sync-check.log" 2>&1 \
+  || die "sync --check failed after the fast path"
+if python3 - "$SCENARIO_LOG_DIR/sync-check.log" <<'CHECK'
+import re
+import sys
+
+text = open(sys.argv[1]).read()
+blocks = re.split(r"(?m)^TASK \[", text)
+routes = [b for b in blocks if b.startswith(("routes from the configuration]",
+                                              "files the configuration no longer owns]",
+                                              "reload caddy for the routes]"))]
+if not routes or any(re.search(r"(?m)^changed:", b) for b in routes):
+    sys.exit(1)
+CHECK
+then
+  pass "a later sync finds nothing to change in Caddy"
+else
+  fail "a later sync finds nothing to change in Caddy" || true
+fi
+
+"$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- \
+  "printf 'dup.example.com {\n\trespond \"by hand\"\n}\n' > /etc/caddy/sites.d/handmade.caddy" \
+  >"$SCENARIO_LOG_DIR/handmade.log" 2>&1 || die "could not write the hand-made site"
+REFUSED=$("$DEVMACHINE_ACCEPT_BIN" expose add alice 8081 --host dup.example.com --publish 2>&1)
+REFUSED_EXIT=$?
+printf '%s\n' "$REFUSED" > "$SCENARIO_LOG_DIR/refused.log"
+if [ "$REFUSED_EXIT" -ne 0 ]; then
+  contains "$REFUSED" "caddy refused" "a file Caddy refuses fails, in Caddy's words" || true
+else
+  fail "a file Caddy refuses fails, in Caddy's words" || true
+fi
+KEPT=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- 'cat /etc/caddy/sites.d/alice-routes.caddy' 2>&1)
+refutes "$KEPT" "dup.example.com" "and the old routes file stays" || true
+DUP_ROW=$("$DEVMACHINE_ACCEPT_BIN" expose list 2>&1 | grep '^dup.example.com.*alice' || true)
+if [ -n "$DUP_ROW" ]; then
+  refutes "$DUP_ROW" "published" "and the refused route stays in the configuration, unpublished" || true
+else
+  fail "and the refused route stays in the configuration, unpublished" || true
+fi
+"$DEVMACHINE_ACCEPT_BIN" expose rm dup.example.com --yes >"$SCENARIO_LOG_DIR/unrefuse.log" 2>&1 \
+  || die "could not forget the refused route"
+"$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- 'rm -f /etc/caddy/sites.d/handmade.caddy' \
+  >>"$SCENARIO_LOG_DIR/handmade.log" 2>&1 || die "could not remove the hand-made site"
+
+RM_STARTED=$(now_ms)
 "$DEVMACHINE_ACCEPT_BIN" expose rm app.example.com --yes \
   >"$SCENARIO_LOG_DIR/expose-rm.log" 2>&1 || die "could not remove app.example.com"
-"$DEVMACHINE_ACCEPT_BIN" sync --yes >"$SCENARIO_LOG_DIR/sync-unroute.log" 2>&1 \
-  || die "could not sync the removal"
+RM_MS=$(( $(now_ms) - RM_STARTED ))
+echo "  expose rm took ${RM_MS} ms"
 GONE=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- 'ls /etc/caddy/sites.d' 2>&1)
-refutes "$GONE" "alice-routes" "expose rm and sync removed the file" || true
+refutes "$GONE" "alice-routes" "expose rm removes the file without a sync" || true
+if [ "$RM_MS" -lt 30000 ]; then
+  pass "expose rm is done in seconds (${RM_MS} ms)"
+else
+  fail "expose rm is done in seconds (${RM_MS} ms)" || true
+fi
+refutes "$(served_code app.example.com)" "200" "and Caddy stops serving the host" || true
 
 LOCAL_PORT=$(free_port)
 "$DEVMACHINE_ACCEPT_BIN" tunnel alice 8080 --local "$LOCAL_PORT" \
@@ -277,4 +340,4 @@ BUSY_PID=
 MD=$("$DEVMACHINE_ACCEPT_BIN" machine doctor 2>&1)
 contains "$MD" "ssh" "machine doctor checks this computer" || true
 
-scenario_done 13 "v0.6"
+scenario_done 19 "v0.6"
