@@ -1,0 +1,55 @@
+internal/expose/apply.go
+  s_a0cbf6c120c4f8::t_7f4bceceaefa38 1-157
+internal/provision/routes_test.go
+  s_a0cbf6c120c4f8::t_6d742cbe58bf78 1-149
+internal/expose/apply_test.go
+  s_a0cbf6c120c4f8::t_b5d2802093112f 1-296
+docs/concepts/publishing.md
+  s_a0cbf6c120c4f8::t_8e3a5282c6b9aa 31-35
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_a1aff3bb74b28f 90-92
+docs/guides/agno-agentos-with-control-plane.md
+  s_a0cbf6c120c4f8::t_07ec5bfd00fefb 170
+docs/guides/cloudflare-dns.md
+  s_a0cbf6c120c4f8::t_5da17629015ca7 99-100,130
+docs/guides/docker-site-on-8080.md
+  s_a0cbf6c120c4f8::t_70507252d946d0 82-83,97-98
+docs/guides/express-site-with-tls.md
+  s_a0cbf6c120c4f8::t_3fa6ddd7fa770f 71-72,87-88
+docs/guides/one-consultant-three-startups.md
+  s_a0cbf6c120c4f8::t_1145c929a436f7 149,196-197
+docs/how-it-works/published-sites.md
+  s_a0cbf6c120c4f8::t_ff1274f7bd3155 18-58
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_ced47d5c0d96d6 539,541,547-570,577-585
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_8a99e50994d0e8 344-347,363-390
+internal/commands/expose.go
+  s_a0cbf6c120c4f8::t_beda916b3aa56b 7,9,38-46,53,65-180,183,187-194,230-232,234-238,256-260,262,272-297,301,304,474,478-483,505-517,543-585,588,590
+internal/commands/expose_test.go
+  s_a0cbf6c120c4f8::t_6eef9fdf94a51c 5,12,67-121,139-141,169-171,197,200-212,346,372,378,382,398-525,543,558-560,578-579,593-595,598-628,638-703,715-733
+internal/config/config.go
+  s_a0cbf6c120c4f8::t_90d53c3dfb7160 168-169
+internal/expose/expose.go
+  s_a0cbf6c120c4f8::t_df786f16c182c0 96-109
+internal/provision/ansible.go
+  s_a0cbf6c120c4f8::t_14690d3b7fa228 665-670,673,675-679,686-688,690
+internal/provision/routes.go
+  s_a0cbf6c120c4f8::t_063980e1fbeb2b 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "deab2058cb381bd22376d57c7eba6bc1b6434303",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
