@@ -240,5 +240,7 @@ capture_sync v05-sync6
 require_converged_recap "$SYNC_RECAP" "sync after adding hostinger"
 HELP=$("$DEVMACHINE_ACCEPT_BIN" packages help hostinger 2>&1)
 contains "$HELP" "zones" "the provider says what it accepts" || true
+RAN=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" --package hostinger -- help 2>&1)
+contains "$RAN" "zones" "run --package reaches a local package where sync unpacked it" || true
 
-scenario_done 21 "v0.5"
+scenario_done 22 "v0.5"

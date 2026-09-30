@@ -399,3 +399,19 @@ func TestAnyCallsAPackageThatNeedsNoCredential(t *testing.T) {
 		t.Fatalf("ran %q", client.commands)
 	}
 }
+
+func TestAnyCallsALocalPackageWhereAnsibleUnpackedIt(t *testing.T) {
+	dir := configDirWith(t, pkgSpec{name: "tool", entrypoint: "bin/tool", commands: []string{"*"}})
+	client := &recordingClient{out: "ok"}
+
+	got, err := Any(dir, "main", "", provision.RemoteDir, "tool", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := got.Call(context.Background(), []string{"context"}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.commands) != 1 || !strings.HasPrefix(client.commands[0], "/opt/devmachine/roles.local/tool/bin/tool ") {
+		t.Fatalf("ran %q, want the entrypoint under roles.local", client.commands)
+	}
+}

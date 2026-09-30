@@ -639,6 +639,18 @@ If you do not have the exact address, delete the stale connection file
 directly from `<user cache dir>/devmachine/cm/` instead. Either way, the next
 `run` opens a fresh connection.
 
+## `run --package` fails with "exit status 127"
+
+**What it means:** the machine has no file at the entrypoint path. The CLI
+builds that path from your configuration, the way `sync` does: a package in
+your own `packages/` directory runs from `/opt/devmachine/roles.local/<name>`,
+and one from the release runs from `/opt/devmachine/roles/<name>`. If you
+added or removed a local copy since the last `sync`, the CLI looks in one
+directory and the machine still holds the package in the other.
+
+**What to do:** Run `devmachine sync`, so the machine matches your
+configuration again.
+
 ## "no package named X, and none is available"
 
 **What it means:** Either the name is wrong, or no packages release is
