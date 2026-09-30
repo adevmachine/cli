@@ -537,7 +537,7 @@ reads. It stores the value under `<workspace>/<name>` and delivers it
 on the next `devmachine credentials push`, or right away with `--push`.
 
 By default it lands in `~/.devmachine/env` — see
-[the `~/.devmachine/env` contract](#devmachine-env). `--env-file
+[the `~/.devmachine/env` contract](#the-devmachineenv-file). `--env-file
 <path>` delivers into that dotenv file instead, relative to the
 workspace's home: the existing `<NAME>=` line is replaced, or a new one
 appended, and everything else in the file is left exactly as it was. A
@@ -557,7 +557,7 @@ where each is delivered. `rm --workspace w --from-file` also removes
 the name from its file, on the next `credentials push` — it is not
 edited here, so `rm` never needs to reach the machine.
 
-### `~/.devmachine/env` {#devmachine-env}
+### The `~/.devmachine/env` file
 
 A sourceable file inside every workspace, `KEY='value'` per line,
 0600, owned by the workspace's own account. It holds every workspace

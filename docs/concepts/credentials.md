@@ -84,7 +84,7 @@ it on the next `devmachine credentials push` — or right away, with
 
 By default it lands in `~/.devmachine/env`, a file the workspace's
 shell sources on login (see
-[the `~/.devmachine/env` contract](../reference/commands.md#devmachine-env)
+[the `~/.devmachine/env` contract](../reference/commands.md#the-devmachineenv-file)
 in the command reference). Give `--env-file` a path instead, relative
 to the workspace's home, to edit that file directly:
 
