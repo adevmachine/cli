@@ -639,6 +639,31 @@ If you do not have the exact address, delete the stale connection file
 directly from `<user cache dir>/devmachine/cm/` instead. Either way, the next
 `run` opens a fresh connection.
 
+## `upload` refuses a file or a folder
+
+**What it means:** one of these, checked on your computer before
+anything connects, or on the machine before anything is written:
+
+- "is a folder: upload sends files" — `upload` sends single files. Send
+  an archive instead (`tar czf notes.tgz notes`) and unpack it with
+  `devmachine run`.
+- "no such file or directory" or "cannot be read" — the path is wrong, or
+  your account cannot read that file.
+- "--dir … reaches outside the home" or "is outside the home" — the
+  folder climbs out with `../`, or is an absolute path in another home.
+  `upload` only writes inside the home of the account it sends to.
+- "reaches outside the home through a symbolic link" — the folder, or one
+  on the way to it, is a link to somewhere outside the home. Following it
+  would put the file wherever the link points.
+- "is not a folder" — a file sits where the folder should be.
+
+With several files, the others are still sent; only the refused ones are
+missing, and the command exits non-zero.
+
+**What to do:** Pick a folder inside the home (the default,
+`~/.cache/devmachine/uploads`, always works), or replace the link on the
+machine with a real folder.
+
 ## `run --package` fails with "exit status 127"
 
 **What it means:** the machine has no file at the entrypoint path. The CLI

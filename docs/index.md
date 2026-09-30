@@ -102,6 +102,8 @@ these when something behaves in a way that surprises you.
   — why `expose` writes to your configuration, not straight to the server.
 - [What sync removes](how-it-works/what-sync-removes.md) — what `sync` cleans
   up, and what it leaves alone.
+- [How an upload lands](how-it-works/uploads.md) — why `upload` renames
+  files, never overwrites one, and stays inside the home.
 
 ## Reference
 

@@ -72,6 +72,7 @@ scripts/accept/run.sh setup-git
 scripts/accept/run.sh v05-packages-credentials-dns
 scripts/accept/run.sh v06-expose-tunnel
 scripts/accept/run.sh workspace-secrets
+scripts/accept/run.sh upload
 ```
 
 Every run creates uniquely named `devmachine-accept-*` VMs and removes them by

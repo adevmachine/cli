@@ -359,6 +359,42 @@ See [packages](../concepts/packages.md).
 `run` keeps its SSH connection open for five minutes and reuses it, so a
 script calling it every few seconds skips the handshake each time.
 
+## upload
+
+```
+devmachine upload <file>... [--workspace w] [--dir path] [--mode 0600]
+```
+
+Sends local files into a home on a machine and prints, one per line, the
+absolute path each one landed at. With `--format json` it prints
+`[{"local": "...", "remote": "...", "bytes": N}]`; a file that failed has
+an `error` field instead of `remote`.
+
+- **Where.** `--workspace` sends into that workspace's home, as its own
+  account. Without it, the files go to the home of the machine's admin,
+  on the machine `--machine` names, or the only one configured. A
+  workspace and a `--machine` it does not live on is refused.
+- **Folder.** `~/.cache/devmachine/uploads` by default. `--dir` names
+  another folder, relative to the home (`notes`, `~/notes`) or absolute
+  inside it (`/home/acme/notes`). A folder outside the home is refused,
+  and so is one that leaves it through a symbolic link. Missing folders
+  are created, mode `0700`.
+- **Names.** Each file keeps its name, with the local time before the
+  extension: `report.pdf` becomes `report-20260930-143012.pdf`,
+  `photo.final.png` becomes `photo.final-20260930-143012.png`, and
+  `Makefile` and `.env` get it at the end. A name already taken gets
+  `-2`, `-3` and so on: nothing is ever overwritten. Spaces and accents
+  are kept; only `/`, line breaks and NUL become `_`.
+- **Mode.** `0600` unless `--mode` says otherwise.
+- **Failures.** A folder, a missing file or one you cannot read is
+  refused before anything connects. With several files, every one is
+  tried; the command exits non-zero if any failed, and names each on
+  stderr.
+
+stdout holds only the paths, so a script or an app can read them. Each
+upload is one line in [the command log](#the-command-log). See
+[how an upload lands](../how-it-works/uploads.md).
+
 ## dns
 
 ```
@@ -656,7 +692,7 @@ devmachine help [command] [--json]
 
 ## The command log
 
-`run` and `sync` each append one line to `<config>/history.log`, mode
+`run`, `upload` and `sync` each append one line to `<config>/history.log`, mode
 `0600`:
 
 ```
