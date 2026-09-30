@@ -73,7 +73,12 @@ scripts/accept/run.sh v05-packages-credentials-dns
 scripts/accept/run.sh v06-expose-tunnel
 scripts/accept/run.sh workspace-secrets
 scripts/accept/run.sh upload
+scripts/accept/run.sh network-package
 ```
+
+`network-package` uses a stand-in network package whose scripts are trivial,
+so the real Tailscale never runs; it proves `login`, `resolve`, and an alias
+that connects through `ssh-proxy` and falls through a dropped address.
 
 Every run creates uniquely named `devmachine-accept-*` VMs and removes them by
 default, including when a scenario fails. For investigation only,
