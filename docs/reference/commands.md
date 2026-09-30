@@ -441,7 +441,7 @@ Use this instead of `expose` for anything not plain HTTP, or that only
 you should see: a database tool with real data, an inbox with real mail,
 a queue dashboard that can drain a queue.
 
-| | Anyone | Only you |
+| Traffic | Anyone | Only you |
 | --- | --- | --- |
 | **HTTP** | `expose` | `tunnel` |
 | **Anything else** | nothing | `tunnel` |
