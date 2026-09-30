@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/secrets"
+	agentskills "github.com/mydevmachine/devmachine/internal/skills"
 )
 
 // No test reaches the network by accident: a test that needs a release says
@@ -15,6 +16,20 @@ import (
 func TestMain(m *testing.M) {
 	latestPackagesRelease = func(context.Context) (string, error) {
 		return "", errors.New("tests do not reach GitHub")
+	}
+	latestCLIRelease = func(context.Context) (string, error) {
+		return "", errors.New("tests do not reach GitHub")
+	}
+	releaseCacheDir = func() (string, error) {
+		return "", errors.New("tests keep no cache of their own")
+	}
+	executablePath = func() (string, error) {
+		return "", errors.New("tests never replace the binary running them")
+	}
+	findBrew = func() (string, error) { return "", errors.New("tests never run brew") }
+	execBinary = func(string, []string) error { return errors.New("tests never start another binary") }
+	localSkills = func() (agentskills.Installer, error) {
+		return agentskills.Installer{}, errors.New("tests never read the real home")
 	}
 	os.Setenv(secrets.KeychainEnv, "off")
 	if err := isolateGitConfig(); err != nil {

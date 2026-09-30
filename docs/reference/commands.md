@@ -122,6 +122,14 @@ fails, naming the alias and what is wrong, with the fix `devmachine
 aliases --write`. It is skipped on a self machine — there is no
 address to write a Host entry for.
 
+Last come two checks about your computer, not the machine: `cli` (is this
+the newest CLI release) and `packages pin` (does `config.yml` pin the newest
+packages release). Either one **warns** when it is behind, with the fix
+`devmachine update`, and never fails. When GitHub cannot be reached they
+report `skip`. The answers are kept for 6 hours in your cache folder
+(`~/Library/Caches/devmachine` on macOS, `~/.cache/devmachine` on Linux), so
+running `doctor` often does not hit GitHub's rate limit.
+
 No credential or DNS provider needed is not a failure. A check that could
 not run reports `skip` and why — "I cannot tell" is not "it is not
 there". A `warn` is the same idea for something worth fixing that does not
@@ -682,6 +690,51 @@ release and checksum, for the machine synced. It also refreshes
 `~/.ssh/config`'s managed block, when `ssh_aliases: true` is set, and
 prints how to reach each workspace on that machine: `devmachine ssh <ws>`
 always, and `ssh <ws>-devmachine` when aliases are on.
+
+## update
+
+```
+devmachine update [--machine m] [--skip-cli] [--skip-packages] [--yes]
+```
+
+Brings everything up to date, then stops before it changes a machine. Five
+steps, in order, each with a short header:
+
+1. **CLI** — asks GitHub for the newest release. If it is newer: when
+   Homebrew installed the CLI, runs `brew update`, `brew trust --formula`
+   (only on a Homebrew that has it) and `brew upgrade
+   mydevmachine/tap/devmachine`; otherwise downloads the release archive for
+   your system, checks it against the release's `checksums.txt`, and swaps
+   it in for the running binary. Then the new binary runs the other steps.
+   A development build (`devmachine version` says `dev`) is never replaced.
+2. **Packages** — when `config.yml` pins an older packages release, pins the
+   newest, like `packages pin`. Only `config.yml` changes (and, in a
+   versioned configuration, one commit). Nothing is pinned when nothing was.
+3. **Skills** — `skills update`, for the skills on your computer, from the
+   release just pinned.
+4. **Doctor** — `doctor` on every machine (or the one `--machine` names).
+   A failed check is shown, and the run goes on. A machine that cannot be
+   reached skips step 5.
+5. **Sync check** — `sync --check` on every machine it reached, and the
+   tasks each one would change. If any would change, it asks once: `Apply
+   these changes with sync? [y/N]`. Yes runs `sync` on those machines. No,
+   an empty answer, or no terminal at all prints the exact `devmachine sync`
+   command to run later.
+
+| Flag | Meaning |
+| --- | --- |
+| `--skip-cli` | leave the CLI as it is |
+| `--skip-packages` | leave the packages pin as it is |
+| `--yes` | answer yes to the sync question — this changes machines; use it only in automation you trust |
+
+The output ends with one line per step: `updated`, `already latest`, `ok`,
+`nothing to do`, `skipped` or `failed`, with the reason. The exit code is
+non-zero when a step failed — a failed doctor check included. Saying no to
+the sync is not a failure.
+
+`update` prints for a person, so it refuses `--format json`; use `doctor`
+and `sync --check` with `--format json` instead. Why it works this way:
+[Updating](../how-it-works/updating.md).
 
 ## version, help
 

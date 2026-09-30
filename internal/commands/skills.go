@@ -145,17 +145,9 @@ func newSkillsUpdateCmd(opts *options) *cobra.Command {
 					return errDeclined
 				}
 			}
-			results := make([]agentskills.InstallResult, 0, len(records))
-			for _, record := range records {
-				source, err := skillSourceID(cmd.Context(), dir, record.Source)
-				if err != nil {
-					return err
-				}
-				result, err := installer.Install(source, record.Agents)
-				if err != nil {
-					return err
-				}
-				results = append(results, result)
+			results, err := refreshSkills(cmd.Context(), dir, installer, records)
+			if err != nil {
+				return err
 			}
 			if opts.format == formatJSON {
 				return writeJSON(cmd.OutOrStdout(), results)
@@ -170,6 +162,25 @@ func newSkillsUpdateCmd(opts *options) *cobra.Command {
 	}
 	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
 	return c
+}
+
+// refreshSkills reinstalls every managed skill source from where it comes
+// from today: the pinned release for the official skills, the local package
+// for a local one.
+func refreshSkills(ctx context.Context, dir string, installer agentskills.Installer, records []agentskills.Installed) ([]agentskills.InstallResult, error) {
+	results := make([]agentskills.InstallResult, 0, len(records))
+	for _, record := range records {
+		source, err := skillSourceID(ctx, dir, record.Source)
+		if err != nil {
+			return results, err
+		}
+		result, err := installer.Install(source, record.Agents)
+		if err != nil {
+			return results, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
 }
 
 func newSkillsRemoveCmd(opts *options) *cobra.Command {

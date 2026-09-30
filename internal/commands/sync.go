@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -50,45 +51,8 @@ func newSyncCmd(opts *options) *cobra.Command {
 }
 
 func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) error {
-	dir, _, err := config.Dir(opts.configDir)
+	prep, err := prepareSync(cmd.Context(), opts)
 	if err != nil {
-		return err
-	}
-	cfg, err := loadConfig(opts)
-	if err != nil {
-		return err
-	}
-	machine, err := cfg.Machine(opts.machine)
-	if err != nil {
-		return err
-	}
-	if machine.Self {
-		if _, err := lookPath("ansible-playbook"); err != nil {
-			return fmt.Errorf(
-				"ansible-playbook is not on your computer: run `devmachine setup --machine %s`", machine.Name)
-		}
-	}
-
-	store, err := openStore(cmd.Context(), dir, cfg.Packages)
-	if err != nil {
-		return err
-	}
-	lock, err := packages.LoadLock(dir)
-	if err != nil {
-		return err
-	}
-	plan, err := packages.ResolveMachine(store, cfg, machine, version)
-	if err != nil {
-		if cfg.Packages == "" {
-			return fmt.Errorf("%w; no packages release is pinned, so only local packages exist: "+
-				"run `devmachine packages pin` to pin the latest release", err)
-		}
-		return err
-	}
-	// Generate stays pure: it never reads the lock itself, so the previous
-	// extensions come in on the plan.
-	plan.PreviousExtensions = lock.Extensions[machine.Name]
-	if err := validateLocalPackages(plan); err != nil {
 		return err
 	}
 
@@ -99,15 +63,14 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 		notes = cmd.ErrOrStderr()
 	}
 
-	summary := provision.Summary(plan)
-	for _, line := range summary {
+	for _, line := range prep.summary {
 		if _, err := fmt.Fprintln(notes, line); err != nil {
 			return err
 		}
 	}
 
 	if !yes && !check {
-		ok, err := confirm(cmd.InOrStdin(), notes, "Apply this to "+machine.Name+"?")
+		ok, err := confirm(cmd.InOrStdin(), notes, "Apply this to "+prep.machine.Name+"?")
 		if err != nil {
 			return err
 		}
@@ -116,32 +79,100 @@ func runSync(cmd *cobra.Command, opts *options, check, yes bool, tags []string) 
 		}
 	}
 
-	client, _, err := dial(cmd.Context(), machine, "")
+	result, err := prep.apply(cmd.Context(), opts, check, tags, notes)
 	if err != nil {
 		return err
 	}
+	return reportSync(cmd, opts, prep.cfg, prep.machine.Name, check, prep.summary, result)
+}
+
+// preparedSync is everything a sync works out before it reaches the machine:
+// what to send, and the plan a person is shown.
+type preparedSync struct {
+	dir     string
+	cfg     config.Config
+	machine config.Machine
+	store   *packages.Store
+	lock    packages.Lock
+	plan    packages.MachinePlan
+	summary []string
+}
+
+func prepareSync(ctx context.Context, opts *options) (preparedSync, error) {
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return preparedSync{}, err
+	}
+	cfg, err := loadConfig(opts)
+	if err != nil {
+		return preparedSync{}, err
+	}
+	machine, err := cfg.Machine(opts.machine)
+	if err != nil {
+		return preparedSync{}, err
+	}
+	if machine.Self {
+		if _, err := lookPath("ansible-playbook"); err != nil {
+			return preparedSync{}, fmt.Errorf(
+				"ansible-playbook is not on your computer: run `devmachine setup --machine %s`", machine.Name)
+		}
+	}
+
+	store, err := openStore(ctx, dir, cfg.Packages)
+	if err != nil {
+		return preparedSync{}, err
+	}
+	lock, err := packages.LoadLock(dir)
+	if err != nil {
+		return preparedSync{}, err
+	}
+	plan, err := packages.ResolveMachine(store, cfg, machine, version)
+	if err != nil {
+		if cfg.Packages == "" {
+			return preparedSync{}, fmt.Errorf("%w; no packages release is pinned, so only local packages exist: "+
+				"run `devmachine packages pin` to pin the latest release", err)
+		}
+		return preparedSync{}, err
+	}
+	// Generate stays pure: it never reads the lock itself, so the previous
+	// extensions come in on the plan.
+	plan.PreviousExtensions = lock.Extensions[machine.Name]
+	if err := validateLocalPackages(plan); err != nil {
+		return preparedSync{}, err
+	}
+	return preparedSync{dir: dir, cfg: cfg, machine: machine, store: store, lock: lock,
+		plan: plan, summary: provision.Summary(plan)}, nil
+}
+
+// apply runs the plan on the machine, streaming Ansible's output to out, and
+// records a real run in the lock.
+func (p preparedSync) apply(ctx context.Context, opts *options, check bool, tags []string, out io.Writer) (provision.Result, error) {
+	client, _, err := dial(ctx, p.machine, "")
+	if err != nil {
+		return provision.Result{}, err
+	}
 	defer client.Close()
 
-	result, runErr := provisionerFor(client).Apply(cmd.Context(), plan, provision.Options{
-		Check: check, Tags: tags, Out: notes,
+	result, runErr := provisionerFor(client).Apply(ctx, p.plan, provision.Options{
+		Check: check, Tags: tags, Out: out,
 	})
-	record(opts, target{machine: machine}, syncCommandLine(check, tags), runErr == nil)
+	record(opts, target{machine: p.machine}, syncCommandLine(check, tags), runErr == nil)
 	if runErr != nil {
-		return runErr
+		return result, runErr
 	}
 
 	// A dry run changed nothing, so recording it as applied would make the
 	// lock claim something nobody did.
 	if !check {
-		if err := packages.SaveLock(dir, lock.WithPlan(plan, store, time.Now())); err != nil {
-			return err
+		if err := packages.SaveLock(p.dir, p.lock.WithPlan(p.plan, p.store, time.Now())); err != nil {
+			return result, err
 		}
-		repo.AutoCommit(cmd.Context(), dir, "chore(config): lock packages for "+machine.Name)
-		if err := refreshAliases(cfg, notes); err != nil {
-			return err
+		repo.AutoCommit(ctx, p.dir, "chore(config): lock packages for "+p.machine.Name)
+		if err := refreshAliases(p.cfg, out); err != nil {
+			return result, err
 		}
 	}
-	return reportSync(cmd, opts, cfg, machine.Name, check, summary, result)
+	return result, nil
 }
 
 // validateLocalPackages checks the operator's own recipes before anything is

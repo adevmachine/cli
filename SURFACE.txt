@@ -59,6 +59,7 @@ devmachine ssh
 devmachine stats
 devmachine sync
 devmachine tunnel
+devmachine update
 devmachine upload
 devmachine version
 devmachine workspaces

@@ -30,6 +30,11 @@ func newDoctorCmd(opts *options) *cobra.Command {
 			}
 
 			checks := doctor.RunWithScanner(cmd.Context(), dir, opts.machine, dial, scanHostKey, wanted)
+			var pinned string
+			if cfg, err := loadConfig(opts); err == nil {
+				pinned = cfg.Packages
+			}
+			checks = append(checks, freshnessChecks(cmd.Context(), pinned)...)
 
 			if opts.format == formatJSON {
 				if err := writeJSON(cmd.OutOrStdout(), struct {

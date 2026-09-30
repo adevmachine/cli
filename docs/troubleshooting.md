@@ -696,3 +696,72 @@ packages exist.
 **What to do:** Run `devmachine packages pin`, which pins the latest release,
 then `devmachine sync`. A configuration made by `setup` from version 0.7.7 on
 is already pinned.
+
+## `update` says "checksum mismatch for devmachine_…tar.gz"
+
+**What it means:** The archive that arrived is not the one the release
+published — a proxy rewrote it, the download broke half way, or something is
+in between you and GitHub that should not be. Nothing was replaced: the new
+file is checked before anything is written, and your CLI is exactly as it was.
+
+**What to do:** Run `devmachine update` again. If it keeps failing, install by
+hand with `curl -fsSL https://mydevmachine.sh/install.sh | sh`, which checks
+the same checksum, from another network.
+
+## `update` says "replacing …: permission denied"
+
+**What it means:** The CLI lives in a folder your user cannot write, such as
+`/usr/local/bin`, so the new version could not be put in its place. Nothing
+was replaced.
+
+**What to do:** Reinstall it where you can write, with
+`curl -fsSL https://mydevmachine.sh/install.sh | sh` (it installs to
+`~/.local/bin`), and remove the old copy. Running `update` with `sudo` would
+also work, but then the rest of the update runs as root, with root's
+configuration.
+
+## "… was installed by Homebrew, but brew is not on PATH"
+
+**What it means:** The CLI's real file is inside Homebrew's `Cellar`, so only
+Homebrew should replace it — and `update` could not find `brew` to ask.
+
+**What to do:** Put Homebrew on your `PATH` (`eval "$(/opt/homebrew/bin/brew
+shellenv)"` on Apple silicon), or run `brew upgrade mydevmachine/tap/devmachine`
+yourself, then `devmachine update --skip-cli`.
+
+## `update` says "still 0.7.17 after the upgrade"
+
+**What it means:** The upgrade finished, but the binary that started next is
+the same version. Usually Homebrew did not know the new release yet, or
+another `devmachine` earlier on your `PATH` is the one that ran.
+
+**What to do:** Run `which -a devmachine` to see every copy. Remove the ones
+you do not use, then `brew update && brew upgrade mydevmachine/tap/devmachine`
+or the install script.
+
+## `doctor` says `skip  cli  could not find the latest release`
+
+**What it means:** GitHub could not be asked: you are offline, or GitHub
+answered `403` because this address used up its 60 unauthenticated requests
+for the hour. It says nothing about your CLI, which is why it is a `skip` and
+not a failure.
+
+**What to do:** Nothing, usually — the next `doctor` asks again. Once an
+answer arrives, it is kept for 6 hours.
+
+## `update` found changes and did not ask
+
+**What it means:** There was no terminal to ask in — a cron job, a CI step,
+or input from a pipe — and `--yes` was not given. With nobody to answer,
+`update` applies nothing.
+
+**What to do:** Run the `devmachine sync` command it printed, or pass `--yes`
+if this is automation you trust to change servers.
+
+## `update` says "--format json is not supported"
+
+**What it means:** `update` asks a question and prints progress for a person.
+There is no single JSON document it could promise.
+
+**What to do:** For a script, use `devmachine doctor --format json` and
+`devmachine sync --check --format json`.
