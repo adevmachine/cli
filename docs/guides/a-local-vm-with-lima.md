@@ -1,7 +1,6 @@
 ---
 description: "Try devmachine on a virtual machine on your own computer before you pay for a server."
 category: Get started
-minutes: 15
 level: Beginner
 needs:
   - "A Mac or Linux computer"

@@ -1,7 +1,6 @@
 ---
 description: "Write an agent skill once as a package, and every workspace gets it on the next sync."
 category: Workspaces
-minutes: 20
 level: Intermediate
 needs:
   - "A machine already set up"

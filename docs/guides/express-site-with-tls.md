@@ -1,7 +1,6 @@
 ---
 description: "Run an Express app in a workspace and serve it at your own domain, with HTTPS."
 category: Web apps
-minutes: 10
 level: Beginner
 needs:
   - "A Debian or Ubuntu VPS"

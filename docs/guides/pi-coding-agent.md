@@ -1,7 +1,6 @@
 ---
 description: "Install the Pi coding agent in a workspace and use it for everyday work on your server."
 category: Agents
-minutes: 10
 level: Beginner
 needs:
   - "A workspace"

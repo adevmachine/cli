@@ -1,7 +1,6 @@
 ---
 description: "Serve Agno AgentOS and its control plane dashboard, each at its own subdomain with HTTPS."
 category: Agents
-minutes: 30
 level: Advanced
 needs:
   - "A Debian or Ubuntu VPS"

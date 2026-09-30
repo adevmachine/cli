@@ -1,7 +1,6 @@
 ---
 description: "See what a workspace is missing, then sign in and hand over tokens with credentials, login and secrets."
 category: Security
-minutes: 20
 level: Beginner
 needs:
   - "A Debian or Ubuntu VPS"

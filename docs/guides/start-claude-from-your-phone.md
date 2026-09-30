@@ -1,7 +1,6 @@
 ---
 description: "Keep a Claude Code session waiting on your server, so your phone can open it with no SSH step."
 category: Agents
-minutes: 10
 level: Intermediate
 needs:
   - "Claude Code signed in on a workspace"

@@ -1,7 +1,6 @@
 ---
 description: "Run your own Tailscale control server with Headscale and put your devmachine on it."
 category: Networking
-minutes: 45
 level: Advanced
 needs:
   - "A second small server, or your devmachine"

@@ -1,7 +1,6 @@
 ---
 description: "When to use ssh and when to use mosh, and the one firewall setting mosh needs."
 category: Networking
-minutes: 10
 level: Beginner
 needs:
   - "A workspace"

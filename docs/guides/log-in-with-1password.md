@@ -1,7 +1,6 @@
 ---
 description: "Keep devmachine's SSH key in 1Password and approve each use with Touch ID."
 category: Security
-minutes: 15
 level: Intermediate
 needs:
   - "A Debian or Ubuntu VPS"

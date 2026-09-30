@@ -1,7 +1,6 @@
 ---
 description: "Write a WhatsApp API once as your own package, then run it on two machines."
 category: Web apps
-minutes: 30
 level: Advanced
 needs:
   - "One or two Debian or Ubuntu VPS"

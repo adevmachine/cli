@@ -1,7 +1,6 @@
 ---
 description: "Close the laptop, and Claude Code keeps working on the server inside tmux."
 category: Workspaces
-minutes: 5
 level: Beginner
 needs:
   - "A workspace"

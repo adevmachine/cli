@@ -50,7 +50,7 @@ frontmatter_of() {
 while IFS= read -r guide; do
   [ "$(basename "$guide")" = "index.md" ] && continue
   front=$(frontmatter_of "$guide")
-  for key in description category minutes level needs related; do
+  for key in description category level needs related; do
     if ! printf '%s\n' "$front" | grep -q "^$key:"; then
       echo "missing $key in the frontmatter of $guide"
       problems=1

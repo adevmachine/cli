@@ -1,7 +1,6 @@
 ---
 description: "Give devmachine a scoped Cloudflare token, and expose add points your domain names for you."
 category: Networking
-minutes: 15
 level: Beginner
 needs:
   - "A Debian or Ubuntu VPS"

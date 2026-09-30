@@ -1,7 +1,6 @@
 ---
 description: "Install devmachine, connect a server and open your first workspace, one command at a time."
 category: Get started
-minutes: 15
 level: Beginner
 needs:
   - "A Debian or Ubuntu VPS"

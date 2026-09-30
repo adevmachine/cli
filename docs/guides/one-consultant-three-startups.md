@@ -1,7 +1,6 @@
 ---
 description: "One server, one sandbox per client: separate stacks, logins and agents that never mix."
 category: Workspaces
-minutes: 30
 level: Intermediate
 needs:
   - "A VPS with 12 GB of RAM"

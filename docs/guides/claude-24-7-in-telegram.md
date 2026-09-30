@@ -1,7 +1,6 @@
 ---
 description: "Message Claude Code from Telegram while it runs on your server around the clock."
 category: Agents
-minutes: 20
 level: Intermediate
 needs:
   - "A workspace with claude-code"

@@ -1,7 +1,6 @@
 ---
 description: "Run Nous Research's Hermes Agent always on, in a sandbox of its own."
 category: Agents
-minutes: 10
 level: Beginner
 needs:
   - "A machine from Getting started"

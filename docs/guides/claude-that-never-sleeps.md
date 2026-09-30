@@ -1,7 +1,6 @@
 ---
 description: "Turn on Remote Control with /rc and reach a running Claude Code session from your phone or Claude Desktop."
 category: Agents
-minutes: 10
 level: Beginner
 needs:
   - "A workspace with claude-code"

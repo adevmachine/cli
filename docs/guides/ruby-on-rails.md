@@ -1,7 +1,6 @@
 ---
 description: "Fork an open source Rails project into a workspace, run its tests and view its dev server privately."
 category: Workspaces
-minutes: 30
 level: Intermediate
 needs:
   - "A Debian or Ubuntu VPS"

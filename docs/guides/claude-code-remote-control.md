@@ -1,7 +1,6 @@
 ---
 description: "Start Claude Code on your server and drive the same session from the Claude app on your phone."
 category: Agents
-minutes: 10
 level: Beginner
 needs:
   - "A Debian or Ubuntu VPS"
