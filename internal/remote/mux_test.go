@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -270,5 +271,42 @@ func TestMuxClientStopsAtARefusedHostKeyAndSaysSo(t *testing.T) {
 	}
 	if n := strings.Count(string(body), "x"); n != 1 {
 		t.Fatalf("ssh ran %d times, want 1: a refused key must not fall through to the next address", n)
+	}
+}
+
+func TestMuxClientDoesNotRetryAnotherAddressAfterSendingPartOfTheInput(t *testing.T) {
+	fakeCacheDir(t)
+	m := muxTestMachine(t)
+	m.Hosts = append(m.Hosts, config.Host{Address: "203.0.113.11"})
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\necho x >> " + calls + "\nhead -c 4 >/dev/null\nexit 255\n"
+	if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	origLookPath := lookPath
+	lookPath = func(string) (string, error) { return fakeSSH, nil }
+	t.Cleanup(func() { lookPath = origLookPath })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, ok := client.(interface {
+		RunInput(context.Context, string, io.Reader) (string, error)
+	})
+	if !ok {
+		t.Fatal("the mux client takes no input")
+	}
+	_, err = runner.RunInput(context.Background(), "cat > f", strings.NewReader("0123456789"))
+	if err == nil || !strings.Contains(err.Error(), "part of the input") {
+		t.Fatalf("got %v, want an error saying part of the input was already sent", err)
+	}
+	body, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(body), "x"); n != 1 {
+		t.Fatalf("ssh ran %d times, want 1: a half-sent input must not go to the next address", n)
 	}
 }

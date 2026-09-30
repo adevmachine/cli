@@ -479,6 +479,17 @@ accounts, so "where do I log in" has no single answer.
 **What to do:** Name the workspace. The list in the error shows every
 workspace that uses it.
 
+## "the connection dropped after part of the input was sent"
+
+A machine with several addresses in `hosts:` is normally tried one address
+after another until one answers. That is safe only while nothing has been
+sent yet. This error means the first connection took part of a file or a
+secret and then dropped. Sending the rest to the next address would leave a
+cut-off file on the machine, so the CLI stops instead.
+
+Run the same command again. If one address keeps dropping, move the stable
+one first in `hosts:`.
+
 ## The SSH host key is not trusted
 
 **What it means:** Configurations made by v0.6 and earlier have no stored

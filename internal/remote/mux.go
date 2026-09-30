@@ -133,10 +133,16 @@ func (c *muxClient) Close() error { return nil }
 // stdout still holds whatever the command printed before it failed.
 func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, stdout, stderr io.Writer) error {
 	var failures []string
+	var sent countingReader
+	if stdin != nil {
+		sent.r = stdin
+	}
 	for _, address := range c.addresses {
 		argv := append(append([]string{}, c.args...), c.user+"@"+address, command)
 		cmd := exec.CommandContext(ctx, c.sshPath, argv...)
-		cmd.Stdin = stdin
+		if stdin != nil {
+			cmd.Stdin = &sent
+		}
 		cmd.Stdout = stdout
 
 		var errBuf bytes.Buffer
@@ -155,10 +161,28 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 			if strings.Contains(errBuf.String(), "Host key verification failed") {
 				return fmt.Errorf("machine %q at %s: %w", c.machine, address, ErrHostKeyRejected)
 			}
+			if sent.n > 0 {
+				return fmt.Errorf("machine %q at %s: the connection dropped after part of the input was sent, so it is not sent again to another address: %s",
+					c.machine, address, strings.TrimSpace(errBuf.String()))
+			}
 			failures = append(failures, fmt.Sprintf("%s (%s)", address, strings.TrimSpace(errBuf.String())))
 			continue
 		}
 		return fmt.Errorf("running %q: %w", command, runErr)
 	}
 	return fmt.Errorf("machine %q: no address answered: %s", c.machine, strings.Join(failures, "; "))
+}
+
+// countingReader lets exec tell a connection that failed before reading any
+// input, which another address can safely retry, from one that already took
+// part of it, where a retry would deliver only the rest.
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
 }
