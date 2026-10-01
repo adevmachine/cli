@@ -1,0 +1,23 @@
+docs/troubleshooting.md
+  s_785cced9544d71::t_8bd6a90ae0815c 183-196
+internal/remote/bootstrap.go
+  s_785cced9544d71::t_5724860d4d4728 165-169,173
+internal/remote/bootstrap_test.go
+  s_785cced9544d71::t_1543559ff4ea4b 578-593
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "85cebdadf8fe06f5ee4294c70c43fd43f0012316",
+  "prompts": {},
+  "sessions": {
+    "s_785cced9544d71": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7bd2d5-bc77-494b-80af-2421eac35fbf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
