@@ -150,6 +150,9 @@ func (e *External) ask(ctx context.Context, stdin string, args ...string) (provi
 // `set -a` exports what the file sets and `set +a` stops there, so nothing else
 // is added and a provider cannot come to depend on something that happens to be
 // in one operator's shell.
+//
+// A file that is not there yet is skipped, not sourced: `help` needs no
+// credential, and dash ends the whole command when `.` cannot read its file.
 func (e *External) shellFor(args []string, stdin string) string {
 	quoted := make([]string, 0, len(args))
 	for _, a := range args {
@@ -161,7 +164,8 @@ func (e *External) shellFor(args []string, stdin string) string {
 
 	run := fmt.Sprintf("%s %s", quoteArg(e.entrypoint), strings.Join(quoted, " "))
 	if e.credential != "" {
-		run = fmt.Sprintf("set -a; . %s; set +a; %s", quoteArg(credentials.EnvFile(e.credential)), run)
+		env := quoteArg(credentials.EnvFile(e.credential))
+		run = fmt.Sprintf("[ ! -r %[1]s ] || { set -a; . %[1]s; set +a; }; %[2]s", env, run)
 	}
 	if stdin == "" {
 		return run

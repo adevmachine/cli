@@ -20,18 +20,14 @@ import (
 // can see a real package entrypoint really execute — the only way to prove
 // `run --package` and `packages help` reach it, rather than a mock of it.
 //
-// External always prefixes the entrypoint with sourcing the credential's env
-// file from /etc/devmachine/<name>/env — a real path on the machine this
-// test does not have and must not create. That prefix is a published
-// contract (see internal/credentials.EnvFile) and always has this exact
-// shape, so it is stripped before the command runs locally.
+// The command runs whole, credential sourcing included: this computer has no
+// /etc/devmachine/<name>/env, which is the state of a machine before
+// `credentials push`, and the entrypoint must still be reached.
 type localClient struct {
 	// root maps the machine's package directory onto where the test wrote
 	// the package instead, since /opt/devmachine does not exist here.
 	root string
 }
-
-const sourcedPrefix = "; set +a; "
 
 // machineRolesLocalDir is dns.rolesLocalDir joined onto dns.remoteDir. It is
 // unexported in internal/dns, so it is written out here rather than reached
@@ -39,11 +35,7 @@ const sourcedPrefix = "; set +a; "
 const machineRolesLocalDir = "/opt/devmachine/roles.local/"
 
 func (c localClient) Run(ctx context.Context, command string) (string, error) {
-	real := command
-	if i := strings.LastIndex(command, sourcedPrefix); i >= 0 {
-		real = command[i+len(sourcedPrefix):]
-	}
-	real = strings.ReplaceAll(real, machineRolesLocalDir, c.root+"/")
+	real := strings.ReplaceAll(command, machineRolesLocalDir, c.root+"/")
 	out, err := exec.CommandContext(ctx, "sh", "-c", real).CombinedOutput()
 	return string(out), err
 }

@@ -443,9 +443,32 @@ func TestInstallAnsibleAgainstTheThrowawayMachine(t *testing.T) {
 }
 
 // TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise runs the wrapper in a
-// real shell with a fake id and a fake sudo on PATH, so what is proved is the
+// real shell with a fake id, sudo and bash on PATH, so what is proved is the
 // branch the shell takes, not the text of the command.
 func TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise(t *testing.T) {
+	for _, uid := range []string{"0", "1000"} {
+		bin := t.TempDir()
+		writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho "+uid+"\n")
+		writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nprintf 'sudo:%s %s %s|' \"$1\" \"$2\" \"$3\"\nshift 2\nexec \"$@\"\n")
+		writeScript(t, filepath.Join(bin, "bash"), "#!/bin/sh\nprintf 'bash|'\nexec /bin/sh \"$@\"\n")
+
+		want := "bash|direct:it's here"
+		if uid != "0" {
+			want = "sudo:-n -H " + filepath.Join(bin, "bash") + "|" + want
+		}
+		got, err := runShell(t, bin, AsRoot(`printf "direct:%s" "it's here"`))
+		if err != nil {
+			t.Fatalf("uid %s: %v", uid, err)
+		}
+		if got != want {
+			t.Fatalf("uid %s: got %q, want %q", uid, got, want)
+		}
+	}
+}
+
+// TestAsRootFallsBackToShWithoutBash: a minimal image may have no bash, and
+// root must still be reached there.
+func TestAsRootFallsBackToShWithoutBash(t *testing.T) {
 	for _, c := range []struct {
 		uid  string
 		want string
@@ -456,14 +479,34 @@ func TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise(t *testing.T) {
 		bin := t.TempDir()
 		writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho "+c.uid+"\n")
 		writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nprintf 'sudo:%s %s %s|' \"$1\" \"$2\" \"$3\"\nshift 2\nexec \"$@\"\n")
+		if err := os.Symlink("/bin/sh", filepath.Join(bin, "sh")); err != nil {
+			t.Fatal(err)
+		}
 
-		got, err := runShell(t, bin, AsRoot(`printf "direct:%s" "it's here"`))
+		cmd := exec.Command("/bin/sh", "-c", AsRoot(`printf "direct:%s" "it's here"`))
+		cmd.Env = append(os.Environ(), "PATH="+bin)
+		out, err := cmd.Output()
 		if err != nil {
 			t.Fatalf("uid %s: %v", c.uid, err)
 		}
-		if got != c.want {
-			t.Fatalf("uid %s: got %q, want %q", c.uid, got, c.want)
+		if string(out) != c.want {
+			t.Fatalf("uid %s: got %q, want %q", c.uid, out, c.want)
 		}
+	}
+}
+
+// TestAsRootKeepsBashLeniencyForRoot: before the wrapper, root's login shell
+// ran the command, and bash goes on past a `.` of a missing file.
+func TestAsRootKeepsBashLeniencyForRoot(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("no bash on this computer")
+	}
+	bin := t.TempDir()
+	writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho 0\n")
+
+	got, err := runShell(t, bin, AsRoot(". "+filepath.Join(bin, "missing")+" 2>/dev/null; printf ran"))
+	if err != nil || got != "ran" {
+		t.Fatalf("got %q (%v), want ran", got, err)
 	}
 }
 
@@ -526,7 +569,7 @@ func TestBootstrapRunsAsRootForAnAdminWhoIsNot(t *testing.T) {
 		if command == OSReleaseCommand {
 			continue
 		}
-		if !strings.Contains(command, "sudo -n -H sh -c") {
+		if !strings.Contains(command, `sudo -n -H "$devmachine_sh" -c`) {
 			t.Fatalf("it runs without root: %s", command)
 		}
 	}

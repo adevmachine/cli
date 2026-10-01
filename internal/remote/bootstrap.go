@@ -95,9 +95,15 @@ func ProveAuth(ctx context.Context, m config.Machine, user string, a Auth) (Clie
 // fails at once, and CheckRoot is what says so in words.
 //
 // stdin is left to the script, because the hardening drop-in arrives on it.
+//
+// bash when there is one, as root's login shell was before this wrapper
+// existed: dash ends a script at a `.` of a missing file where bash goes on,
+// and a command written against one must not change meaning under the other.
 func AsRoot(script string) string {
 	quoted := shellQuote(script)
-	return `if [ "$(id -u)" -eq 0 ]; then sh -c ` + quoted + `; else sudo -n -H sh -c ` + quoted + `; fi`
+	return `devmachine_sh=$(command -v bash) || devmachine_sh=sh; ` +
+		`if [ "$(id -u)" -eq 0 ]; then "$devmachine_sh" -c ` + quoted +
+		`; else sudo -n -H "$devmachine_sh" -c ` + quoted + `; fi`
 }
 
 // ErrNoRoot is an admin login that is not root and has no passwordless sudo.

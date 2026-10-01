@@ -118,6 +118,32 @@ func TestExternalPipelineActuallyDeliversTheRecordToTheEntrypoint(t *testing.T) 
 	}
 }
 
+// TestExternalAsksAProviderWhoseCredentialWasNeverPushed: help needs no
+// credential, and dash, unlike bash, exits when `.` cannot read its file.
+func TestExternalAsksAProviderWhoseCredentialWasNeverPushed(t *testing.T) {
+	c := &recordingClient{out: `{"commands": []}`}
+	if _, err := newExternalWith(c).Help(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	provider := filepath.Join(dir, "provider")
+	if err := os.WriteFile(provider, []byte("#!/bin/sh\nprintf asked\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	command := strings.ReplaceAll(c.commands[0], "/etc/devmachine/hostinger/env", filepath.Join(dir, "missing", "env"))
+	command = strings.ReplaceAll(command, "/opt/devmachine/roles/hostinger/bin/provider", provider)
+	for _, shell := range []string{"sh", "bash", "dash"} {
+		if _, err := exec.LookPath(shell); err != nil {
+			continue
+		}
+		out, err := exec.Command(shell, "-c", command).CombinedOutput()
+		if err != nil || string(out) != "asked" {
+			t.Fatalf("%s: got %q (%v), want the provider asked", shell, out, err)
+		}
+	}
+}
+
 func TestExternalTurnsAReportedKindIntoASentinel(t *testing.T) {
 	c := &recordingClient{
 		out: `{"error": {"kind": "unauthenticated", "message": "Authentication error"}}`,

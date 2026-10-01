@@ -62,6 +62,13 @@ account runs it through `sudo -n`. A server where the admin is root never
 sees `sudo` at all, and neither does your own computer as a `self`
 machine.
 
+Either way the step runs in `bash` when the server has it, and in `sh` only
+when it does not. Root's login shell was `bash` before any of this existed,
+and the two differ where it matters: `sh` on Debian and Ubuntu is `dash`,
+which stops a whole command when it cannot read a file it was told to load.
+A package's `help` loads its credential first, and before `credentials push`
+that file is not there yet; `help` must still answer.
+
 It asks, rather than trying without `sudo` and trying again with it. A
 retry would run a half-finished step twice, and would read any failure at
 all — a full disk, a refused SSH setting — as a missing permission.
