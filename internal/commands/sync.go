@@ -164,7 +164,7 @@ func (p preparedSync) apply(ctx context.Context, opts *options, check bool, tags
 	// A dry run changed nothing, so recording it as applied would make the
 	// lock claim something nobody did.
 	if !check {
-		if err := packages.SaveLock(p.dir, p.lock.WithPlan(p.plan, p.store, time.Now())); err != nil {
+		if err := packages.SaveLock(p.dir, p.lock.WithPlan(p.plan, p.store, time.Now(), tags)); err != nil {
 			return result, err
 		}
 		repo.AutoCommit(ctx, p.dir, "chore(config): lock packages for "+p.machine.Name)

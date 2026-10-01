@@ -423,3 +423,23 @@ func TestSyncNeedsAMachineWhenThereAreSeveral(t *testing.T) {
 		t.Fatal("it applied to a machine nobody named")
 	}
 }
+
+func TestSyncWithTagsLocksOnlyWhatRan(t *testing.T) {
+	stubSync(t)
+	dir := configWithPackages(t)
+
+	if _, err := execute(t, "--config", dir, "sync", "--yes", "--tags", "claude-code"); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := packages.LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lock.Machines["main"]) != 0 {
+		t.Fatalf("base is locked although only claude-code ran: %#v", lock.Machines["main"])
+	}
+	if got := lock.Workspaces["alice"]; len(got) != 1 || got[0].Name != "claude-code" {
+		t.Fatalf("alice's lock is %#v, want claude-code", got)
+	}
+}

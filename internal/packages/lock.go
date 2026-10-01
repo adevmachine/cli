@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
@@ -76,7 +77,11 @@ func LoadLock(configDir string) (Lock, error) {
 //
 // Only the machine and the workspaces in the plan are replaced: syncing one
 // machine says nothing about another, and the lock must not claim it does.
-func (l Lock) WithPlan(plan MachinePlan, store *Store, now time.Time) Lock {
+//
+// A run narrowed by tags only ran the packages it named, so only those are
+// recorded; every other entry, and every extension it did not write, stays
+// as the last full run left it.
+func (l Lock) WithPlan(plan MachinePlan, store *Store, now time.Time, tags []string) Lock {
 	out := Lock{
 		Release:    store.Version(),
 		AppliedAt:  now.UTC().Format(time.RFC3339),
@@ -94,12 +99,56 @@ func (l Lock) WithPlan(plan MachinePlan, store *Store, now time.Time) Lock {
 		out.Extensions = map[string][]string{}
 	}
 
-	out.Machines[plan.Machine.Name] = lockEntries(plan.OnMachine.Ordered, store)
-	for _, w := range plan.Workspaces {
-		out.Workspaces[w.Target.Name] = lockEntries(w.Ordered, store)
+	if len(tags) == 0 {
+		out.Machines[plan.Machine.Name] = lockEntries(plan.OnMachine.Ordered, store)
+		for _, w := range plan.Workspaces {
+			out.Workspaces[w.Target.Name] = lockEntries(w.Ordered, store)
+		}
+		out.Extensions[plan.Machine.Name] = extensionPaths(plan.Extensions)
+		return out
 	}
-	out.Extensions[plan.Machine.Name] = extensionPaths(plan.Extensions)
+
+	tagged := func(name string) bool { return slices.Contains(tags, name) }
+	if entries, ran := taggedEntries(l.Machines[plan.Machine.Name], plan.OnMachine.Ordered, store, tagged); ran {
+		out.Machines[plan.Machine.Name] = entries
+	}
+	for _, w := range plan.Workspaces {
+		if entries, ran := taggedEntries(l.Workspaces[w.Target.Name], w.Ordered, store, tagged); ran {
+			out.Workspaces[w.Target.Name] = entries
+		}
+	}
+	var written []Extension
+	for _, e := range plan.Extensions {
+		if tagged(e.From) {
+			written = append(written, e)
+		}
+	}
+	if len(written) > 0 {
+		paths := append(slices.Clone(l.Extensions[plan.Machine.Name]), extensionPaths(written)...)
+		sort.Strings(paths)
+		out.Extensions[plan.Machine.Name] = slices.Compact(paths)
+	}
 	return out
+}
+
+// taggedEntries is a target's earlier entries with the packages a tagged run
+// applied put in or brought up to date, and whether any of them ran at all.
+func taggedEntries(previous []LockEntry, found []Found, store *Store, tagged func(string) bool) ([]LockEntry, bool) {
+	out := slices.Clone(previous)
+	ran := false
+	for _, entry := range lockEntries(found, store) {
+		if !tagged(entry.Name) {
+			continue
+		}
+		ran = true
+		i := slices.IndexFunc(out, func(e LockEntry) bool { return e.Name == entry.Name })
+		if i >= 0 {
+			out[i] = entry
+		} else {
+			out = append(out, entry)
+		}
+	}
+	return out, ran
 }
 
 // extensionPaths is every path a plan's extensions write, sorted so the lock

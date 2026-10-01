@@ -59,7 +59,7 @@ func TestLockRecordsWhatWasAppliedWhere(t *testing.T) {
 	configDir := t.TempDir()
 	plan := planWith("main", []string{"base", "docker"}, map[string][]string{"alice": {"claude-code"}})
 
-	lock := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC))
+	lock := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC), nil)
 	if err := SaveLock(configDir, lock); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestLockKeepsOtherMachinesAlone(t *testing.T) {
 	existing := Lock{Machines: map[string][]LockEntry{"sandbox": {{Name: "git", Source: SourceRelease}}}}
 	plan := planWith("main", []string{"base"}, nil)
 
-	got := existing.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	got := existing.WithPlan(plan, storeStub("v1", "abc123"), time.Now(), nil)
 	if len(got.Machines["sandbox"]) != 1 {
 		t.Fatal("syncing one machine rewrote another's entry")
 	}
@@ -112,7 +112,7 @@ func TestLockRecordsALocalPackageWithNothingToPin(t *testing.T) {
 		},
 	}
 
-	got := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	got := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now(), nil)
 	entry := got.Machines["main"][0]
 	if entry.Source != SourceLocal {
 		t.Fatalf("source %q", entry.Source)
@@ -128,7 +128,7 @@ func TestLockClearsAWorkspaceThatNowDeclaresNothing(t *testing.T) {
 	existing := Lock{Workspaces: map[string][]LockEntry{"alice": {{Name: "claude-code", Source: SourceRelease}}}}
 	plan := planWith("main", nil, map[string][]string{"alice": {}})
 
-	got := existing.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	got := existing.WithPlan(plan, storeStub("v1", "abc123"), time.Now(), nil)
 	if len(got.Workspaces["alice"]) != 0 {
 		t.Fatalf("got %#v", got.Workspaces["alice"])
 	}
@@ -147,7 +147,7 @@ func TestLockRecordsTheExtensionsAPlanWrites(t *testing.T) {
 		{From: "sharing", Target: "alice", Into: "/etc/caddy/sites.d", Source: "files/sharing.caddy", Scope: ScopeWorkspace},
 	})
 
-	got := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	got := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now(), nil)
 	want := []string{"/etc/caddy/sites.d/alice-sharing-sharing.caddy"}
 	if !reflect.DeepEqual(got.Extensions["main"], want) {
 		t.Fatalf("got %#v", got.Extensions["main"])
@@ -174,7 +174,7 @@ func TestLockExtensionsRoundTripThroughSaveAndLoad(t *testing.T) {
 	plan := planWithExtensions("main", []Extension{
 		{From: "sharing", Target: "alice", Into: "/etc/caddy/sites.d", Source: "files/sharing.caddy", Scope: ScopeWorkspace},
 	})
-	lock := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now())
+	lock := Lock{}.WithPlan(plan, storeStub("v1", "abc123"), time.Now(), nil)
 	if err := SaveLock(dir, lock); err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestLoadLockSaysWhichFileItCouldNotRead(t *testing.T) {
 
 func TestSaveLockLeavesNoTemporaryFileBehind(t *testing.T) {
 	dir := t.TempDir()
-	if err := SaveLock(dir, Lock{}.WithPlan(planWith("main", []string{"base"}, nil), storeStub("v1", "abc"), time.Now())); err != nil {
+	if err := SaveLock(dir, Lock{}.WithPlan(planWith("main", []string{"base"}, nil), storeStub("v1", "abc"), time.Now(), nil)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -222,5 +222,59 @@ func TestSaveLockLeavesNoTemporaryFileBehind(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Name() != LockFile {
 		t.Fatalf("got %#v", entries)
+	}
+}
+
+func lockEntryNames(entries []LockEntry) []string {
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, e.Name)
+	}
+	return out
+}
+
+func TestATaggedRunLocksOnlyTheTaggedPackages(t *testing.T) {
+	previous := Lock{}.WithPlan(planWith("main", []string{"base"}, nil), storeStub("v1", "old"), time.Now(), nil)
+	plan := planWith("main", []string{"base", "caddy", "devmachine-app", "essentials"}, nil)
+
+	got := previous.WithPlan(plan, storeStub("v2", "new"), time.Now(), []string{"devmachine-app"})
+
+	if names := lockEntryNames(got.Machines["main"]); !reflect.DeepEqual(names, []string{"base", "devmachine-app"}) {
+		t.Fatalf("machine entries %v, want the earlier base and the tagged devmachine-app", names)
+	}
+	if got.Machines["main"][0].Version != "v1" {
+		t.Fatalf("base claims %q, but it never ran in v2", got.Machines["main"][0].Version)
+	}
+	if got.Machines["main"][1].Version != "v2" {
+		t.Fatalf("devmachine-app claims %q, want v2", got.Machines["main"][1].Version)
+	}
+}
+
+func TestATaggedRunLeavesAnUntaggedWorkspaceAsItWas(t *testing.T) {
+	previous := Lock{}.WithPlan(planWith("main", nil, map[string][]string{"alice": {"zsh"}}), storeStub("v1", "old"), time.Now(), nil)
+	plan := planWith("main", nil, map[string][]string{"alice": {"zsh", "claude-code"}, "bob": {"zsh"}})
+
+	got := previous.WithPlan(plan, storeStub("v2", "new"), time.Now(), []string{"claude-code"})
+
+	if names := lockEntryNames(got.Workspaces["alice"]); !reflect.DeepEqual(names, []string{"zsh", "claude-code"}) {
+		t.Fatalf("alice entries %v", names)
+	}
+	if _, ok := got.Workspaces["bob"]; ok {
+		t.Fatalf("bob is locked although nothing ran for him: %#v", got.Workspaces["bob"])
+	}
+}
+
+func TestATaggedRunKeepsTrackingTheExtensionsItDidNotRemove(t *testing.T) {
+	previous := Lock{Extensions: map[string][]string{"main": {"/etc/caddy/sites.d/old-site.caddy"}}}
+	plan := planWithExtensions("main", []Extension{
+		{From: "sharing", Target: "main", Into: "/etc/caddy/sites.d", Source: "files/site.caddy", Scope: ScopeMachine},
+		{From: "other", Target: "main", Into: "/etc/caddy/sites.d", Source: "files/site.caddy", Scope: ScopeMachine},
+	})
+
+	got := previous.WithPlan(plan, storeStub("v2", "new"), time.Now(), []string{"sharing"})
+
+	want := []string{"/etc/caddy/sites.d/old-site.caddy", "/etc/caddy/sites.d/sharing-site.caddy"}
+	if !reflect.DeepEqual(got.Extensions["main"], want) {
+		t.Fatalf("extensions %#v, want %#v", got.Extensions["main"], want)
 	}
 }

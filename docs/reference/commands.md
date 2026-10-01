@@ -933,7 +933,14 @@ logins — run after `devmachine login` instead of a full sync.
 stdout is the result; the plan and machine output go to stderr.
 
 On success, `<config>/packages.lock` records what was applied, at which
-release and checksum, for the machine synced. It also refreshes
+release and checksum, for the machine synced. With `--tags`, it records only
+the packages named: every other package keeps the entry the last full sync
+left, and one that never ran stays out of the lock, so `run --package` and
+the next `sync` see what is really there. The files a package added to
+another's folder (`extends`) are recorded only for the packages named, and
+none of the old ones is forgotten, since the step that removes them did not
+run. The whole bundle is still sent, so every package's entrypoint comes from
+the pinned release. It also refreshes
 `~/.ssh/config`'s managed block, when `ssh_aliases: true` is set, and
 prints how to reach each workspace on that machine: `devmachine ssh <ws>`
 always, and `ssh <ws>-devmachine` when aliases are on.
