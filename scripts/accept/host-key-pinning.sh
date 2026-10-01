@@ -131,7 +131,7 @@ fi
 contains "$CHANGED" "SSH host key changed" "the rejection names the changed host key" || true
 contains "$CHANGED" "--replace" "the rejection names the explicit recovery" || true
 
-CHECK=$("$DEVMACHINE_ACCEPT_BIN" --format json machines trust "$VM" --check --replace --yes 2>&1)
+CHECK=$("$DEVMACHINE_ACCEPT_BIN" --format json machines trust "$VM" --check 2>&1)
 CHECK_STATUS=$?
 printf '%s\n' "$CHECK" > "$SCENARIO_DIR/check.log"
 [ "$CHECK_STATUS" -eq 0 ] || die "host-key check failed: $CHECK"
@@ -140,6 +140,19 @@ contains "$CHECK" '"presented_fingerprint": "SHA256:' "check reports the present
 contains "$CHECK" '"check": true' "check reports that it did not write" || true
 AFTER_CHECK=$(cksum "$KNOWN_HOSTS" | awk '{print $1 ":" $2}')
 equals "$AFTER_CHECK" "$BEFORE" "check leaves known_hosts unchanged" || true
+contains "$CHECK" '"fix": "devmachine machines trust' "check names the fix" || true
+contains "$CHECK" '--replace --expect SHA256:' "the fix pins the presented key" || true
+
+WRONG=$("$DEVMACHINE_ACCEPT_BIN" --format json machines trust "$VM" --replace --yes --expect SHA256:notTheKey 2>&1)
+WRONG_STATUS=$?
+printf '%s\n' "$WRONG" > "$SCENARIO_DIR/wrong-expect.log"
+if [ "$WRONG_STATUS" -ne 0 ]; then
+  pass "a replace expecting another key is refused"
+else
+  fail "a replace expecting another key is refused" || true
+fi
+AFTER_WRONG=$(cksum "$KNOWN_HOSTS" | awk '{print $1 ":" $2}')
+equals "$AFTER_WRONG" "$BEFORE" "a refused replace leaves known_hosts unchanged" || true
 
 REPLACED=$("$DEVMACHINE_ACCEPT_BIN" --format json machines trust "$VM" --replace --yes 2>&1)
 REPLACE_STATUS=$?
@@ -158,4 +171,4 @@ fi
   && pass "a normal command succeeds only after explicit replacement" \
   || die "the connection did not recover after explicit replacement"
 
-scenario_done 16 "host-key pinning"
+scenario_done 20 "host-key pinning"

@@ -116,6 +116,137 @@ func TestMachinesTrustCheckReportsChangeWithoutWriting(t *testing.T) {
 	}
 }
 
+func TestMachinesTrustCheckReportsChangeWithoutReplace(t *testing.T) {
+	dir, presented := trustCommandFixture(t)
+	old := commandHostKey(t)
+	seedTrust(t, dir, old)
+	before := trustChecksum(t, dir)
+
+	out, err := execute(t, "--format", "json", "--config", dir, "machines", "trust", "main", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after := trustChecksum(t, dir); after != before {
+		t.Fatal("--check changed the file")
+	}
+	var result trustResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("stdout was not only JSON: %v (%q)", err, out)
+	}
+	if result.Status != "changed" || result.Changed {
+		t.Fatalf("result = %#v", result)
+	}
+	if result.CurrentFingerprint != hostkeys.Fingerprint(old) || result.PresentedFingerprint != hostkeys.Fingerprint(presented) {
+		t.Fatalf("fingerprints = %#v", result)
+	}
+	if result.Fix != "devmachine machines trust main --replace --expect "+hostkeys.Fingerprint(presented) {
+		t.Fatalf("fix = %q", result.Fix)
+	}
+	if result.Verify != "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub" {
+		t.Fatalf("verify = %q", result.Verify)
+	}
+}
+
+func TestMachinesTrustCheckSuggestsTrustForMissingKey(t *testing.T) {
+	dir, _ := trustCommandFixture(t)
+	out, err := execute(t, "--format", "json", "--config", dir, "machines", "trust", "main", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result trustResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("stdout was not only JSON: %v (%q)", err, out)
+	}
+	if result.Status != "missing" || result.Fix != "devmachine machines trust main --expect "+result.PresentedFingerprint {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestMachinesTrustMatchingKeySuggestsNoFix(t *testing.T) {
+	dir, presented := trustCommandFixture(t)
+	seedTrust(t, dir, presented)
+	out, err := execute(t, "--format", "json", "--config", dir, "machines", "trust", "main", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		t.Fatalf("stdout was not only JSON: %v (%q)", err, out)
+	}
+	for _, field := range []string{"fix", "verify"} {
+		if _, ok := raw[field]; ok {
+			t.Fatalf("matching key carries %q: %v", field, raw)
+		}
+	}
+}
+
+func TestMachinesTrustCheckNamesThePinnedKeyType(t *testing.T) {
+	dir, _ := trustCommandFixture(t)
+	seedTrust(t, dir, commandHostKey(t))
+	out, err := execute(t, "--format", "json", "--config", dir, "machines", "trust", "main", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result trustResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.CurrentKeyType != "ssh-ed25519" {
+		t.Fatalf("current_key_type = %q", result.CurrentKeyType)
+	}
+}
+
+func TestMachinesTrustReplaceRefusesAKeyOtherThanTheExpectedOne(t *testing.T) {
+	dir, presented := trustCommandFixture(t)
+	seedTrust(t, dir, commandHostKey(t))
+	before := trustChecksum(t, dir)
+
+	_, err := execute(t, "--config", dir, "machines", "trust", "main", "--replace", "--yes", "--expect", "SHA256:somethingElse")
+	if err == nil || !strings.Contains(err.Error(), hostkeys.Fingerprint(presented)) {
+		t.Fatalf("error = %v", err)
+	}
+	if after := trustChecksum(t, dir); after != before {
+		t.Fatal("an unexpected key was written")
+	}
+}
+
+func TestMachinesTrustReplaceWritesTheExpectedKey(t *testing.T) {
+	dir, presented := trustCommandFixture(t)
+	dir = gitRepoDir(t, dir)
+	seedTrust(t, dir, commandHostKey(t))
+	if _, err := execute(t, "--config", dir, "machines", "trust", "main", "--replace", "--yes", "--expect", hostkeys.Fingerprint(presented)); err != nil {
+		t.Fatal(err)
+	}
+	assertTrustedKey(t, dir, presented)
+}
+
+func TestMachinesTrustNewKeyRefusesAnUnexpectedOne(t *testing.T) {
+	dir, _ := trustCommandFixture(t)
+	if _, err := execute(t, "--config", dir, "machines", "trust", "main", "--yes", "--expect", "SHA256:somethingElse"); err == nil {
+		t.Fatal("an unexpected new key was trusted")
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, config.KnownHostsFileName)); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatal("refusal created known_hosts")
+	}
+}
+
+func TestHostKeyVerifyCommandNamesTheSameKeyType(t *testing.T) {
+	cases := map[string]string{
+		"ssh-ed25519":         "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+		"ecdsa-sha2-nistp256": "ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub",
+		"ssh-rsa":             "ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub",
+		"rsa-sha2-512":        "ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub",
+		"sk-ssh-ed25519":      "",
+		"ecdsa-sha2-nistp256-cert-v01@openssh.com": "",
+		"ssh-ed25519-cert-v01@openssh.com":         "",
+	}
+	for keyType, want := range cases {
+		if got := hostKeyVerifyCommand(keyType); got != want {
+			t.Errorf("hostKeyVerifyCommand(%q) = %q, want %q", keyType, got, want)
+		}
+	}
+}
+
 func TestMachinesTrustChangedKeyWithReplaceCommitsIt(t *testing.T) {
 	dir, presented := trustCommandFixture(t)
 	dir = gitRepoDir(t, dir)

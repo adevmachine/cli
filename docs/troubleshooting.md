@@ -698,16 +698,46 @@ devmachine trusted before. This can mean a deliberate rebuild, a
 configuration mistake, or an attack — devmachine cannot tell which, and will
 not connect until you decide.
 
-**What to do:** Verify the address and both fingerprints yourself. If you
-just rebuilt the server on purpose, run
-`devmachine machines trust <machine> --replace`. Add `--check` to preview
-without writing, and `--yes` to skip confirmation — that never substitutes
-for `--replace`.
+**What to do:** Run `devmachine machines trust <machine> --check`. It reads
+the presented key without logging in, writes nothing, and prints both
+fingerprints, a command to print the same key on the server, and the fix.
+Run that command from the machine's own console — the provider's web
+console, or `limactl shell` on the Mac that runs a Lima VM — never
+through the SSH connection you are trying to verify. If the fingerprints match, run
+`devmachine machines trust <machine> --replace`. `--yes` skips confirmation
+— that never substitutes for `--replace`.
 
 `run` can keep working for up to five minutes after the key changes. It
 reuses the connection it opened last time, which was checked when it was
 opened and still goes to the same server. The first new connection after
 that checks the key again and stops with this error.
+
+## The host key changed after restarting a Lima VM
+
+**What it means:** Usually nothing bad. Lima hands the VM a new cloud-init
+instance ID (`iid-<time>`) on every `limactl start`, so cloud-init treats
+each boot as a new instance and, by default (`ssh_deletekeys`), deletes the
+SSH host keys and writes new ones. Restarting the VM — to change its
+memory or CPUs, or for any other reason — gives it a new host key. The
+disk, the users and the Tailscale address stay the same. A different local
+network address underneath Tailscale does not matter either: the key is
+pinned to the machine's name, not to an address.
+
+**What to do:** Check the fingerprint from the Mac that runs the VM, with
+`limactl shell <instance>` — a local path to the VM, not the network path
+you are trying to verify — and compare it as in
+[The SSH host key changed](#the-ssh-host-key-changed). The files under
+`/etc/ssh/ssh_host_*` carry the time of the last boot. Then replace the
+key.
+
+To keep the keys across restarts, tell cloud-init not to delete them, on
+the VM:
+
+```
+echo 'ssh_deletekeys: false' | sudo tee /etc/cloud/cloud.cfg.d/99-keep-host-keys.cfg
+```
+
+The next restart keeps the key you trusted.
 
 ## The SSH trust file is malformed
 

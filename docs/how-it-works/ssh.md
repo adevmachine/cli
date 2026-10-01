@@ -109,6 +109,14 @@ connection first, then record a deliberate rebuild explicitly:
 devmachine machines trust <machine> --replace
 ```
 
+`devmachine machines trust <machine> --check` shows both fingerprints
+without writing, together with a command that prints the server's own
+key of the same type. That command is meant for the machine's console, not
+for an SSH session: an attacker in the middle would answer an SSH session
+with whatever fingerprint you expect. An app built on the CLI reads the
+same report from `--format json` and should ask for that comparison before
+it offers to replace the key.
+
 `--yes` only skips the local confirmation — it cannot replace a key
 without `--replace`, and never touches the server. `UpdateHostKeys` is
 off, so a server can never rotate this decision on its own.
