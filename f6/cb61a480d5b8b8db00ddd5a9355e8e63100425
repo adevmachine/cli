@@ -1,0 +1,33 @@
+docs/concepts/configuration.md
+  s_785cced9544d71::t_a83412b4239db4 79-80,93-97
+docs/reference/commands.md
+  s_785cced9544d71::t_d1777a27c85dee 372-384
+docs/troubleshooting.md
+  s_785cced9544d71::t_7c5a8e037ddfd0 20-34
+internal/aliases/aliases.go
+  s_785cced9544d71::t_bdf9be17719d2f 302-325
+internal/commands/aliases.go
+  s_785cced9544d71::t_d0c300db707d99 4,7-8,12,31,90-91,120,124-128,130,152-163,168-171,201,209-240
+internal/commands/aliases_test.go
+  s_785cced9544d71::t_e19e414e9161c2 110-115,127-170
+internal/commands/machine.go
+  s_785cced9544d71::t_c130e216cc2d57 103
+internal/config/config.go
+  s_785cced9544d71::t_28496d7ddb5ec2 237-242,943-951
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f6cb61a480d5b8b8db00ddd5a9355e8e63100425",
+  "prompts": {},
+  "sessions": {
+    "s_785cced9544d71": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7bd2d5-bc77-494b-80af-2421eac35fbf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
