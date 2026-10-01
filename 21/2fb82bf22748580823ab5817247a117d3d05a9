@@ -1,0 +1,29 @@
+docs/reference/commands.md
+  s_0e026f8493f787::t_be6594d6f27976 220,278-287
+docs/troubleshooting.md
+  s_0e026f8493f787::t_04784d3bd35147 705-706,715-740
+docs/upgrade.md
+  s_0e026f8493f787::t_dc6f6c3e5c7c31 135-136
+internal/commands/machines_trust.go
+  s_0e026f8493f787::t_cf0f5728698078 23,28-30,41,65,116,118,126-128,142,152,156-158,172,178-199,205-208,236
+internal/commands/machines_trust_test.go
+  s_0e026f8493f787::t_5ca986818c1fcf 142,160,176-229,240-241
+scripts/accept/host-key-pinning.sh
+  s_0e026f8493f787::t_7433b23682a601 134,143-155,174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "212fb82bf22748580823ab5817247a117d3d05a9",
+  "prompts": {},
+  "sessions": {
+    "s_0e026f8493f787": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc53a4a-3463-4496-9b3f-215a72f0f6e2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
