@@ -132,7 +132,8 @@ devmachine machines trust <name> --check
 ```
 
 compares the SSH host key devmachine expects against the one the server
-presents, without writing anything. Worth running before a `sync` you are
+presents, without writing anything. Read the `status` it prints
+(`matching`, `changed` or `missing`); it exits 0 either way. Worth running before a `sync` you are
 not fully expecting, on a server you have not touched in a while.
 
 ## Nothing changes on a server until you run sync

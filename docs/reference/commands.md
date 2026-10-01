@@ -217,7 +217,7 @@ devmachine machines list                  each machine, its addresses, port and 
 devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--tailscale]   the same, asking nothing
-devmachine machines trust [name] [--check] [--replace] [--yes]   check or update its SSH fingerprint
+devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]   check or update its SSH fingerprint
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on your computer
 devmachine machines start <name>          start a local machine
@@ -275,12 +275,16 @@ on it, naming the reason.
 `trust` reads the server's public fingerprint without logging in: asks
 before saving a new one, does nothing if it matches, refuses a changed
 one unless `--replace`. `--check` compares without writing and reports a
-changed key instead of refusing it. JSON fields: `machine`, `address`,
-`status` (`matching`, `changed`, `missing`), `key_type`, optional
-`current_fingerprint`, `presented_fingerprint`, `check`, `changed`, and,
-while the key is not yet trusted, `fix` (the command that trusts it) and
-`verify` (a command that prints the same key's fingerprint on the server,
-to run from its own console).
+changed key instead of refusing it; it exits 0 for every status, so a
+script reads `status`, not the exit code. `--expect <SHA256:…>` writes
+only if the presented key has that fingerprint — the key the operator
+verified, not whatever a second scan happens to meet. JSON fields:
+`machine`, `address`, `status` (`matching`, `changed`, `missing`),
+`key_type`, optional `current_key_type` and `current_fingerprint` (the
+pinned key), `presented_fingerprint`, `check`, `changed`, and, while the
+key is not yet trusted, `fix` (the command that trusts it, with
+`--expect`) and `verify` (a command that prints the same key's
+fingerprint on the server, to run from its own console).
 
 `rm` takes a machine out of `config.yml` and **does nothing to the server
 itself**. Asks first unless `--yes`; refuses to leave a workspace
