@@ -105,6 +105,17 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&s.yes, "yes", false, "answer yes to writing SSH host entries, without asking")
 	c.Flags().StringVar(&selfName, "self", "",
 		"add your computer as a machine, named <name>, instead of asking for an address")
+	c.Flags().StringVar(&s.address, "address", "",
+		"the machine's address; with it, nothing is asked and every other answer is a flag or its default")
+	c.Flags().StringVar(&s.name, "name", "", "the machine's name (needed with --address)")
+	c.Flags().StringVar(&s.user, "user", config.DefaultAdminUser,
+		"the admin login: root, or an account with passwordless sudo")
+	c.Flags().IntVar(&s.port, "port", config.DefaultPort, "the SSH port")
+	c.Flags().StringVar(&s.key, "key", "new",
+		"`new` for a key of the CLI's own for this machine (made or reused), or a private key file")
+	c.Flags().StringVar(&s.fingerprint, "fingerprint", "",
+		"the host key fingerprint to trust on first contact (SHA256:…), checked through another channel")
+	c.Flags().BoolVar(&s.tailscale, "tailscale", false, "also add the tailscale package")
 	return c
 }
 
@@ -201,9 +212,16 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 		return err
 	}
 
+	if opts.unattended() {
+		// Nothing is read: an unattended run that reached a question would
+		// otherwise block on a terminal nobody is watching.
+		in = strings.NewReader("")
+	}
 	r := bufio.NewReader(in)
-	m, err := askForMachine(r, out, "")
-	if err != nil {
+	var m config.Machine
+	if opts.unattended() {
+		m = machineFromFlags(opts)
+	} else if m, err = askForMachine(r, out, ""); err != nil {
 		return err
 	}
 	if m.Name == "" {
@@ -213,11 +231,21 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 		return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
 	}
 	m.KnownHostsFile = filepath.Join(dir, config.KnownHostsFileName)
-	if err := trustFirstContact(ctx, r, out, m); err != nil {
+	if opts.unattended() {
+		err = trustExpected(ctx, out, m, opts.fingerprint)
+	} else {
+		err = trustFirstContact(ctx, r, out, m)
+	}
+	if err != nil {
 		return err
 	}
 
-	key, err := askForKey(r, out, dir, m.Name)
+	var key chosenKey
+	if opts.unattended() {
+		key, err = keyFromFlag(out, dir, m.Name, opts.key)
+	} else {
+		key, err = askForKey(r, out, dir, m.Name)
+	}
 	if err != nil {
 		return err
 	}
@@ -235,10 +263,16 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
 		return err
 	}
-	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes); err != nil {
+	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes || opts.unattended()); err != nil {
 		return err
 	}
-	if err := offerTailscale(r, out, dir, m.Name); err != nil {
+	switch {
+	case opts.unattended() && opts.tailscale:
+		err = addTailscale(out, dir, m.Name)
+	case !opts.unattended():
+		err = offerTailscale(r, out, dir, m.Name)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -251,6 +285,16 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n",
 		m.Name, m.Name)
 	return nil
+}
+
+// machineFromFlags is askForMachine's answer for an unattended run.
+func machineFromFlags(opts setupOptions) config.Machine {
+	return config.Machine{
+		Name:  opts.name,
+		Hosts: []config.Host{{Address: opts.address}},
+		User:  opts.user,
+		Port:  opts.port,
+	}
 }
 
 func newMachinesCreateLocalCmd(opts *options) *cobra.Command {

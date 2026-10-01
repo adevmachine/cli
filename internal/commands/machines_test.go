@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
 )
 
@@ -274,5 +275,100 @@ func TestMachinesAddGivesTheNewMachineTheEssentials(t *testing.T) {
 	}
 	if !slices.Equal(cfg.Machines[1].Packages, []string{"essentials"}) {
 		t.Fatalf("new machine packages are %#v", cfg.Machines[1].Packages)
+	}
+}
+
+// TestMachinesAddWithFlagsAsksNothing: an agent or a script adds a machine in
+// one command. Every question has a flag, and none is asked.
+func TestMachinesAddWithFlagsAsksNothing(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	out, err := executeWithInput(t, "",
+		"--config", dir, "machines", "add",
+		"--name", "sandbox", "--address", "100.64.0.7", "--user", "alice", "--port", "2222",
+		"--fingerprint", hostkeys.Fingerprint(steps.hostKey), "--no-aliases")
+	if err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	if slices.Contains(steps.events, "ask trust") {
+		t.Fatalf("it asked to trust the host key: %q", steps.events)
+	}
+	if !steps.hardened || !steps.ansible {
+		t.Fatalf("it did not run the bootstrap: %q", steps.events)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("sandbox")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.User != "alice" || m.Port != 2222 || m.Hosts[0].Address != "100.64.0.7" {
+		t.Fatalf("machine = %#v", m)
+	}
+	if m.Key != filepath.Join(keys.Dir(dir), "sandbox") {
+		t.Fatalf("it did not make a key of its own: %q", m.Key)
+	}
+}
+
+// TestMachinesAddWithFlagsRefusesAnUncheckedHostKey: with nobody to ask,
+// trusting whatever answered would be trust on first use with no one looking.
+// The fingerprint has to come from the person, checked elsewhere.
+func TestMachinesAddWithFlagsRefusesAnUncheckedHostKey(t *testing.T) {
+	for _, c := range []struct{ name, fingerprint string }{
+		{"none given", ""},
+		{"a different one", "SHA256:AAAAnotthisone"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+			before, err := os.ReadFile(filepath.Join(dir, config.FileName))
+			if err != nil {
+				t.Fatal(err)
+			}
+			steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+			args := []string{"--config", dir, "machines", "add", "--name", "sandbox", "--address", "100.64.0.7"}
+			if c.fingerprint != "" {
+				args = append(args, "--fingerprint", c.fingerprint)
+			}
+			_, err = executeWithInput(t, "", args...)
+			if err == nil || !strings.Contains(err.Error(), "--fingerprint") ||
+				!strings.Contains(err.Error(), hostkeys.Fingerprint(steps.hostKey)) {
+				t.Fatalf("got %v", err)
+			}
+			after, err := os.ReadFile(filepath.Join(dir, config.FileName))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != string(before) || steps.installedKey || steps.hardened {
+				t.Fatalf("it went on anyway: %q", steps.events)
+			}
+		})
+	}
+}
+
+func TestMachinesAddWithFlagsAddsTailscaleOnlyWhenAsked(t *testing.T) {
+	for _, want := range []bool{false, true} {
+		dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+		steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+		args := []string{"--config", dir, "machines", "add", "--name", "sandbox", "--address", "100.64.0.7",
+			"--fingerprint", hostkeys.Fingerprint(steps.hostKey), "--no-aliases"}
+		if want {
+			args = append(args, "--tailscale")
+		}
+		if _, err := executeWithInput(t, "", args...); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := config.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, _ := cfg.Machine("sandbox")
+		if got := slices.Contains(m.Packages, tailscalePackage); got != want {
+			t.Fatalf("--tailscale %v: packages %q", want, m.Packages)
+		}
 	}
 }

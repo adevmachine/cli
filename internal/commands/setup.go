@@ -66,7 +66,21 @@ type setupOptions struct {
 	noAliases    bool
 	yes          bool
 	machine      string
+	// The answers `machines add` takes as flags. An address makes the whole
+	// run unattended: nothing is asked, and what has no flag takes its
+	// default.
+	name        string
+	address     string
+	user        string
+	port        int
+	key         string
+	fingerprint string
+	tailscale   bool
 }
+
+// unattended is a `machines add` that asks nothing, because its answers came
+// as flags.
+func (o setupOptions) unattended() bool { return o.address != "" }
 
 // tailscalePackage is the recipe `setup` and `machines add` offer to add when
 // the person wants the machine reachable over Tailscale too.
@@ -305,6 +319,11 @@ func offerTailscale(r *bufio.Reader, out io.Writer, dir, machine string) error {
 	if !ok {
 		return nil
 	}
+	return addTailscale(out, dir, machine)
+}
+
+// addTailscale puts the tailscale package on a machine, once.
+func addTailscale(out io.Writer, dir, machine string) error {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		return err
@@ -490,6 +509,32 @@ func offerSetupSkills(ctx context.Context, dir string, in io.Reader, out io.Writ
 // trustFirstContact records the host identity before setup offers any
 // authentication method or changes the remote machine.
 func trustFirstContact(ctx context.Context, reader io.Reader, out io.Writer, machine config.Machine) error {
+	return trustFirstContactWith(ctx, out, machine, func(fingerprint string) (bool, error) {
+		question := fmt.Sprintf("Trust this %s fingerprint for %s? This is trust on first use; compare it through the provider console or another trusted channel first.", fingerprint, machine.Name)
+		return confirmHostKey(reader, out, question)
+	})
+}
+
+// trustExpected trusts a first-contact host key only when it is the one the
+// person said to expect. With nobody to ask, trusting whatever answered would
+// be trust on first use with no one looking.
+func trustExpected(ctx context.Context, out io.Writer, machine config.Machine, expected string) error {
+	return trustFirstContactWith(ctx, out, machine, func(fingerprint string) (bool, error) {
+		if expected == fingerprint {
+			return true, nil
+		}
+		if expected == "" {
+			return false, fmt.Errorf("%s presented %s, and no --fingerprint was given to check it against: "+
+				"compare it through the provider console or a connection you already trust, then pass "+
+				"--fingerprint %s", machine.Name, fingerprint, fingerprint)
+		}
+		return false, fmt.Errorf("%s presented %s, not the %s that --fingerprint expects: nothing was "+
+			"trusted or changed. Check which one is right before trying again", machine.Name, fingerprint, expected)
+	})
+}
+
+func trustFirstContactWith(ctx context.Context, out io.Writer, machine config.Machine,
+	approve func(fingerprint string) (bool, error)) error {
 	presented, address, err := scanHostKey(ctx, machine)
 	if err != nil {
 		return err
@@ -515,8 +560,7 @@ func trustFirstContact(ctx context.Context, reader io.Reader, out io.Writer, mac
 		return err
 	}
 
-	question := fmt.Sprintf("Trust this %s fingerprint for %s? This is trust on first use; compare it through the provider console or another trusted channel first.", fingerprint, machine.Name)
-	ok, err := confirmHostKey(reader, out, question)
+	ok, err := approve(fingerprint)
 	if err != nil {
 		return err
 	}
@@ -612,6 +656,36 @@ func recordKey(dir string, m *config.Machine, key chosenKey) error {
 	}
 	m.AgentKey = key.Public
 	return nil
+}
+
+// keyFromFlag is askForKey's answer for an unattended run: the CLI's own key
+// for the machine — made now, or reused — or the key file --key names.
+func keyFromFlag(out io.Writer, dir, machine, path string) (chosenKey, error) {
+	if path != "" && path != "new" {
+		expanded, err := expandHome(path)
+		if err != nil {
+			return chosenKey{}, err
+		}
+		public, err := keys.PublicFor(expanded)
+		if err != nil {
+			return chosenKey{}, err
+		}
+		return chosenKey{Path: expanded, Public: public}, nil
+	}
+	mine := filepath.Join(keys.Dir(dir), machine)
+	if _, err := os.Stat(mine); err == nil {
+		public, err := keys.PublicFor(mine)
+		if err != nil {
+			return chosenKey{}, err
+		}
+		return chosenKey{Path: mine, Public: public}, nil
+	}
+	generated, public, err := keys.Generate(keys.Dir(dir), machine)
+	if err != nil {
+		return chosenKey{}, err
+	}
+	fmt.Fprintf(out, "made %s\n", generated)
+	return chosenKey{Path: generated, Public: public}, nil
 }
 
 // askForKey offers the three ways in: a key of the CLI's own, a key file, or

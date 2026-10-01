@@ -215,6 +215,7 @@ as it prints, so it is the quickest way to find what is wrong.
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
+devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--tailscale]   the same, asking nothing
 devmachine machines trust [name] [--check] [--replace] [--yes]   check or update its SSH fingerprint
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on your computer
@@ -238,8 +239,31 @@ is asked. Refuses if a self machine already exists, or the name is taken.
 See [your computer as a machine](../how-it-works/your-computer-as-a-machine.md)
 for how this differs from `machines create-local`.
 
+**Unattended.** `--address` makes `add` ask nothing, so a script or an
+agent adds a machine in one command; every question has a flag, and what
+is left out takes its default:
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--name` | (required) | the machine's name |
+| `--address` | — | an IP, a hostname, or `tailscale:<name>` |
+| `--user` | `root` | the admin login: root, or an account with passwordless sudo |
+| `--port` | `22` | the SSH port |
+| `--key` | `new` | a key of the CLI's own for this machine (made, or reused when it exists), or a private key file |
+| `--fingerprint` | — | the host key to trust on first contact |
+| `--tailscale` | off | also add the `tailscale` package |
+
+SSH aliases are written unless `--no-aliases`. `--fingerprint` is required
+for a machine not trusted yet: with nobody to ask, trusting whatever
+answers would be trust on first use with no one looking. Without it, or
+with a different one, `add` stops before changing anything and prints the
+fingerprint it was shown, to check through the provider console or a
+connection you already trust. A key that does not log in yet stops it
+too: there is no password to ask for, so put the key's public half in the
+admin's `authorized_keys` first, or run `add` without flags.
+
 Adding or removing a machine, like adding or removing a workspace, refreshes
-`~/.ssh/config`'s managed block when `ssh_aliases: true` is set — see
+the SSH aliases when `ssh_aliases: true` is set — see
 [SSH aliases](../concepts/reaching-your-server.md#ssh-aliases).
 
 A self machine has no `hosts`, `user`, `port` or `key`, and no workspace
