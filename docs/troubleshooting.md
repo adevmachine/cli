@@ -25,6 +25,9 @@ needs to know which one to act on.
 **What to do:** Add `--machine <name>`, or use a workspace name — that already
 says which server it lives on.
 
+`doctor` never says this: with several machines and no `--machine`, it
+checks every one of them.
+
 ## "no address answered"
 
 **What it means:** Nothing answered at the address devmachine tried. The error
@@ -207,6 +210,15 @@ wrong.
 devmachine keep the aliases and check them, run `devmachine aliases
 --write` once and say yes. See
 [SSH aliases](concepts/reaching-your-server.md#ssh-aliases).
+
+## `doctor` exits non-zero, but most machines say `pass`
+
+**What it means:** With several machines, `doctor` checks all of them and
+exits non-zero when any one has a `fail`. The error names which ones, for
+example `some checks failed on far`.
+
+**What to do:** Look at that machine's block, or run `devmachine doctor
+--machine far` to see only its checks.
 
 ## A setting is accepted, but the package still uses its default
 

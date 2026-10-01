@@ -105,7 +105,8 @@ devmachine sync --check
 devmachine sync
 ```
 
-With more than one machine, add `--machine <name>` to `doctor` and `sync`.
+With more than one machine, add `--machine <name>` to `sync`; `doctor` checks
+every machine unless you name one.
 The lock file records exactly which package release each machine is running,
 so `sync --check` always compares against what is really there, not against
 what you last typed.
