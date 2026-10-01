@@ -908,6 +908,7 @@ always, and `ssh <ws>-devmachine` when aliases are on.
 
 ```
 devmachine update [--machine m] [--skip-cli] [--skip-packages] [--yes]
+devmachine update --cli-only [--format json]
 ```
 
 Brings everything up to date, then stops before it changes a machine. Five
@@ -939,6 +940,20 @@ steps, in order, each with a short header:
 | `--skip-cli` | leave the CLI as it is |
 | `--skip-packages` | leave the packages pin as it is |
 | `--yes` | answer yes to the sync question — this changes machines; use it only in automation you trust |
+| `--cli-only` | run step 1 alone and stop: no packages pin, skills, doctor or sync, and no configuration is read. It cannot be combined with the other flags or `--machine` |
+
+With `--cli-only`, a build from source (`devmachine version` says `dev`)
+is an error, not a skip: there is no install to update, so it says what to
+run instead. With `--cli-only --format json`, the log goes to stderr and
+stdout gets one object at the end:
+
+```json
+{"from": "0.7.22", "to": "0.7.23", "method": "homebrew", "status": "updated", "ok": true}
+```
+
+`method` is `homebrew`, `download` (the release archive) or `source`;
+`status` is `updated`, `already latest` or `failed`, and a failure adds
+`error` with the reason and exits non-zero.
 
 The output ends with one line per step: `updated`, `already latest`, `ok`,
 `nothing to do`, `skipped` or `failed`, with the reason. The doctor line
@@ -951,8 +966,9 @@ CLI update, the packages pin, the skills, the sync check, or a sync you
 applied. What doctor finds never fails `update`; run `devmachine doctor`
 when a script needs that exit code. Saying no to the sync is not a failure.
 
-`update` prints for a person, so it refuses `--format json`; use `doctor`
-and `sync --check` with `--format json` instead. Why it works this way:
+Without `--cli-only`, `update` prints for a person, so it refuses
+`--format json`; use `doctor` and `sync --check` with `--format json`
+instead. Why it works this way:
 [Updating](../how-it-works/updating.md).
 
 ## version, help

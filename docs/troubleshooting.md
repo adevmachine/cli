@@ -840,6 +840,17 @@ file is checked before anything is written, and your CLI is exactly as it was.
 hand with `curl -fsSL https://mydevmachine.sh/install.sh | sh`, which checks
 the same checksum, from another network.
 
+## `update --cli-only` says "\"dev\" was built from source"
+
+**What it means:** This `devmachine` was built from the source code, not
+installed from a release, so it has no release version and no install that
+`update` could replace. Plain `update` skips the CLI step for such a build;
+`--cli-only` has nothing else to do, so it fails.
+
+**What to do:** Build it again from the source (`git pull && make build`),
+or install a release with `curl -fsSL https://mydevmachine.sh/install.sh |
+sh` and remove the built copy from your `PATH`.
+
 ## `update` says "replacing …: permission denied"
 
 **What it means:** The CLI lives in a folder your user cannot write, such as

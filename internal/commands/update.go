@@ -61,7 +61,26 @@ type updateFlags struct {
 	skipCLI      bool
 	skipPackages bool
 	yes          bool
+	cliOnly      bool
 	continueFrom string
+}
+
+// How the running CLI was installed, as `update --cli-only --format json`
+// names it.
+const (
+	methodHomebrew = "homebrew"
+	methodDownload = "download"
+	methodSource   = "source"
+)
+
+// cliOnlyResult is what `update --cli-only --format json` prints last.
+type cliOnlyResult struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Method string `json:"method"`
+	Status string `json:"status"`
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
 }
 
 func newUpdateCmd(opts *options) *cobra.Command {
@@ -77,14 +96,25 @@ func newUpdateCmd(opts *options) *cobra.Command {
 			"the sync command to run later.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opts.format == formatJSON {
-				return errors.New("update is for a person to read; --format json is not supported: " +
-					"use `doctor` and `sync --check` with --format json instead")
-			}
 			u := &updater{cmd: cmd, opts: opts, flags: flags, out: cmd.OutOrStdout()}
+			if flags.cliOnly {
+				if err := cliOnlyConflict(cmd, opts); err != nil {
+					return err
+				}
+				if opts.format == formatJSON {
+					u.out = cmd.ErrOrStderr()
+				}
+				return u.runCLIOnly(cmd.Context())
+			}
+			if opts.format == formatJSON {
+				return errors.New("update is for a person to read; --format json is supported only with " +
+					"--cli-only: use `doctor` and `sync --check` with --format json instead")
+			}
 			return u.run(cmd.Context())
 		},
 	}
+	c.Flags().BoolVar(&flags.cliOnly, "cli-only", false,
+		"update only the CLI itself, then stop: no packages, skills, doctor or sync")
 	c.Flags().BoolVar(&flags.skipCLI, "skip-cli", false, "do not update the CLI itself")
 	c.Flags().BoolVar(&flags.skipPackages, "skip-packages", false, "do not move the packages pin")
 	c.Flags().BoolVar(&flags.yes, "yes", false, "apply the sync without asking; this changes machines")
@@ -105,6 +135,72 @@ type updater struct {
 	machines  []config.Machine
 	reachable map[string]bool
 	results   []stepResult
+}
+
+// cliOnlyConflict refuses a flag that belongs to a step --cli-only never runs,
+// rather than ignoring it.
+func cliOnlyConflict(cmd *cobra.Command, opts *options) error {
+	for _, name := range []string{"skip-cli", "skip-packages", "yes"} {
+		if cmd.Flags().Changed(name) {
+			return fmt.Errorf("--cli-only updates only the CLI; it cannot be combined with --%s", name)
+		}
+	}
+	if opts.machine != "" {
+		return errors.New("--cli-only updates only the CLI on this computer; it cannot be combined with --machine")
+	}
+	return nil
+}
+
+// runCLIOnly is the CLI step alone. It reads no configuration and never
+// reaches a machine, the packages pin or the skills.
+func (u *updater) runCLIOnly(ctx context.Context) error {
+	u.say("==> CLI")
+	r, handedOver := u.cliStep(ctx)
+	if handedOver {
+		return nil
+	}
+	failed := r.status == stepFailed
+	if !failed {
+		u.finish(r)
+	}
+	if u.opts.format == formatJSON {
+		result := cliOnlyResult{
+			From: version, To: version, Method: u.installMethod(ctx), Status: r.status, OK: !failed,
+		}
+		if u.flags.continueFrom != "" {
+			result.From = u.flags.continueFrom
+		}
+		if failed {
+			result.Error = r.detail
+		}
+		if err := writeJSON(u.cmd.OutOrStdout(), result); err != nil {
+			return err
+		}
+	}
+	if failed {
+		return fmt.Errorf("updating the CLI: %s", r.detail)
+	}
+	return nil
+}
+
+// installMethod names how the running binary was installed, or "" when the
+// binary cannot be found.
+func (u *updater) installMethod(ctx context.Context) string {
+	if _, ok := release.Compare(version, "0"); !ok {
+		return methodSource
+	}
+	executable, err := executablePath()
+	if err != nil {
+		return ""
+	}
+	var brewPrefix string
+	if brewPath, err := findBrew(); err == nil {
+		brewPrefix, _ = selfupdate.Brew{Path: brewPath}.Prefix(ctx)
+	}
+	if selfupdate.HomebrewPrefix(executable, brewPrefix) != "" {
+		return methodHomebrew
+	}
+	return methodDownload
 }
 
 func (u *updater) run(ctx context.Context) error {
@@ -227,6 +323,11 @@ func (u *updater) cliStep(ctx context.Context) (stepResult, bool) {
 	if u.flags.skipCLI {
 		return stepResult{name, stepSkipped, "--skip-cli"}, false
 	}
+	if _, ok := release.Compare(version, "0"); !ok && u.flags.cliOnly {
+		return stepResult{name, stepFailed, fmt.Sprintf(
+			"%q was built from source, so update cannot tell how to replace it: build it again from source, "+
+				"or install a release with `curl -fsSL https://mydevmachine.sh/install.sh | sh`", version)}, false
+	}
 	if _, ok := release.Compare(version, "0"); !ok {
 		return stepResult{name, stepSkipped, fmt.Sprintf("%q is a development build; it is never replaced", version)}, false
 	}
@@ -245,11 +346,15 @@ func (u *updater) cliStep(ctx context.Context) (stepResult, bool) {
 		return stepResult{name, stepFailed, err.Error()}, false
 	}
 
-	u.say("  starting the new version for the remaining steps")
+	next, retry := "for the remaining steps", "run `devmachine update --skip-cli`"
+	if u.flags.cliOnly {
+		next, retry = "to confirm it", "run `devmachine version` to check it"
+	}
+	u.say("  starting the new version " + next)
 	argv := append([]string{newBinary}, selfupdate.ContinueArgs(commandLineArgs(), version)...)
 	if err := execBinary(newBinary, argv); err != nil {
 		return stepResult{name, stepFailed, fmt.Sprintf(
-			"installed %s, but could not start it (%v): run `devmachine update --skip-cli`", latest, err)}, false
+			"installed %s, but could not start it (%v): %s", latest, err, retry)}, false
 	}
 	return stepResult{}, true
 }

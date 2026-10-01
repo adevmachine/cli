@@ -77,6 +77,8 @@ The five steps:
 With more than one machine, `--machine <name>` limits steps 4 and 5 to that
 one. `--skip-cli` and `--skip-packages` leave those alone. `--yes` answers
 the question for you — only for automation you trust to change servers.
+`--cli-only` updates the CLI and stops there: nothing else is read or
+changed. The Devmachine app's "Update CLI" button runs it.
 
 Without a terminal (a cron job, a pipe) `update` never asks and never
 applies: it prints the `sync` command to run later. How and why each step

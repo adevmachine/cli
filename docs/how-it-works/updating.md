@@ -25,6 +25,16 @@ naming the version it replaced, so it skips step 1 and reports `0.7.17 →
 0.7.18`. If the "new" binary turns out to be the same version, that is
 reported as a failure, not as success.
 
+## Only the CLI, when that is all you asked for
+
+`update --cli-only` is step 1 and nothing more. It is what the Devmachine
+app runs behind its "Update CLI" button: the app replaces a program on your
+computer for you, but moving the packages pin or syncing a server stays
+something you start yourself. So `--cli-only` reads no configuration and
+refuses `--yes`, `--skip-…` and `--machine` instead of ignoring them. The
+new binary is still started after the swap, with `--cli-only`, only to
+confirm the version changed.
+
 ## Homebrew's binary goes through Homebrew
 
 A binary Homebrew installed (the real file lives in Homebrew's `Cellar`,

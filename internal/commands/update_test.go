@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -496,7 +497,12 @@ type selfUpdateWorld struct {
 
 func newSelfUpdateWorld(t *testing.T, archiveBody string, tamper bool) selfUpdateWorld {
 	t.Helper()
-	w := newUpdateWorld(t, "v17", "v17", 0)
+	return newSelfUpdateWorldPinned(t, "v17", "v17", archiveBody, tamper)
+}
+
+func newSelfUpdateWorldPinned(t *testing.T, pinned, latest, archiveBody string, tamper bool) selfUpdateWorld {
+	t.Helper()
+	w := newUpdateWorld(t, pinned, latest, 0)
 	runningVersion(t, "0.7.17")
 
 	archive := testTarball(t, archiveBody)
@@ -665,4 +671,222 @@ func TestUpdateShowsTheEndOfAFailedSyncCheckAndAsksNothing(t *testing.T) {
 		t.Fatalf("offered or applied a sync after a failed check:\n%s", out)
 	}
 	assertSummary(t, out, "sync", "failed")
+}
+
+func assertOnlyTheCLIWasTouched(t *testing.T, w updateWorld, out string) {
+	t.Helper()
+	for _, other := range []string{"==> 2/5", "Packages", "Skills", "Doctor", "Sync check", "Summary"} {
+		if strings.Contains(out, other) {
+			t.Fatalf("--cli-only went past the CLI (%q):\n%s", other, out)
+		}
+	}
+	if len(w.runs.runs) != 0 {
+		t.Fatalf("--cli-only reached a machine: %+v", w.runs.runs)
+	}
+	if got := pinnedIn(t, w.dir); got != "v16" {
+		t.Fatalf("--cli-only moved the packages pin to %q", got)
+	}
+}
+
+func TestUpdateCLIOnlyReplacesTheBinaryAndHandsOverWithCLIOnly(t *testing.T) {
+	w := newSelfUpdateWorldPinned(t, "v16", "v17", "new binary", false)
+	t.Cleanup(swap(&commandLineArgs, func() []string { return []string{"--config", w.dir, "update", "--cli-only"} }))
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if body, _ := os.ReadFile(w.binary); string(body) != "new binary" {
+		t.Fatalf("the binary was not replaced: %q", body)
+	}
+	want := []string{w.binary, w.binary, "--config", w.dir, "update", "--cli-only", "--continue-after-self-update=0.7.17"}
+	if !slices.Equal(*w.execed, want) {
+		t.Fatalf("started %q; want %q", *w.execed, want)
+	}
+	if !strings.Contains(out, "0.7.17 → v0.7.18") {
+		t.Fatalf("does not say what it updates:\n%s", out)
+	}
+	assertOnlyTheCLIWasTouched(t, w.updateWorld, out)
+}
+
+func TestUpdateCLIOnlyAfterTheHandOverSaysWhatChangedAndStops(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only", "--continue-after-self-update=0.7.17")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "updated: 0.7.17 → 0.7.18") {
+		t.Fatalf("does not say what changed:\n%s", out)
+	}
+	if *w.cli != 0 {
+		t.Fatal("the new binary asked GitHub again")
+	}
+	assertOnlyTheCLIWasTouched(t, w, out)
+}
+
+func TestUpdateCLIOnlyAfterAHandOverToTheSameVersionFails(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only", "--continue-after-self-update=0.7.18")
+	if err == nil || !strings.Contains(err.Error(), "still 0.7.18") {
+		t.Fatalf("got %v\n%s", err, out)
+	}
+	assertOnlyTheCLIWasTouched(t, w, out)
+}
+
+func TestUpdateCLIOnlyWhenAlreadyLatestDoesNothingElse(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "already latest: 0.7.18") {
+		t.Fatalf("does not say it is current:\n%s", out)
+	}
+	assertOnlyTheCLIWasTouched(t, w, out)
+}
+
+func TestUpdateCLIOnlyNeedsNoConfiguration(t *testing.T) {
+	runningVersion(t, "0.7.18")
+	stubLatestCLI(t, "v0.7.18", nil)
+
+	out, err := execute(t, "--config", filepath.Join(t.TempDir(), "missing"), "update", "--cli-only")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+func TestUpdateCLIOnlyFailsOnADevelopmentBuildAndSaysWhatToRun(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	runningVersion(t, "dev")
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only")
+	if err == nil {
+		t.Fatalf("a build from source must fail:\n%s", out)
+	}
+	for _, want := range []string{"built from source", "install.sh"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("%q does not say %q", err, want)
+		}
+	}
+	if *w.cli != 0 {
+		t.Fatal("asked GitHub about a build it can never replace")
+	}
+	assertOnlyTheCLIWasTouched(t, w, out)
+}
+
+func TestUpdateCLIOnlyFailsWhenTheLookupFails(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	stubLatestCLI(t, "", errors.New("no route to host"))
+
+	out, err := execute(t, "--config", w.dir, "update", "--cli-only")
+	if err == nil || !strings.Contains(err.Error(), "no route to host") {
+		t.Fatalf("got %v\n%s", err, out)
+	}
+	assertOnlyTheCLIWasTouched(t, w, out)
+}
+
+func TestUpdateCLIOnlyRefusesTheFlagsOfTheOtherSteps(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	for _, flag := range []string{"--skip-cli", "--skip-packages", "--yes"} {
+		_, err := execute(t, "--config", w.dir, "update", "--cli-only", flag)
+		if err == nil || !strings.Contains(err.Error(), flag) {
+			t.Fatalf("%s: got %v", flag, err)
+		}
+	}
+	_, err := execute(t, "--config", w.dir, "--machine", "main", "update", "--cli-only")
+	if err == nil || !strings.Contains(err.Error(), "--machine") {
+		t.Fatalf("--machine: got %v", err)
+	}
+	if *w.cli != 0 || len(w.runs.runs) != 0 {
+		t.Fatal("a refused combination still did something")
+	}
+}
+
+type cliOnlyJSON struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Method string `json:"method"`
+	Status string `json:"status"`
+	OK     bool   `json:"ok"`
+	Error  string `json:"error"`
+}
+
+func decodeCLIOnly(t *testing.T, stdout string) cliOnlyJSON {
+	t.Helper()
+	var got cliOnlyJSON
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("stdout is not one JSON object: %v\n%s", err, stdout)
+	}
+	return got
+}
+
+func TestUpdateCLIOnlyJSONReportsTheResultAndLogsToStderr(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	binary := filepath.Join(t.TempDir(), "devmachine")
+	writeCommandFile(t, binary, "binary")
+	t.Cleanup(swap(&executablePath, func() (string, error) { return binary, nil }))
+	t.Cleanup(swap(&findBrew, func() (string, error) { return "", errors.New("no brew") }))
+
+	stdout, stderr, err := executeSplit(t, "--config", w.dir, "--format", "json",
+		"update", "--cli-only", "--continue-after-self-update=0.7.17")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, stderr)
+	}
+	got := decodeCLIOnly(t, stdout)
+	want := cliOnlyJSON{From: "0.7.17", To: "0.7.18", Method: "download", Status: "updated", OK: true}
+	if got != want {
+		t.Fatalf("got %+v; want %+v", got, want)
+	}
+	if !strings.Contains(stderr, "updated: 0.7.17 → 0.7.18") {
+		t.Fatalf("the log is not on stderr:\n%s", stderr)
+	}
+}
+
+func TestUpdateCLIOnlyJSONReportsAFailure(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	stubLatestCLI(t, "", errors.New("no route to host"))
+
+	stdout, _, err := executeSplit(t, "--config", w.dir, "--format", "json", "update", "--cli-only")
+	if err == nil {
+		t.Fatal("a failure must still fail the command")
+	}
+	got := decodeCLIOnly(t, stdout)
+	if got.OK || got.Status != "failed" || !strings.Contains(got.Error, "no route to host") || got.From != "0.7.18" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestUpdateCLIOnlyJSONNamesHomebrew(t *testing.T) {
+	w := newUpdateWorld(t, "v16", "v17", 0)
+	root := t.TempDir()
+	prefix := filepath.Join(root, "brew")
+	binary := filepath.Join(prefix, "Cellar", "devmachine", "0.7.18", "bin", "devmachine")
+	writeCommandFile(t, binary, "binary")
+	fake := filepath.Join(root, "bin", "brew")
+	writeCommandFile(t, fake, fmt.Sprintf("#!/bin/sh\n[ \"$1\" = --prefix ] && echo %q\nexit 0\n", prefix))
+	if err := os.Chmod(fake, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(swap(&executablePath, func() (string, error) { return binary, nil }))
+	t.Cleanup(swap(&findBrew, func() (string, error) { return fake, nil }))
+
+	stdout, stderr, err := executeSplit(t, "--config", w.dir, "--format", "json", "update", "--cli-only")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, stderr)
+	}
+	got := decodeCLIOnly(t, stdout)
+	want := cliOnlyJSON{From: "0.7.18", To: "0.7.18", Method: "homebrew", Status: "already latest", OK: true}
+	if got != want {
+		t.Fatalf("got %+v; want %+v", got, want)
+	}
+}
+
+func TestUpdateWithoutCLIOnlyStillRefusesJSON(t *testing.T) {
+	_, err := execute(t, "--format", "json", "update", "--skip-cli")
+	if err == nil || !strings.Contains(err.Error(), "--cli-only") {
+		t.Fatalf("the refusal does not point at --cli-only: %v", err)
+	}
 }
