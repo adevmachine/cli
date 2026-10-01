@@ -1,0 +1,49 @@
+Makefile
+  s_785cced9544d71::t_a9334007a2336c 4,40-45
+docs/development.md
+  s_785cced9544d71::t_fe1a9ecd6ab996 7
+docs/how-it-works/trust-bootstrap.md
+  s_785cced9544d71::t_dedeb04a705f2a 51-98
+docs/troubleshooting.md
+  s_785cced9544d71::t_0f04ff112c3066 109-167
+internal/commands/setup.go
+  s_785cced9544d71::t_d03b06c3f1edec 38-39,278,371-376,378-380,387-421,701-711,727-732
+internal/commands/setup_test.go
+  s_785cced9544d71::t_2c9ee9fc1fe3a2 45-46,62,130-138,427,1057-1135
+internal/credentials/deliver.go
+  s_785cced9544d71::t_750519c78f6086 126
+internal/credentials/present.go
+  s_785cced9544d71::t_fde4375fa44536 79
+internal/provision/ansible_runner.go
+  s_785cced9544d71::t_a7a45984acfd5e 48-53,56,70,74-78,91-100
+internal/provision/ansible_runner_test.go
+  s_785cced9544d71::t_a70bb748ee2a83 14-15,30-31,36-38,114,117-121,123-124,140-144,374,385-416
+internal/remote/bootstrap.go
+  s_785cced9544d71::t_dcd14a2d7516ca 5,84-119,176,180,183,191,265
+internal/remote/bootstrap_test.go
+  s_785cced9544d71::t_0fcffa4b258d1e 12,301,303,306,443-547
+internal/remote/local_test.go
+  s_785cced9544d71::t_1e58c0f3ff0ca4 120-130
+internal/remote/remote.go
+  s_785cced9544d71::t_89048a4d5147cc 569-571,606-617,672-681
+internal/remote/remote_test.go
+  s_785cced9544d71::t_c457394c98ddf0 847-878
+scripts/fake-vps.sh
+  s_785cced9544d71::t_dcacf02ed2df87 33-37,78-89,107,114,128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "38e1bd3d13652be1dadd791b6b09d4d1185a6ec6",
+  "prompts": {},
+  "sessions": {
+    "s_785cced9544d71": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7bd2d5-bc77-494b-80af-2421eac35fbf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
