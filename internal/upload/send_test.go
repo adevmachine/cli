@@ -3,6 +3,7 @@ package upload
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"os"
 	"os/exec"
@@ -239,5 +240,30 @@ func TestSendAppliesTheRequestedMode(t *testing.T) {
 	info, _ := os.Stat(got)
 	if info.Mode().Perm() != 0o644 {
 		t.Fatalf("mode %v", info.Mode().Perm())
+	}
+}
+
+func TestSendCarriesTheComposedFormOfTheFolder(t *testing.T) {
+	cmd := command(Request{Dir: "notes/ção", Stem: "a", Ext: ".txt", Mode: "0600"})
+	composed := `"` + base64.StdEncoding.EncodeToString([]byte("notes/ção")) + `"`
+	if !strings.HasSuffix(cmd, composed) {
+		t.Fatalf("the command does not end with the composed folder: %s", cmd[len(cmd)-80:])
+	}
+}
+
+func TestSendIntoAFolderGivenDecomposedLandsInTheComposedOne(t *testing.T) {
+	home, _ := homeAndOutside(t)
+	c := &homeClient{home: home}
+	if err := os.MkdirAll(filepath.Join(home, "ção"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := send(t, c, "ção", "a.txt", "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(home)
+	if len(entries) != 1 {
+		t.Fatalf("a second folder was made: %v (%s)", entries, got)
 	}
 }

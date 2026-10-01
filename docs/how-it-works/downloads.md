@@ -39,6 +39,15 @@ legal file name. The CLI sends it to the machine encoded in base64, and
 the machine decodes it into a variable. The path is never part of a
 command line, so nothing in it can run.
 
+## An accent a Mac spelled differently still matches
+
+A letter like `ç` can be stored as one character (composed) or as `c`
+plus a separate cedilla (decomposed). Linux file names are almost always
+composed; a Mac app's process arguments arrive decomposed, even when the
+app had them composed. The bytes differ, so the machine would answer
+"does not exist" for a file that is there. When the path as given is
+not on the machine, `download` tries its composed form before giving up.
+
 ## The connection is the one `run` keeps open
 
 The file streams over the same SSH connection `run` and `upload` reuse,

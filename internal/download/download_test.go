@@ -259,3 +259,29 @@ func assertNoLeftovers(t *testing.T, dir string) {
 		t.Fatalf("temporary files were left behind: %v", leftovers)
 	}
 }
+
+func TestStatAlsoTriesTheComposedFormOfADecomposedPath(t *testing.T) {
+	decomposed := "/home/acme/c\u0327a\u0303o.txt"
+	composed := "/home/acme/\u00e7\u00e3o.txt"
+
+	cmd := statCommand(decomposed)
+	for _, form := range []string{decomposed, composed} {
+		if !strings.Contains(cmd, encoded(form)) {
+			t.Fatalf("the command does not carry %q", form)
+		}
+	}
+}
+
+func TestStatFindsAFileUnderTheComposedNameWhenGivenTheDecomposedOne(t *testing.T) {
+	dir := machineDir(t)
+	composed := filepath.Join(dir, "\u00e7\u00e3o.txt")
+	write(t, composed, "x")
+
+	got, err := Stat(context.Background(), &shellClient{}, filepath.Join(dir, "c\u0327a\u0303o.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Size != 1 {
+		t.Fatalf("got %+v", got)
+	}
+}

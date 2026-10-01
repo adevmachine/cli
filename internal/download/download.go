@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/remote"
+	"golang.org/x/text/unicode/norm"
 )
 
 // FolderExt is what a folder becomes on this computer: one archive, written
@@ -42,18 +43,30 @@ type Result struct {
 // the home, `~/` too, or absolute. It has no single quote in it, since it
 // travels inside one; the path arrives base64-encoded, so it is never shell
 // syntax.
+//
+// The second argument is the same path composed (NFC), tried only when the
+// path as given is not there: a Mac app's process arguments arrive
+// decomposed (NFD), while a Linux file name is almost always composed.
 const statScript = `set -eu
 fail() {
 	printf "error %s\n" "$*"
 	exit 1
 }
+resolve() {
+	case "$1" in
+	"~") printf %s "${HOME:-}" ;;
+	"~/"*) printf %s "${HOME:-}/${1#"~/"}" ;;
+	/*) printf %s "$1" ;;
+	*) printf %s "${HOME:-}/$1" ;;
+	esac
+}
 p=$(printf %s "$1" | base64 -d) || fail "cannot decode the path"
-case "$p" in
-"~") p=${HOME:-} ;;
-"~/"*) p=${HOME:-}/${p#"~/"} ;;
-/*) ;;
-*) p=${HOME:-}/$p ;;
-esac
+c=$(printf %s "$2" | base64 -d) || fail "cannot decode the path"
+p=$(resolve "$p")
+c=$(resolve "$c")
+if [ ! -e "$p" ] && [ ! -L "$p" ] && { [ -e "$c" ] || [ -L "$c" ]; }; then
+	p=$c
+fi
 [ "$p" != "/" ] || fail "/ is the whole disk: name a folder inside it"
 if [ -d "$p" ]; then
 	[ -r "$p" ] && [ -x "$p" ] || fail "$p cannot be read"
@@ -83,7 +96,7 @@ func encoded(s string) string {
 }
 
 func statCommand(p string) string {
-	return "sh -c '" + statScript + "' devmachine-download " + encoded(p)
+	return "sh -c '" + statScript + "' devmachine-download " + encoded(p) + " " + encoded(norm.NFC.String(p))
 }
 
 func streamCommand(s Source) string {

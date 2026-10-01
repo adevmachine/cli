@@ -115,6 +115,13 @@ printf '%s\n' "$JSON" > "$SCENARIO_LOG_DIR/upload-json.log"
 SHAPE=$(printf '%s' "$JSON" | python3 -c 'import json,sys; e=json.load(sys.stdin)[0]; print(sorted(e), e["bytes"])')
 equals "$SHAPE" "['bytes', 'local', 'remote'] 11" "--format json gives local, remote and bytes" || true
 
+on_vm "su - acme -c 'mkdir -p ~/\$(printf \"relat\\303\\263rios\")'" >"$SCENARIO_LOG_DIR/nfc-folder.log" \
+  || die "could not make the composed folder"
+"$DEVMACHINE_ACCEPT_BIN" upload "$FILES/report.pdf" --workspace acme --dir "$(printf 'relato\314\201rios')" \
+  >"$SCENARIO_LOG_DIR/upload-nfd.log" 2>&1 || true
+FOLDERS=$(on_vm "ls /home/acme | grep -c '^relat'; true")
+equals "$FOLDERS" "1" "--dir sent decomposed (NFD) lands in the composed folder, not a twin" || true
+
 CLIMB=$("$DEVMACHINE_ACCEPT_BIN" upload "$FILES/report.pdf" --workspace acme --dir ../bob 2>&1)
 contains "$CLIMB" "outside the home" "--dir ../bob is refused" || true
 
@@ -135,4 +142,4 @@ printf 'x\n' > "$HOSTILE"
 PWNED=$(on_vm 'ls /home/acme | grep -c pwned; true')
 equals "$PWNED" "0" "a hostile file name never runs as a command" || true
 
-scenario_done 13 "upload"
+scenario_done 14 "upload"

@@ -88,6 +88,12 @@ $TO/relatório final.txt" "relative and ~/ paths land under their own names, acc
 equals "$(cat "$TO/report.pdf" "$TO/relatório final.txt")" "plain body
 accents and spaces" "both files arrive with their content" || true
 
+DECOMPOSED=$(printf 'proj/relato\314\201rio final.txt')
+NFD_TO="$SCENARIO_DIR/nfd"
+mkdir -p "$NFD_TO"
+"$DEVMACHINE_ACCEPT_BIN" download "$DECOMPOSED" --workspace acme --to "$NFD_TO" >"$SCENARIO_LOG_DIR/nfd.log" 2>&1 || true
+equals "$(cat "$NFD_TO"/* 2>/dev/null)" "accents and spaces" "a path a Mac app sends decomposed (NFD) still finds the composed file" || true
+
 AGAIN=$("$DEVMACHINE_ACCEPT_BIN" download /home/acme/proj/report.pdf --workspace acme --to "$TO" 2>&1)
 equals "$AGAIN" "$TO/report-2.pdf" "the same name twice gets -2 instead of overwriting" || true
 
@@ -120,4 +126,4 @@ equals "$PWNED" "0" "a hostile path never runs as a command" || true
 LEFT=$(ls -A "$TO" | grep -c '^\.devmachine-download-'; true)
 equals "$LEFT" "0" "no temporary file is left behind" || true
 
-scenario_done 10 "download"
+scenario_done 11 "download"

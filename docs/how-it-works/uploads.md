@@ -31,6 +31,11 @@ nearest existing folder on the way is resolved, and if it leads out of
 the home through a symbolic link, the upload stops before it writes. A
 link that stays inside the home is fine.
 
+A folder named with accents is matched the same way `download` matches
+one: when `--dir` as given is not on the machine, its composed form is
+used, so a Mac app that sends it decomposed does not get a twin folder
+next to the real one. See [how a download lands](downloads.md#an-accent-a-mac-spelled-differently-still-matches).
+
 ## A file name is never a command
 
 The name of a file is whatever its owner typed, and a name like

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mydevmachine/devmachine/internal/remote"
+	"golang.org/x/text/unicode/norm"
 )
 
 // DefaultDir is where a file lands when no folder is named, relative to the
@@ -93,6 +94,9 @@ type Request struct {
 // It has no single quote in it, since it travels inside one to whatever
 // login shell the account has. The home check refuses a folder that leaves
 // the home through a symbolic link, the same rule credentials delivery keeps.
+// The folder also arrives composed (NFC), and that form is used when the one
+// given does not exist yet: a Mac app's process arguments are decomposed
+// (NFD), while a Linux folder name is almost always composed.
 // The file is written to a temporary name and hard-linked into place, which
 // fails rather than replaces when the name is taken, even against a second
 // upload running at the same time.
@@ -112,10 +116,18 @@ mode=$4
 home=${HOME:-}
 [ -n "$home" ] || fail "the account has no home folder"
 real_home=$(cd -P "$home" 2>/dev/null && pwd -P) || fail "the home $home is not a folder"
-case "$dir" in
-/*) full=$dir ;;
-*) full=$home/$dir ;;
-esac
+composed=$(decode "$5") || fail "cannot decode the folder"
+under_home() {
+	case "$1" in
+	/*) printf %s "$1" ;;
+	*) printf %s "$home/$1" ;;
+	esac
+}
+full=$(under_home "$dir")
+if [ ! -e "$full" ] && [ ! -L "$full" ]; then
+	dir=$composed
+	full=$(under_home "$dir")
+fi
 case "$full" in
 "$home" | "$home"/* | "$real_home" | "$real_home"/*) ;;
 *) fail "$dir is outside the home ($home)" ;;
@@ -160,7 +172,7 @@ func command(r Request) string {
 		return `"` + base64.StdEncoding.EncodeToString([]byte(s)) + `"`
 	}
 	return "sh -c '" + script + "' devmachine-upload " +
-		arg(r.Dir) + " " + arg(r.Stem) + " " + arg(r.Ext) + " " + r.Mode
+		arg(r.Dir) + " " + arg(r.Stem) + " " + arg(r.Ext) + " " + r.Mode + " " + arg(norm.NFC.String(r.Dir))
 }
 
 // Send streams body into place on the machine c reaches and returns the
