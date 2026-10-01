@@ -1,0 +1,29 @@
+docs/how-it-works/trust-bootstrap.md
+  s_a0cbf6c120c4f8::t_eff41f938f3d3d 65-71
+internal/commands/packages_helpers_test.go
+  s_a0cbf6c120c4f8::t_a80c02540906a8 23-25,38
+internal/dns/external.go
+  s_a0cbf6c120c4f8::t_9c4753b71b4021 153-155,167-168
+internal/dns/external_test.go
+  s_a0cbf6c120c4f8::t_a0832dae290741 121-146
+internal/remote/bootstrap.go
+  s_a0cbf6c120c4f8::t_a6844e51296670 98-101,104-106
+internal/remote/bootstrap_test.go
+  s_a0cbf6c120c4f8::t_b553359b3e202b 446,449-471,482-484,486-488,492-493,498-512,572
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f6f5d7bbb14fd9eafe4feba2b88d23550adf7a1",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
