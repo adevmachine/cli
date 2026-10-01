@@ -299,6 +299,30 @@ func quoteSSHConfig(value string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) + `"`
 }
 
+// PathFor is the one file a configuration keeps its aliases in:
+// `ssh_aliases_path` when it names one, ~/.ssh/config otherwise. Every writer
+// and every check goes through here, so the aliases never end up in two files.
+func PathFor(cfg config.Config) (string, error) {
+	if cfg.SSHAliasesPath == "" {
+		return DefaultPath()
+	}
+	return ExpandHome(cfg.SSHAliasesPath)
+}
+
+// ExpandHome turns a leading ~/ into the home directory, the way a person
+// writes the path in config.yml or a package passes it to --path.
+func ExpandHome(path string) (string, error) {
+	rest, ok := strings.CutPrefix(path, "~/")
+	if !ok {
+		return path, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("finding the home directory: %w", err)
+	}
+	return filepath.Join(home, rest), nil
+}
+
 // DefaultPath is the person's own SSH configuration.
 func DefaultPath() (string, error) {
 	home, err := os.UserHomeDir()

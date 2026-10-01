@@ -76,7 +76,8 @@ credentials:
 
 packages: v0.0.1           # the pinned release the packages come from
 domain: example.com
-ssh_aliases: true          # keep ~/.ssh/config's devmachine block up to date
+ssh_aliases: true          # keep the SSH aliases up to date
+ssh_aliases_path: ~/.ssh/devmachine-aliases   # where they live; ~/.ssh/config when left out
 ```
 
 `user` defaults to `root`, `port` to `22`. Nothing here is a secret — a
@@ -88,6 +89,11 @@ automatically — the behaviour every configuration had before this field
 existed. `devmachine aliases --write` sets it to `true` the first time it
 runs interactively and you say yes. See
 [reaching your server](reaching-your-server.md#ssh-aliases).
+
+`ssh_aliases_path` is the one file the aliases are kept in, for a
+`~/.ssh/config` that something else generates and that `Include`s the
+aliases from a file of their own. `devmachine aliases --write --path
+<file>` sets it.
 
 ## Settings
 

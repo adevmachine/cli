@@ -234,6 +234,12 @@ type Config struct {
 	// aliases --write` is run by hand. The operator answers once, during
 	// setup or `machines add`, and the answer is never asked again.
 	SSHAliases bool `yaml:"ssh_aliases,omitempty"`
+	// SSHAliasesPath is the one file the aliases live in, when it is not
+	// ~/.ssh/config: a person whose ~/.ssh/config is generated from a
+	// template keeps them in a file of their own and Includes it. Every
+	// writer and every check reads it from here, so the aliases are never in
+	// two places at once.
+	SSHAliasesPath string `yaml:"ssh_aliases_path,omitempty"`
 }
 
 // CredentialsFor is the operator's answer about each credential for one
@@ -930,6 +936,15 @@ func modeOf(path string) os.FileMode {
 func SetSSHAliases(dir string, value bool) error {
 	return editDocument(dir, func(root *yaml.Node) error {
 		setField(root, "ssh_aliases", boolNode(value))
+		return nil
+	})
+}
+
+// SetSSHAliasesPath records the one file the aliases live in. Empty takes the
+// field out, which means ~/.ssh/config again.
+func SetSSHAliasesPath(dir, path string) error {
+	return editDocument(dir, func(root *yaml.Node) error {
+		setField(root, "ssh_aliases_path", stringNode(path))
 		return nil
 	})
 }

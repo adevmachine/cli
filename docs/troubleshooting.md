@@ -17,6 +17,21 @@ still work either way — only the plain `ssh`/`mosh` form, and tools that dial
 `ssh` themselves (VS Code Remote-SSH, Zed, the macOS app), need the alias.
 See [SSH aliases](concepts/reaching-your-server.md#ssh-aliases).
 
+## A new workspace's alias works for a moment, then "Could not resolve hostname"
+
+**What it means:** The aliases ended up in two files. Something else owns
+`~/.ssh/config` — a template, a dotfiles manager — and keeps the aliases
+in a file it `Include`s, while the CLI was writing its block into
+`~/.ssh/config` itself. The next time that tool rewrote `~/.ssh/config`,
+the CLI's block went with it, and the included file never learned about
+the new workspace.
+
+**What to do:** Tell the CLI where the aliases live, once:
+`devmachine aliases --write --path ~/.ssh/<that-file> --yes`. It records
+the file as `ssh_aliases_path`, empties the block it had left in
+`~/.ssh/config`, and every later change — a new workspace, a new machine —
+is written there.
+
 ## "several machines are configured: say which one with --machine"
 
 **What it means:** You have more than one server configured, and this command

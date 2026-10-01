@@ -100,7 +100,7 @@ func aliasesCheck(opts *options) machineCheck {
 	if err != nil {
 		return machineCheck{Name: "aliases", Status: machineWarn, Detail: err.Error()}
 	}
-	path, err := aliases.DefaultPath()
+	path, err := aliases.PathFor(cfg)
 	if err != nil {
 		return machineCheck{Name: "aliases", Status: machineWarn, Detail: err.Error()}
 	}

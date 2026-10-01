@@ -107,7 +107,12 @@ func TestAliasesWriteToTheDefaultPathRecordsSSHAliases(t *testing.T) {
 	}
 }
 
-func TestAliasesWriteToACustomPathDoesNotRecordSSHAliases(t *testing.T) {
+// TestAliasesWriteToACustomPathMakesItTheirOneHome: a file written by hand is
+// where the aliases live from then on, so a later refresh writes there too
+// instead of growing a second copy in ~/.ssh/config. Found on a Mac whose
+// ~/.ssh/config is generated from a template that Includes the aliases file.
+func TestAliasesWriteToACustomPathMakesItTheirOneHome(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
 	path := filepath.Join(t.TempDir(), "ssh_config")
 
@@ -119,8 +124,50 @@ func TestAliasesWriteToACustomPathDoesNotRecordSSHAliases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.SSHAliases {
-		t.Fatal("a custom --path should not turn automatic refresh on")
+	if !cfg.SSHAliases || cfg.SSHAliasesPath != path {
+		t.Fatalf("ssh_aliases %v, ssh_aliases_path %q", cfg.SSHAliases, cfg.SSHAliasesPath)
+	}
+
+	// A workspace added later is refreshed into that same file, and nothing
+	// is written into ~/.ssh/config.
+	if _, err := execute(t, "--config", dir, "workspaces", "new", "bob", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "Host bob-devmachine") {
+		t.Fatalf("the refresh did not reach %s:\n%s", path, body)
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".ssh", "config")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a second copy went into ~/.ssh/config: %v", err)
+	}
+}
+
+// TestAliasesMovingEmptiesTheOldBlock: ssh reads the first value it finds, so a
+// stale block left in the old file would beat the new one.
+func TestAliasesMovingEmptiesTheOldBlock(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	old := filepath.Join(os.Getenv("HOME"), ".ssh", "config")
+	moved := filepath.Join(t.TempDir(), "aliases")
+
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--path", moved, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "Host alice-devmachine") {
+		t.Fatalf("the old block is still there:\n%s", body)
+	}
+	if moved, err := os.ReadFile(moved); err != nil || !strings.Contains(string(moved), "Host alice-devmachine") {
+		t.Fatalf("the new file has no alias: %v\n%s", err, moved)
 	}
 }
 

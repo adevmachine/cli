@@ -1,11 +1,15 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/aliases"
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +28,7 @@ func refreshAliases(cfg config.Config, out io.Writer) error {
 	if !cfg.SSHAliases {
 		return nil
 	}
-	path, err := aliases.DefaultPath()
+	path, err := aliases.PathFor(cfg)
 	if err != nil {
 		return err
 	}
@@ -83,7 +87,8 @@ func newAliasesCmd(opts *options) *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&write, "write", false, "write the block into an SSH configuration")
-	c.Flags().StringVar(&path, "path", "", "the file to write (default: ~/.ssh/config)")
+	c.Flags().StringVar(&path, "path", "",
+		"the file the aliases live in from now on (default: ssh_aliases_path, else ~/.ssh/config)")
 	c.Flags().BoolVar(&check, "check", false, "say what would be written, and write nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "write without asking")
 	return c
@@ -112,13 +117,17 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 		return err
 	}
 
-	defaultPath, err := aliases.DefaultPath()
+	current, err := aliases.PathFor(cfg)
 	if err != nil {
 		return err
 	}
-	if write && path == "" {
-		path = defaultPath
+	if path == "" {
+		path = current
 	}
+	if path, err = aliases.ExpandHome(path); err != nil {
+		return err
+	}
+	moving := path != current
 
 	written := false
 	if write && !check {
@@ -140,14 +149,26 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 		}
 		written = true
 
-		// Writing this by hand into the default file is exactly the answer
-		// `setup` asks for. Recording it is what makes every later change
-		// keep it up to date without asking again.
-		if path == defaultPath && !cfg.SSHAliases {
+		// Writing them by hand is exactly the answer `setup` asks for, and
+		// the file they were written to is where they live from now on.
+		// Recording both is what keeps every later change in that one file,
+		// instead of a refresh writing a second copy into ~/.ssh/config.
+		recorded := false
+		if moving {
+			if err := moveAliases(dir, &cfg, current, path); err != nil {
+				return err
+			}
+			recorded = true
+		}
+		if !cfg.SSHAliases {
 			if err := config.SetSSHAliases(dir, true); err != nil {
 				return err
 			}
 			cfg.SSHAliases = true
+			recorded = true
+		}
+		if recorded {
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): keep the SSH aliases in "+path)
 		}
 	}
 
@@ -177,11 +198,43 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 			cmd.Printf("%-24s %s@%s:%d\n", a.Name, a.User, a.Host, a.Port)
 		}
 		cmd.Printf("\nWritten into %s, between the devmachine markers.\n", path)
-		if path == defaultPath && cfg.SSHAliases {
+		if cfg.SSHAliases {
 			cmd.Println("This will stay up to date automatically from now on.")
 		}
 	default:
 		cmd.Printf("%s\n%s%s\n", aliases.Begin, block, aliases.End)
+	}
+	return nil
+}
+
+// moveAliases records the new file as the aliases' one home and empties the
+// block in the file they lived in before, so ssh never reads two copies — the
+// older one first, through an Include, would win.
+func moveAliases(dir string, cfg *config.Config, from, to string) error {
+	defaultPath, err := aliases.DefaultPath()
+	if err != nil {
+		return err
+	}
+	recorded := to
+	if to == defaultPath {
+		recorded = ""
+	}
+	if err := config.SetSSHAliasesPath(dir, recorded); err != nil {
+		return err
+	}
+	cfg.SSHAliasesPath = recorded
+
+	// Only a file that holds the block is touched: emptying one that never
+	// had it would create it, or add markers to somebody's own file.
+	body, err := os.ReadFile(from)
+	if errors.Is(err, os.ErrNotExist) || (err == nil && !strings.Contains(string(body), aliases.Begin)) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", from, err)
+	}
+	if _, err := aliases.WriteChanged(from, ""); err != nil {
+		return fmt.Errorf("emptying the aliases left in %s: %w", from, err)
 	}
 	return nil
 }
