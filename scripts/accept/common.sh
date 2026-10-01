@@ -23,6 +23,10 @@ fail() {
   return 1
 }
 
+show_got() {
+  printf '%s\n' "$1" | sed 's/^/        got: /'
+}
+
 # Remove only line-ending characters. In particular, spaces and tabs inside or
 # around a short value remain significant (" active" is not "active").
 _accept_trim_line_endings() {
@@ -50,6 +54,8 @@ equals() {
     pass "$3"
   else
     fail "$3"
+    show_got "$1"
+    return 1
   fi
 }
 
@@ -58,6 +64,8 @@ contains() {
     pass "$3"
   else
     fail "$3"
+    show_got "$1"
+    return 1
   fi
 }
 

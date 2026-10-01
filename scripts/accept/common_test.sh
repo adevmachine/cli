@@ -30,6 +30,17 @@ accept_reset
 equals $'\tactive' "active" "leading tabs stay significant" >/dev/null || true
 [ "$ACCEPT_FAILURES" -eq 1 ]
 
+accept_reset
+shown=$(contains "the real answer" "zones" "a missed substring shows what came back" || true)
+printf '%s' "$shown" | grep -Fq "the real answer"
+shown=$(contains "zones" "zones" "a found substring stays quiet" || true)
+if printf '%s' "$shown" | grep -Fq "got:"; then
+  echo "contains printed the output of a passing check" >&2
+  exit 1
+fi
+shown=$(equals "inactive" "active" "a mismatch shows what came back" || true)
+printf '%s' "$shown" | grep -Fq "inactive"
+
 cleanup_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/devmachine-accept-common.XXXXXX")
 cleanup_marker="$cleanup_test_dir/path-fallback-used"
 cat > "$cleanup_test_dir/devmachine" <<EOF
