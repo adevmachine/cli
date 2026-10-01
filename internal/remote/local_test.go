@@ -117,3 +117,14 @@ func TestLocalClientPutsStderrInTheError(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// TestElevateNeverUsesSudoOnYourOwnComputer: a self machine runs as the
+// operator, and asking for sudo there is not the CLI's to do.
+func TestElevateNeverUsesSudoOnYourOwnComputer(t *testing.T) {
+	if got := Elevate(&localClient{}, "true"); got != "true" {
+		t.Fatalf("got %q", got)
+	}
+	if got := Elevate(&sshClient{}, "true"); got != AsRoot("true") {
+		t.Fatalf("a machine over SSH was not elevated: %q", got)
+	}
+}

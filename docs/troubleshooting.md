@@ -106,6 +106,65 @@ packages, on the server — so the server needs it installed.
 distribution calls it. Everything after that is `sync`'s job. `doctor` still
 tells you the truth about everything else without it.
 
+## "the admin login cannot become root"
+
+**What it means:** The machine's `user` in `config.yml` is not root, and
+`sudo -n true` fails as that account — its `sudo` wants a password, or it
+has none. The CLI needs root to turn password login off, install Ansible
+and run `sync`, and nobody is there to type a password, so it stops before
+changing anything.
+
+**What to do:** Either log in as root (`user: root`, with the key in
+root's `authorized_keys`), or give the account passwordless sudo, once,
+on the machine:
+
+```
+echo 'alice ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/devmachine-alice
+sudo chmod 440 /etc/sudoers.d/devmachine-alice
+```
+
+Then run the command again. See
+[an admin login that is not root](how-it-works/trust-bootstrap.md#an-admin-login-that-is-not-root).
+
+## `setup` fails with "Could not open lock file … Permission denied", or `sync` with "sending a directory to /opt/devmachine … mkdir: Permission denied"
+
+**What it means:** The admin login is not root, and the CLI is older than
+the one that runs system steps through `sudo -n`. Those versions ran
+`apt-get`, the SSH hardening and the bundle upload as the admin itself.
+
+**What to do:** Update the CLI (`devmachine update`) and run the same
+command again. Nothing was half-applied: both errors happen before the
+first change. If it then says "the admin login cannot become root", see
+the entry above.
+
+## `setup` says the machine "answered through Tailscale SSH"
+
+**What it means:** Port 22 on the address you gave is Tailscale SSH, not
+`sshd`. Tailscale lets tailnet members in without checking a key, so the
+CLI cannot prove the key from there. It installs the key anyway, so the
+machine stays reachable when Tailscale SSH is off or you are outside the
+tailnet.
+
+**What to do:** Nothing, usually. To prove the key on its own, connect to
+the machine's address outside Tailscale (its LAN or public IP) with
+`ssh -o IdentitiesOnly=yes -o IdentityAgent=none -i <key> <user>@<address>`.
+A machine set up by an older CLI over Tailscale SSH may have no key
+installed at all: `devmachine setup --machine <name>` installs it.
+
+## `setup` shows a host key fingerprint that is not the one in `~/.ssh/known_hosts`
+
+**What it means:** Usually not a different server. A server has several
+host keys — ED25519, ECDSA, RSA — and the CLI asks for its own preferred
+algorithm, which can be a different one from the key your own `ssh`
+recorded. Two fingerprints of different types never match each other.
+
+**What to do:** Compare like with like. The CLI names the type it was
+shown (`presented ecdsa-sha2-nistp256 host key SHA256:…`). Over a
+connection you already trust, list every key with
+`for f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf $f; done` and
+check the line of the same type. Only a mismatch of the same type means
+something changed.
+
 ## "ansible-playbook is not on your computer"
 
 **What it means:** The same check as above, for your own computer. `sync` and

@@ -844,3 +844,35 @@ func TestLiteralTellsAnAddressFromANameToResolve(t *testing.T) {
 		t.Fatal("a tailscale entry is not an address ssh can dial")
 	}
 }
+
+type versionedClient struct {
+	nopTestClient
+	version string
+}
+
+func (c versionedClient) ServerVersion() string { return c.version }
+
+func TestIsTailscaleSSHReadsTheServerVersion(t *testing.T) {
+	for _, c := range []struct {
+		version string
+		want    bool
+	}{
+		{"SSH-2.0-Tailscale", true},
+		{"SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13", false},
+	} {
+		if got := IsTailscaleSSH(versionedClient{version: c.version}); got != c.want {
+			t.Fatalf("%s: got %v", c.version, got)
+		}
+	}
+	if IsTailscaleSSH(nopTestClient{}) {
+		t.Fatal("a client with no version claimed to be Tailscale")
+	}
+}
+
+type nopTestClient struct{}
+
+func (nopTestClient) Run(context.Context, string) (string, error)                 { return "", nil }
+func (nopTestClient) RunInput(context.Context, string, io.Reader) (string, error) { return "", nil }
+func (nopTestClient) Stream(context.Context, string, io.Writer, io.Writer) error  { return nil }
+func (nopTestClient) Upload(context.Context, string, io.Reader) error             { return nil }
+func (nopTestClient) Close() error                                                { return nil }

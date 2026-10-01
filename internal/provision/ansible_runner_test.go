@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 // okRecap is a real recap line, spacing and all.
@@ -25,10 +27,15 @@ type fakeClient struct {
 	output   string
 	err      error
 	runErr   error
+	// runErrOn limits runErr to commands holding this text.
+	runErrOn string
 }
 
 func (c *fakeClient) Run(_ context.Context, command string) (string, error) {
 	c.commands = append(c.commands, command)
+	if c.runErrOn != "" && !strings.Contains(command, c.runErrOn) {
+		return "", nil
+	}
 	return "", c.runErr
 }
 
@@ -104,14 +111,17 @@ func TestApplyStartsFromAnEmptyBundle(t *testing.T) {
 	if _, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil), Options{Out: io.Discard}); err != nil {
 		t.Fatal(err)
 	}
-	if len(c.commands) < 3 {
+	if len(c.commands) < 4 {
 		t.Fatalf("commands: %q", c.commands)
 	}
-	if c.commands[0] != "rm -rf "+RemoteDir {
-		t.Fatalf("first it must empty the bundle, it ran %q", c.commands[0])
+	if !strings.Contains(c.commands[0], "sudo -n true") {
+		t.Fatalf("first it must prove it can become root, it ran %q", c.commands[0])
 	}
-	if c.commands[1] != "upload "+RemoteDir {
-		t.Fatalf("then send the new one, it ran %q", c.commands[1])
+	if c.commands[1] != remote.AsRoot("rm -rf "+RemoteDir) {
+		t.Fatalf("then empty the bundle as root, it ran %q", c.commands[1])
+	}
+	if c.commands[2] != "upload "+RemoteDir {
+		t.Fatalf("then send the new one, it ran %q", c.commands[2])
 	}
 }
 
@@ -127,7 +137,11 @@ func TestApplyRunsTheGeneratedPlaybookFromTheRemoteDirectory(t *testing.T) {
 		"cp /opt/devmachine/site.yml \"$run/site.yml\" && cd \"$run\" && " +
 		"ANSIBLE_CONFIG=/opt/devmachine/ansible.cfg " +
 		"ansible-playbook -i /opt/devmachine/inventory.ini site.yml"
-	if c.commands[len(c.commands)-1] != want {
+	// As root, so an admin with sudo runs every task the way root would —
+	// including the ones that become a workspace's own unprivileged account,
+	// which Ansible cannot do from one unprivileged account to another
+	// without ACLs on its temporary files.
+	if c.commands[len(c.commands)-1] != remote.AsRoot(want) {
 		t.Fatalf("got %q", c.commands[len(c.commands)-1])
 	}
 }
@@ -357,7 +371,7 @@ func TestApplyDoesNotExportAnythingForANonSelfMachine(t *testing.T) {
 }
 
 func TestApplyStopsWhenTheBundleCannotBeEmptied(t *testing.T) {
-	c := &fakeClient{output: okRecap, runErr: errors.New("permission denied")}
+	c := &fakeClient{output: okRecap, runErr: errors.New("permission denied"), runErrOn: "rm -rf"}
 	a := &Ansible{Client: c}
 
 	_, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil), Options{Out: io.Discard})
@@ -366,5 +380,37 @@ func TestApplyStopsWhenTheBundleCannotBeEmptied(t *testing.T) {
 	}
 	if len(c.uploaded) != 0 {
 		t.Fatal("it sent a bundle on top of one it could not empty")
+	}
+}
+
+// TestApplyStopsWhenTheAdminCannotBecomeRoot: a sudo that wants a password is
+// one sentence before anything is touched, not a mkdir error after.
+func TestApplyStopsWhenTheAdminCannotBecomeRoot(t *testing.T) {
+	c := &fakeClient{output: okRecap, runErr: errors.New("a password is required"), runErrOn: "sudo -n true"}
+	a := &Ansible{Client: c}
+
+	_, err := a.Apply(context.Background(), planWith(t, "main", []string{"base"}, nil), Options{Out: io.Discard})
+	if !errors.Is(err, remote.ErrNoRoot) {
+		t.Fatalf("got %v", err)
+	}
+	if len(c.commands) != 1 {
+		t.Fatalf("it went on past the check: %q", c.commands)
+	}
+}
+
+// TestApplyNeverAsksForRootOnASelfMachine: the bundle is the operator's own
+// and the play runs without become; sudo on their computer is not ours to use.
+func TestApplyNeverAsksForRootOnASelfMachine(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	c := &fakeClient{output: okRecap}
+	a := &Ansible{Client: c}
+
+	if _, err := a.Apply(context.Background(), planSelf(t, []string{"base"}), Options{Out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range c.commands {
+		if strings.Contains(command, "sudo") {
+			t.Fatalf("a self machine asked for sudo: %q", command)
+		}
 	}
 }

@@ -35,6 +35,8 @@ var (
 	proveAuth      = remote.ProveAuth
 	harden         = remote.Harden
 	installAnsible = remote.InstallAnsible
+	checkRoot      = remote.CheckRoot
+	tailscaleSSH   = remote.IsTailscaleSSH
 	agentKeys      = keys.FromAgent
 	scanHostKey    = remote.ScanHostKey
 	confirmHostKey = confirm
@@ -273,7 +275,7 @@ func offerSSHAliases(r *bufio.Reader, out io.Writer, dir string, noAliases, yes 
 	if err != nil {
 		return err
 	}
-	path, err := aliases.DefaultPath()
+	path, err := aliases.PathFor(cfg)
 	if err != nil {
 		return err
 	}
@@ -366,11 +368,55 @@ func prepareExisting(ctx context.Context, dir string, out io.Writer, name string
 	}
 	defer func() { _ = client.Close() }()
 
+	if tailscaleSSH(client) {
+		if err := installKeyOverTailscaleSSH(ctx, client, out, m, address); err != nil {
+			return err
+		}
+	}
+
 	fmt.Fprintf(out, "connected as %s@%s; installing Ansible if needed...\n", m.User, address)
+	if err := checkRoot(ctx, client, m.User); err != nil {
+		return err
+	}
 	if err := installAnsible(ctx, client, out); err != nil {
 		return err
 	}
 	return nil
+}
+
+// installKeyOverTailscaleSSH makes sure the machine's key is in
+// authorized_keys when the connection came in through Tailscale SSH, which
+// accepts any key and so never proved this one. A first run over Tailscale SSH
+// by an older CLI took that login as proof and installed nothing; running
+// setup again is how such a machine is repaired.
+func installKeyOverTailscaleSSH(ctx context.Context, client remote.Client, out io.Writer,
+	m config.Machine, address string) error {
+	public, err := machinePublicKey(m)
+	if err != nil {
+		return err
+	}
+	if public == "" {
+		return nil
+	}
+	fmt.Fprintf(out, "%s answered through Tailscale SSH, which does not check keys; "+
+		"making sure the machine's key is installed for when it is reached without it.\n", address)
+	return installKey(ctx, client, public)
+}
+
+// machinePublicKey is the public half of the key a machine logs in with, or
+// empty when the agent offers whatever it holds and there is no one key.
+func machinePublicKey(m config.Machine) (string, error) {
+	switch {
+	case m.Key != "":
+		body, err := os.ReadFile(m.Key + ".pub")
+		if err != nil {
+			return "", fmt.Errorf("reading the public half of %s: %w", m.Key, err)
+		}
+		return strings.TrimSpace(string(body)), nil
+	case m.AgentKey != "":
+		return m.AgentKey, nil
+	}
+	return "", nil
 }
 
 // prepareExistingSelf is `setup`'s whole job for a self machine: no host key
@@ -652,6 +698,17 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 	m config.Machine, key chosenKey, noHarden bool) error {
 	client, address, err := dialWith(ctx, m, m.User, key.auth())
 	switch {
+	case err == nil && tailscaleSSH(client):
+		// Tailscale SSH let the connection in by tailnet identity, not by the
+		// key, so "the key already logs in" would be a claim nothing proved.
+		// The key goes in anyway: without it the machine is unreachable the
+		// day Tailscale SSH is off, or from outside the tailnet.
+		fmt.Fprintf(out, "%s answered through Tailscale SSH, which lets tailnet members in without "+
+			"checking a key, so the key cannot be proved from here; installing it anyway.\n", address)
+		if err := installKey(ctx, client, key.Public); err != nil {
+			_ = client.Close()
+			return err
+		}
 	case err == nil:
 		fmt.Fprintf(out, "%s already logs in as %s@%s, so no password is needed.\n",
 			key.describe(), m.User, address)
@@ -666,6 +723,12 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 		}
 	}
 	defer func() { _ = client.Close() }()
+
+	// Before anything is changed: an admin with no way to root is one clear
+	// sentence here, rather than an apt lock error halfway through.
+	if err := checkRoot(ctx, client, m.User); err != nil {
+		return err
+	}
 
 	if noHarden {
 		fmt.Fprintf(out, "--no-harden: password login is left as it was.\n")

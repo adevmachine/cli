@@ -42,6 +42,8 @@ func swap[T any](p *T, v T) func() {
 type bootstrapStubs struct {
 	keyWorks   bool
 	proofFails bool
+	tailscale  bool
+	noRoot     bool
 	agent      []keys.Offered
 }
 
@@ -57,6 +59,7 @@ type bootstrapSteps struct {
 	provedWith       remote.Auth
 	hardened         bool
 	ansible          bool
+	checkedRoot      bool
 	hostKey          ssh.PublicKey
 }
 
@@ -124,6 +127,15 @@ func stubBootstrap(t *testing.T, s bootstrapStubs) *bootstrapSteps {
 		return nil
 	}))
 	t.Cleanup(swap(&agentKeys, func() ([]keys.Offered, error) { return s.agent, nil }))
+	t.Cleanup(swap(&tailscaleSSH, func(remote.Client) bool { return s.tailscale }))
+	t.Cleanup(swap(&checkRoot, func(_ context.Context, _ remote.Client, user string) error {
+		steps.checkedRoot = true
+		steps.events = append(steps.events, "check root")
+		if s.noRoot {
+			return fmt.Errorf("%w: %q", remote.ErrNoRoot, user)
+		}
+		return nil
+	}))
 
 	return steps
 }
@@ -412,6 +424,7 @@ func TestSetupTrustsTheHostBeforeAnyAuthentication(t *testing.T) {
 		"attempt key authentication",
 		"optional password authentication",
 		"prove key",
+		"check root",
 		"harden",
 		"install ansible",
 	}
@@ -1039,5 +1052,84 @@ func TestSetupSkipsEssentialsAReleaseDoesNotHave(t *testing.T) {
 	got, _ := machinePackagesAfterSetup(t, setupOptions{})
 	if len(got) != 0 {
 		t.Fatalf("machine packages are %#v, want none: v13 has no essentials", got)
+	}
+}
+
+// TestSetupInstallsTheKeyWhenTailscaleSSHLetItIn: Tailscale SSH accepts any
+// key, so a login over it is no proof the key was ever installed. Found on a
+// real machine whose authorized_keys never got the key.
+func TestSetupInstallsTheKeyWhenTailscaleSSHLetItIn(t *testing.T) {
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true, tailscale: true})
+
+	out, err := runSetupIn(t, t.TempDir(),
+		answers("main", "100.64.0.10", "alice", "22", "", "1"), setupOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !steps.installedKey {
+		t.Fatal("the key was taken as proved by a Tailscale SSH login")
+	}
+	if steps.askedForPassword {
+		t.Fatal("it asked for a password it does not need")
+	}
+	if !strings.Contains(out, "Tailscale SSH") || strings.Contains(out, "already logs in") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestSetupChecksRootBeforeHardening(t *testing.T) {
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if _, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "alice", "22", "", "1"), setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	check := slices.Index(steps.events, "check root")
+	hardened := slices.Index(steps.events, "harden")
+	if check < 0 || check > hardened {
+		t.Fatalf("events: %q", steps.events)
+	}
+}
+
+// TestSetupStopsBeforeChangingAnythingWhenTheAdminCannotBecomeRoot: a sudo
+// that wants a password must not leave half a bootstrap behind.
+func TestSetupStopsBeforeChangingAnythingWhenTheAdminCannotBecomeRoot(t *testing.T) {
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true, noRoot: true})
+
+	_, err := runSetupIn(t, t.TempDir(),
+		answers("main", "203.0.113.10", "alice", "22", "", "1"), setupOptions{})
+	if !errors.Is(err, remote.ErrNoRoot) {
+		t.Fatalf("got %v", err)
+	}
+	if steps.hardened || steps.ansible {
+		t.Fatalf("it changed the machine anyway: %q", steps.events)
+	}
+}
+
+// TestSetupAgainInstallsTheKeyOverTailscaleSSH repairs a machine an earlier
+// run left without its key, because Tailscale SSH let that run in anyway.
+func TestSetupAgainInstallsTheKeyOverTailscaleSSH(t *testing.T) {
+	keyPath := filepath.Join(t.TempDir(), "main")
+	if err := os.WriteFile(keyPath+".pub", []byte("ssh-ed25519 AAAAexample devmachine-main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [100.64.0.10]\n    user: alice\n    key: "+keyPath+"\n")
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return nopClient{}, "100.64.0.10", nil
+	}))
+	t.Cleanup(swap(&tailscaleSSH, func(remote.Client) bool { return true }))
+	t.Cleanup(swap(&checkRoot, func(context.Context, remote.Client, string) error { return nil }))
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error { return nil }))
+	var installed string
+	t.Cleanup(swap(&installKey, func(_ context.Context, _ remote.Client, public string) error {
+		installed = public
+		return nil
+	}))
+
+	if _, err := runSetupIn(t, dir, strings.NewReader(""), setupOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if installed != "ssh-ed25519 AAAAexample devmachine-main" {
+		t.Fatalf("installed %q", installed)
 	}
 }

@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -80,6 +81,42 @@ func ProveAuth(ctx context.Context, m config.Machine, user string, a Auth) (Clie
 	return client, nil
 }
 
+// AsRoot wraps a script so it runs as root: directly when the admin login
+// already is root, through `sudo -n` when it is not.
+//
+// It asks `id -u` first instead of trying without sudo and retrying with it.
+// A retry would run a half-finished script twice, and would read any failure
+// at all — a full disk, a refused sshd config — as a missing permission.
+// `-n` because nobody is there to type a password: a sudo that wants one
+// fails at once, and CheckRoot is what says so in words.
+//
+// stdin is left to the script, because the hardening drop-in arrives on it.
+func AsRoot(script string) string {
+	quoted := shellQuote(script)
+	return `if [ "$(id -u)" -eq 0 ]; then sh -c ` + quoted + `; else sudo -n sh -c ` + quoted + `; fi`
+}
+
+// ErrNoRoot is an admin login that is not root and has no passwordless sudo.
+var ErrNoRoot = errors.New("the admin login cannot become root")
+
+// rootCheckScript succeeds for root, and for an admin whose sudo needs no
+// password.
+const rootCheckScript = `if [ "$(id -u)" -eq 0 ]; then exit 0; fi
+sudo -n true`
+
+// CheckRoot proves the admin login can become root before anything is
+// changed, so a missing sudo rule is one clear sentence and not an apt lock
+// error halfway through a bootstrap.
+func CheckRoot(ctx context.Context, c Client, user string) error {
+	if _, err := c.Run(ctx, rootCheckScript); err != nil {
+		return fmt.Errorf("%w: %q is not root, and `sudo -n true` fails as it. "+
+			"Log in as root, or give it passwordless sudo on the machine: "+
+			"echo '%[2]s ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/devmachine-%[2]s: %[3]w",
+			ErrNoRoot, user, err)
+	}
+	return nil
+}
+
 // hardeningDropInPath is where password login is turned off.
 //
 // The 00- prefix is the whole trick, and the reason travels with it in the
@@ -136,14 +173,14 @@ systemctl reload sshd
 // again, so validation is not a courtesy: it is the only thing between a typo
 // and a rebuild. It runs after the key has been proved, never before.
 func Harden(ctx context.Context, c Client) error {
-	if _, err := c.RunInput(ctx, writeDropInScript, strings.NewReader(hardeningDropIn)); err != nil {
+	if _, err := c.RunInput(ctx, AsRoot(writeDropInScript), strings.NewReader(hardeningDropIn)); err != nil {
 		return fmt.Errorf("writing %s: %w", hardeningDropInPath, err)
 	}
 
-	if out, err := c.Run(ctx, validateScript); err != nil {
+	if out, err := c.Run(ctx, AsRoot(validateScript)); err != nil {
 		// A file the daemon refused must not stay: the next reload by
 		// anything at all, a reboot included, would fail on it.
-		if _, rmErr := c.Run(ctx, "rm -f "+hardeningDropInPath); rmErr != nil {
+		if _, rmErr := c.Run(ctx, AsRoot("rm -f "+hardeningDropInPath)); rmErr != nil {
 			return fmt.Errorf("sshd refused %s (%w) and it could not be taken away again (%w): "+
 				"remove it by hand before sshd is reloaded", hardeningDropInPath, err, rmErr)
 		}
@@ -151,7 +188,7 @@ func Harden(ctx context.Context, c Client) error {
 			err, strings.TrimSpace(out))
 	}
 
-	if _, err := c.Run(ctx, reloadScript); err != nil {
+	if _, err := c.Run(ctx, AsRoot(reloadScript)); err != nil {
 		return fmt.Errorf("reloading sshd: %w", err)
 	}
 	return nil
@@ -225,7 +262,7 @@ func InstallAnsible(ctx context.Context, c Client, out io.Writer) error {
 			"which leaves out community.general — and run this again", id)
 	}
 
-	if err := c.Stream(ctx, script, out, out); err != nil {
+	if err := c.Stream(ctx, AsRoot(script), out, out); err != nil {
 		return fmt.Errorf("installing Ansible on %s: %w", id, err)
 	}
 	return nil

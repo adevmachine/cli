@@ -45,9 +45,15 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	if base == "" || base == "/" {
 		return Result{}, fmt.Errorf("refusing to empty %q as the bundle directory", base)
 	}
+	self := plan.Machine.Self
+	if !self {
+		if err := remote.CheckRoot(ctx, a.Client, plan.Machine.User); err != nil {
+			return Result{}, err
+		}
+	}
 	// Unpacking never deletes, and Ansible searches roles.local before roles:
 	// a copy an earlier sync left would keep running instead of this one.
-	if _, err := a.Client.Run(ctx, "rm -rf "+base); err != nil {
+	if _, err := a.Client.Run(ctx, asRootUnlessSelf("rm -rf "+base, self)); err != nil {
 		return Result{}, fmt.Errorf("emptying %s: %w", base, err)
 	}
 	if err := a.Client.Upload(ctx, base, tarball); err != nil {
@@ -61,10 +67,15 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 	var seen bytes.Buffer
 	watched := io.MultiWriter(&seen, out)
 
-	command, err := playbookCommand(opts, base, plan.Machine.Self)
+	command, err := playbookCommand(opts, base, self)
 	if err != nil {
 		return Result{}, err
 	}
+	// The whole run is root's, not only the tasks that ask for become: a task
+	// that becomes a workspace account would otherwise go from one
+	// unprivileged account to another, which Ansible refuses without ACLs on
+	// its temporary files.
+	command = asRootUnlessSelf(command, self)
 	runErr := a.Client.Stream(ctx, command, watched, watched)
 	result := readRecap(seen.String())
 
@@ -75,6 +86,16 @@ func (a *Ansible) Apply(ctx context.Context, plan packages.MachinePlan, opts Opt
 		return result, runErr
 	}
 	return result, nil
+}
+
+// asRootUnlessSelf runs a command as root on a machine reached over SSH,
+// whatever account the admin login is. A self machine is the operator's own
+// computer: its bundle is theirs and its play runs without become.
+func asRootUnlessSelf(command string, self bool) string {
+	if self {
+		return command
+	}
+	return remote.AsRoot(command)
 }
 
 // roleDirs maps each package in the plan onto the directory it is unpacked

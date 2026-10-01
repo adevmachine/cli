@@ -48,6 +48,54 @@ settings as `60-cloudimg-settings.conf`; a file named `99-` would read
 after it and **silently do nothing** — no warning, password login still
 on despite a successful run.
 
+## An admin login that is not root
+
+Many servers arrive with root closed and an ordinary account that has
+`sudo`: a home server, a VM made by Lima or Multipass, some providers'
+images. The CLI works the same on them, as long as that account's `sudo`
+asks for no password.
+
+Everything that changes the system — turning password login off,
+installing Ansible, unpacking a sync's bundle under `/opt/devmachine`,
+running the play — first asks `id -u`. Root runs it directly; any other
+account runs it through `sudo -n`. A server where the admin is root never
+sees `sudo` at all, and neither does your own computer as a `self`
+machine.
+
+It asks, rather than trying without `sudo` and trying again with it. A
+retry would run a half-finished step twice, and would read any failure at
+all — a full disk, a refused SSH setting — as a missing permission.
+
+`-n` because nobody is there to type a password. So before anything is
+changed, `setup`, `machines add` and `sync` check that `sudo -n true`
+works, and stop with one sentence when it does not:
+
+```
+the admin login cannot become root: "alice" is not root, and `sudo -n true` fails as it.
+Log in as root, or give it passwordless sudo on the machine:
+echo 'alice ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/devmachine-alice
+```
+
+The whole play runs as root, not only the tasks that ask for it. A task
+that becomes a workspace account would otherwise go from one unprivileged
+account to another, which Ansible refuses without ACLs on its temporary
+files.
+
+## Tailscale SSH proves nothing about a key
+
+A server with Tailscale SSH turned on answers port 22 on its tailnet
+address with Tailscale, not with `sshd`. Tailscale lets anyone on your
+tailnet in by tailnet identity and accepts any key, or none. "The key
+already logs in" would be true and mean nothing: the key was never
+checked, and may not be on the server at all.
+
+So when the server identifies itself as Tailscale, `setup` and
+`machines add` install the key anyway and say why, instead of taking the
+login as proof. Without the key, the machine is unreachable the day
+Tailscale SSH is off, or from anywhere outside the tailnet. Running
+`devmachine setup --machine <name>` again repairs a machine an older CLI
+set up this way.
+
 ## The password is never stored
 
 It lives in memory for one connection, then is gone — never written to

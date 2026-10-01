@@ -566,7 +566,9 @@ func (c *sshClient) Upload(ctx context.Context, dir string, tarball io.Reader) e
 
 	quoted := shellQuote(dir)
 	session.Stdin = tarball
-	command := "mkdir -p " + quoted + " && tar -C " + quoted + " -xzf -"
+	// As root: the bundle directory sits under /opt, which an admin login
+	// that reaches root through sudo cannot write to as itself.
+	command := AsRoot("mkdir -p " + quoted + " && tar -C " + quoted + " -xzf -")
 	// tar says what it refused on stderr, and that message is the whole
 	// diagnosis when an upload fails.
 	out, err := session.CombinedOutput(command)
@@ -600,6 +602,18 @@ func shellQuote(s string) string {
 }
 
 func (c *sshClient) Close() error { return c.conn.Close() }
+
+// ServerVersion is the identification string the server sent, which is how a
+// Tailscale SSH server is told apart from OpenSSH.
+func (c *sshClient) ServerVersion() string { return string(c.conn.ServerVersion()) }
+
+// IsTailscaleSSH says whether the connection reached Tailscale SSH rather than
+// sshd. Tailscale SSH lets anyone on the tailnet in by tailnet identity and
+// accepts any key, or none: a login over it proves nothing about the key.
+func IsTailscaleSSH(c Client) bool {
+	v, ok := c.(interface{ ServerVersion() string })
+	return ok && strings.Contains(strings.ToLower(v.ServerVersion()), "tailscale")
+}
 
 // localClient runs commands on your computer instead of over SSH, for a
 // machine that declares `self: true`. Every command still goes through
@@ -654,6 +668,16 @@ func (c *localClient) Upload(_ context.Context, dir string, tarball io.Reader) e
 }
 
 func (c *localClient) Close() error { return nil }
+
+// Elevate runs a script as root on a machine reached over SSH, whatever
+// account the admin login is, and leaves it alone on your own computer: a
+// self machine's steps run as you, and sudo there is not this CLI's to use.
+func Elevate(c Client, script string) string {
+	if _, local := c.(*localClient); local {
+		return script
+	}
+	return AsRoot(script)
+}
 
 // extractTarGz writes a gzipped tar's regular files and directories under
 // dir, refusing any entry that would land outside it.

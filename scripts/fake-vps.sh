@@ -30,6 +30,11 @@ VM="${DEVMACHINE_FAKE_VPS:-fakevps}"
 KEY_DIR="${DEVMACHINE_TEST_HOME:-$HOME/.config/devmachine-test}/keys"
 KEY="$KEY_DIR/fake_vps_ed25519"
 KNOWN_HOSTS="${DEVMACHINE_TEST_HOME:-$HOME/.config/devmachine-test}/known_hosts"
+# The admin login the tests use. root is a bought server; any other name is a
+# server whose admin reaches root through passwordless sudo, which is how a
+# home server or a provider's non-root image arrives. Both are first-class:
+# `make test-vps` runs as root, `make test-vps-sudo` as this account.
+ADMIN="${DEVMACHINE_FAKE_VPS_ADMIN:-root}"
 
 # The CLI under test, not one installed somewhere else.
 DEVMACHINE=(go run ./cmd/devmachine)
@@ -70,9 +75,18 @@ cmd_up() {
   chmod 700 "$KEY_DIR"
   [ -f "$KEY" ] || ssh-keygen -t ed25519 -N "" -C "devmachine fake vps" -f "$KEY" >/dev/null
 
-  limactl shell "$VM" -- sudo install -d -m 700 /root/.ssh
-  limactl shell "$VM" -- sudo tee /root/.ssh/authorized_keys >/dev/null < "$KEY.pub"
-  limactl shell "$VM" -- sudo chmod 600 /root/.ssh/authorized_keys
+  admin_home=/root
+  if [ "$ADMIN" != root ]; then
+    admin_home=/home/$ADMIN
+    limactl shell "$VM" -- sudo sh -c "id -u '$ADMIN' >/dev/null 2>&1 || useradd -m -s /bin/bash '$ADMIN'"
+    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$ADMIN" |
+      limactl shell "$VM" -- sudo tee "/etc/sudoers.d/devmachine-$ADMIN" >/dev/null
+    limactl shell "$VM" -- sudo chmod 440 "/etc/sudoers.d/devmachine-$ADMIN"
+  fi
+  limactl shell "$VM" -- sudo install -d -m 700 -o "$ADMIN" -g "$ADMIN" "$admin_home/.ssh"
+  limactl shell "$VM" -- sudo tee "$admin_home/.ssh/authorized_keys" >/dev/null < "$KEY.pub"
+  limactl shell "$VM" -- sudo chown "$ADMIN:$ADMIN" "$admin_home/.ssh/authorized_keys"
+  limactl shell "$VM" -- sudo chmod 600 "$admin_home/.ssh/authorized_keys"
 
   # Read the key through Lima's control channel, before SSH is trusted. This
   # is deterministic test-fixture setup, not trust-on-first-use over the same
@@ -90,14 +104,14 @@ cmd_up() {
   umask 077
   printf '%s %s %s\n' "$lookup" "$key_type" "$key_body" > "$KNOWN_HOSTS"
 
-  echo "up: root@127.0.0.1 port $port, key $KEY"
+  echo "up: $ADMIN@127.0.0.1 port $port, key $KEY"
 }
 
 cmd_env() {
   require_lima
   echo "export DEVMACHINE_TEST_HOST=127.0.0.1"
   echo "export DEVMACHINE_TEST_PORT=$(vm_port)"
-  echo "export DEVMACHINE_TEST_USER=root"
+  echo "export DEVMACHINE_TEST_USER=$ADMIN"
   echo "export DEVMACHINE_TEST_KEY=$KEY"
   echo "export DEVMACHINE_TEST_KNOWN_HOSTS=$KNOWN_HOSTS"
 }
@@ -111,7 +125,7 @@ case "${1:-}" in
     shift
     exec ssh -p "$(vm_port)" -i "$KEY" -o IdentitiesOnly=yes -o IdentityAgent=none \
       -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      root@127.0.0.1 "$@"
+      "$ADMIN@127.0.0.1" "$@"
     ;;
   down) require_lima; "${DEVMACHINE[@]}" machines delete-local --yes "$VM" ;;
   *) sed -n '2,12p' "$0"; exit 1 ;;

@@ -4,6 +4,7 @@
 make build        compile to ./devmachine
 make test         the whole suite
 make test-vps     the suite against a real machine
+make test-vps-sudo  the same, with an admin login that reaches root through sudo
 make lint         golangci-lint
 make fmt          gofmt
 make surface      regenerate SURFACE.txt

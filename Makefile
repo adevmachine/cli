@@ -1,7 +1,7 @@
 BINARY := devmachine
 VERSION ?= dev
 
-.PHONY: accept accept-shell build surface settings test test-vps cover vps-up vps-down fmt lint docs run
+.PHONY: accept accept-shell build surface settings test test-vps test-vps-sudo cover vps-up vps-down fmt lint docs run
 
 accept:
 	scripts/accept/run.sh
@@ -36,6 +36,12 @@ cover:
 # throwaway VPS and points them at it.
 test-vps: vps-up
 	eval "$$(scripts/fake-vps.sh env)" && go test -race ./...
+
+# The same suite with an admin login that is not root and reaches root through
+# passwordless sudo. The suite assumed root until a real machine said otherwise.
+test-vps-sudo:
+	DEVMACHINE_FAKE_VPS_ADMIN=alice scripts/fake-vps.sh up
+	eval "$$(DEVMACHINE_FAKE_VPS_ADMIN=alice scripts/fake-vps.sh env)" && go test -race ./...
 
 vps-up:
 	scripts/fake-vps.sh up

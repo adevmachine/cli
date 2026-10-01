@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -297,12 +298,12 @@ func TestHardeningDropInIsValidToARealSshd(t *testing.T) {
 	defer client.Close()
 
 	probe := "/etc/ssh/sshd_config.d/00-devmachine-probe.conf"
-	defer client.Run(context.Background(), "rm -f "+probe)
+	defer client.Run(context.Background(), AsRoot("rm -f "+probe))
 
-	if _, err := client.RunInput(context.Background(), "cat > "+probe, strings.NewReader(hardeningDropIn)); err != nil {
+	if _, err := client.RunInput(context.Background(), AsRoot("cat > "+probe), strings.NewReader(hardeningDropIn)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.Run(context.Background(), validateScript); err != nil {
+	if _, err := client.Run(context.Background(), AsRoot(validateScript)); err != nil {
 		t.Fatalf("a real sshd refused the drop-in: %v", err)
 	}
 }
@@ -438,4 +439,109 @@ func TestInstallAnsibleAgainstTheThrowawayMachine(t *testing.T) {
 		"ansible-doc -l community.general 2>/dev/null | head -1"); err != nil {
 		t.Fatalf("community.general is missing: %v", err)
 	}
+}
+
+// TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise runs the wrapper in a
+// real shell with a fake id and a fake sudo on PATH, so what is proved is the
+// branch the shell takes, not the text of the command.
+func TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise(t *testing.T) {
+	for _, c := range []struct {
+		uid  string
+		want string
+	}{
+		{"0", "direct:it's here"},
+		{"1000", "sudo:-n sh -c|direct:it's here"},
+	} {
+		bin := t.TempDir()
+		writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho "+c.uid+"\n")
+		writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nprintf 'sudo:%s %s %s|' \"$1\" \"$2\" \"$3\"\nshift\nexec \"$@\"\n")
+
+		got, err := runShell(t, bin, AsRoot(`printf "direct:%s" "it's here"`))
+		if err != nil {
+			t.Fatalf("uid %s: %v", c.uid, err)
+		}
+		if got != c.want {
+			t.Fatalf("uid %s: got %q, want %q", c.uid, got, c.want)
+		}
+	}
+}
+
+// TestAsRootKeepsStdinForTheScript: the hardening drop-in arrives on stdin,
+// so the wrapper must not swallow it.
+func TestAsRootKeepsStdinForTheScript(t *testing.T) {
+	bin := t.TempDir()
+	writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho 1000\n")
+	writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nshift\nexec \"$@\"\n")
+
+	cmd := exec.Command("/bin/sh", "-c", AsRoot("cat"))
+	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	cmd.Stdin = strings.NewReader("PasswordAuthentication no\n")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "PasswordAuthentication no\n" {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestCheckRootAcceptsRootOrPasswordlessSudo(t *testing.T) {
+	c := &recordingClient{}
+	if err := CheckRoot(context.Background(), c, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(c.transcript(), "sudo -n true") {
+		t.Fatalf("it never asked sudo: %s", c.transcript())
+	}
+}
+
+// TestCheckRootSaysHowToFixIt: a sudo that wants a password is the one thing
+// an admin who is not root can meet, and the fix is one line.
+func TestCheckRootSaysHowToFixIt(t *testing.T) {
+	c := &recordingClient{failOn: "sudo -n true"}
+	err := CheckRoot(context.Background(), c, "alice")
+	if !errors.Is(err, ErrNoRoot) {
+		t.Fatalf("got %v", err)
+	}
+	for _, want := range []string{`"alice"`, "alice ALL=(ALL) NOPASSWD:ALL", "/etc/sudoers.d/"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the error does not carry %q: %v", want, err)
+		}
+	}
+}
+
+// TestBootstrapRunsAsRootForAnAdminWhoIsNot: every step that touches the
+// system goes through AsRoot, so an admin with sudo gets the same machine as
+// root does. Found on a real machine whose admin was not root.
+func TestBootstrapRunsAsRootForAnAdminWhoIsNot(t *testing.T) {
+	c := clientWithOsRelease("ID=ubuntu\n")
+	if err := Harden(context.Background(), c); err != nil {
+		t.Fatal(err)
+	}
+	if err := InstallAnsible(context.Background(), c, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range c.commands {
+		if command == OSReleaseCommand {
+			continue
+		}
+		if !strings.Contains(command, "sudo -n sh -c") {
+			t.Fatalf("it runs without root: %s", command)
+		}
+	}
+}
+
+func writeScript(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runShell(t *testing.T, bin, command string) (string, error) {
+	t.Helper()
+	cmd := exec.Command("/bin/sh", "-c", command)
+	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	out, err := cmd.Output()
+	return string(out), err
 }
