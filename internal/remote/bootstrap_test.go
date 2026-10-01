@@ -575,3 +575,19 @@ func TestCheckRootSuggestsAFileSudoReads(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// TestHardenMakesSshdsRuntimeDirectoryBeforeValidating: a socket-activated
+// sshd that never started has no /run/sshd, and sshd -t refuses without it.
+// Found on a real machine reached only through Tailscale SSH.
+func TestHardenMakesSshdsRuntimeDirectoryBeforeValidating(t *testing.T) {
+	c := &recordingClient{}
+	if err := Harden(context.Background(), c); err != nil {
+		t.Fatal(err)
+	}
+	joined := c.transcript()
+	dir := strings.Index(joined, "install -d -m 0755 /run/sshd")
+	check := strings.Index(joined, "sshd -t")
+	if dir < 0 || dir > check {
+		t.Fatalf("sshd -t runs without its runtime directory: %s", joined)
+	}
+}

@@ -180,6 +180,20 @@ connection you already trust, list every key with
 check the line of the same type. Only a mismatch of the same type means
 something changed.
 
+## "Missing privilege separation directory: /run/sshd"
+
+**What it means:** `sshd -t`, which checks the SSH configuration before
+it is reloaded, needs `/run/sshd`. systemd makes that directory only when
+`ssh.service` starts. On Ubuntu 24.04 and later sshd starts through
+`ssh.socket`, and a machine reached only through Tailscale SSH may never
+have started it, so the directory is not there. Nothing about the
+configuration is wrong.
+
+**What to do:** Update the CLI and the packages release: both now make the
+directory before the check. Until then, `sudo install -d -m 0755
+/run/sshd` on the machine and run the command again; the directory is
+temporary and gone at the next reboot.
+
 ## "ansible-playbook is not on your computer"
 
 **What it means:** The same check as above, for your own computer. `sync` and

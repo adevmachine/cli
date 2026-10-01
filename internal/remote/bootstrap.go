@@ -162,9 +162,15 @@ chmod 0644 ` + hardeningDropInPath + `
 //
 // sshd lives in sbin, which a non-interactive SSH session does not always have
 // on its PATH.
+//
+// sshd -t refuses to parse anything without /run/sshd, which systemd makes
+// only when ssh.service starts. Where sshd starts through ssh.socket — Ubuntu
+// 24.04 and later — a machine reached only through Tailscale SSH may never
+// have started it. The directory is tmpfs, and the one systemd would make.
 const validateScript = `set -eu
 PATH="$PATH:/usr/sbin:/sbin"
 export PATH
+install -d -m 0755 /run/sshd
 sshd -t
 `
 
