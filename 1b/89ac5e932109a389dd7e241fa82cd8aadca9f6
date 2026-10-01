@@ -1,0 +1,37 @@
+docs/how-it-works/downloads.md
+  s_a0cbf6c120c4f8::t_a370140ee4a34f 42-50
+docs/how-it-works/uploads.md
+  s_a0cbf6c120c4f8::t_1ab431198a87c1 34-38
+go.mod
+  s_a0cbf6c120c4f8::t_47b2933163f161 11
+go.sum
+  s_a0cbf6c120c4f8::t_9023a66895f246 30-31
+internal/download/download.go
+  s_a0cbf6c120c4f8::t_275c94e4396b87 19,46-49,55-62,64-69,99
+internal/download/download_test.go
+  s_a0cbf6c120c4f8::t_0e4d81922d256c 262-287
+internal/upload/send_test.go
+  s_a0cbf6c120c4f8::t_5d2f119c89449c 6,245-269
+internal/upload/upload.go
+  s_a0cbf6c120c4f8::t_9119a0a99868fc 17,97-99,119-130,175
+scripts/accept/download.sh
+  s_a0cbf6c120c4f8::t_36280a4bf59aa9 91-96,129
+scripts/accept/upload.sh
+  s_a0cbf6c120c4f8::t_6782397a9b5cb7 118-124,145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1b89ac5e932109a389dd7e241fa82cd8aadca9f6",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
