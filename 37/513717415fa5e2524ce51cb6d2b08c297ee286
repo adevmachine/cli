@@ -1,0 +1,39 @@
+docs/how-it-works/what-a-new-machine-starts-with.md
+  s_a0cbf6c120c4f8::t_7c3a5b989f64e9 1-56
+README.md
+  s_a0cbf6c120c4f8::t_a2b3801a1af852 20-21
+docs/agent-setup.md
+  s_a0cbf6c120c4f8::t_05debe2e850252 89
+docs/concepts/packages.md
+  s_a0cbf6c120c4f8::t_96c42b26cb38f6 35-41
+docs/getting-started.md
+  s_a0cbf6c120c4f8::t_0c83e39efd098d 43-44
+docs/guides/your-first-devmachine.md
+  s_a0cbf6c120c4f8::t_fb6be13de00bec 65
+docs/index.md
+  s_a0cbf6c120c4f8::t_490f5cf693f5a7 111-112
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_5dc14ad1c4617c 37-39
+docs/upgrade.md
+  s_a0cbf6c120c4f8::t_71f0af337ad844 119
+internal/commands/setup.go
+  s_a0cbf6c120c4f8::t_a5d035f35b8791 90-91,245,247
+internal/commands/setup_test.go
+  s_a0cbf6c120c4f8::t_997864047c7fea 1034-1036
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "37513717415fa5e2524ce51cb6d2b08c297ee286",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
