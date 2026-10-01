@@ -1,0 +1,39 @@
+docs/concepts/reaching-your-server.md
+  s_a0cbf6c120c4f8::t_55507093e2f7d3 35-47
+internal/commands/machine.go
+  s_a0cbf6c120c4f8::t_3d6d1244e66f61 22,89-90,96-98
+internal/commands/machine_test.go
+  s_a0cbf6c120c4f8::t_ffa7cc3a3efd44 62,80-95
+internal/doctor/doctor.go
+  s_a0cbf6c120c4f8::t_9411efe3e1754f 29-31,213-218,224-226
+internal/doctor/doctor_test.go
+  s_a0cbf6c120c4f8::t_76313aae95e6db 758,871-882,884-891,895-896
+docs/reference/commands.md
+  s_49521aa3150380::t_cc37c5e2224792 127-139,626-628
+docs/troubleshooting.md
+  s_49521aa3150380::t_3ab69afd659efe 199-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c80826b5c9f74530668e0d9269245598275b591d",
+  "prompts": {},
+  "sessions": {
+    "s_49521aa3150380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a459b8d16e559c2fb",
+        "model": "unknown"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    },
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
