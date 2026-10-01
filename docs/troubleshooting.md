@@ -698,16 +698,36 @@ devmachine trusted before. This can mean a deliberate rebuild, a
 configuration mistake, or an attack — devmachine cannot tell which, and will
 not connect until you decide.
 
-**What to do:** Verify the address and both fingerprints yourself. If you
-just rebuilt the server on purpose, run
-`devmachine machines trust <machine> --replace`. Add `--check` to preview
-without writing, and `--yes` to skip confirmation — that never substitutes
-for `--replace`.
+**What to do:** Run `devmachine machines trust <machine> --check`. It reads
+the presented key without logging in, writes nothing, and prints both
+fingerprints, a command to print the same key on the server, and the fix.
+Run that command from the machine's own console — the provider's web
+console, or `limactl shell` for a Lima VM — never through the SSH
+connection you are trying to verify. If the fingerprints match, run
+`devmachine machines trust <machine> --replace`. `--yes` skips confirmation
+— that never substitutes for `--replace`.
 
 `run` can keep working for up to five minutes after the key changes. It
 reuses the connection it opened last time, which was checked when it was
 opened and still goes to the same server. The first new connection after
 that checks the key again and stops with this error.
+
+## The host key changed after resizing or reconfiguring a VM
+
+**What it means:** Often nothing bad. A VM that boots through cloud-init —
+Lima, and many cloud images — regenerates its SSH host keys whenever
+cloud-init believes it is a new instance. Changing the VM's memory, CPUs
+or other settings can give it a new instance ID, so cloud-init deletes the
+old keys and writes new ones on the next boot. The disk, the users and
+the Tailscale address stay the same; only the host key changes. A
+different local network address underneath Tailscale does not matter —
+the key is pinned to the machine's name, not to an address.
+
+**What to do:** Confirm it from the VM itself, for example
+`limactl shell <instance>`: the files under `/etc/ssh/ssh_host_*` carry
+the time of the reboot, and `sudo cloud-init query instance_id` differs
+from before. Compare the fingerprint as in
+[The SSH host key changed](#the-ssh-host-key-changed), then replace it.
 
 ## The SSH trust file is malformed
 

@@ -274,9 +274,13 @@ on it, naming the reason.
 
 `trust` reads the server's public fingerprint without logging in: asks
 before saving a new one, does nothing if it matches, refuses a changed
-one unless `--replace`. `--check` compares without writing. JSON fields:
-`machine`, `address`, `status`, `key_type`, optional
-`current_fingerprint`, `presented_fingerprint`, `check`, `changed`.
+one unless `--replace`. `--check` compares without writing and reports a
+changed key instead of refusing it. JSON fields: `machine`, `address`,
+`status` (`matching`, `changed`, `missing`), `key_type`, optional
+`current_fingerprint`, `presented_fingerprint`, `check`, `changed`, and,
+while the key is not yet trusted, `fix` (the command that trusts it) and
+`verify` (a command that prints the same key's fingerprint on the server,
+to run from its own console).
 
 `rm` takes a machine out of `config.yml` and **does nothing to the server
 itself**. Asks first unless `--yes`; refuses to leave a workspace

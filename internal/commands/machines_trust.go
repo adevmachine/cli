@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
@@ -23,6 +24,12 @@ type trustResult struct {
 	PresentedFingerprint string `json:"presented_fingerprint"`
 	Check                bool   `json:"check"`
 	Changed              bool   `json:"changed"`
+	// Fix is the command that resolves a changed or missing key. It is a
+	// suggestion for a person or an app to run after checking the key.
+	Fix string `json:"fix,omitempty"`
+	// Verify prints the same key's fingerprint on the machine itself, to run
+	// from a console that does not go through this SSH connection.
+	Verify string `json:"verify,omitempty"`
 }
 
 type trustOptions struct {
@@ -92,6 +99,7 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 		KeyType:              presented.Type(),
 		PresentedFingerprint: hostkeys.Fingerprint(presented),
 		Check:                flags.check,
+		Verify:               hostKeyVerifyCommand(presented.Type()),
 	}
 	current, keyErr := store.Key(machine.Name, machine.Port)
 	switch {
@@ -103,12 +111,13 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 	case keyErr == nil:
 		result.Status = "changed"
 		result.CurrentFingerprint = hostkeys.Fingerprint(current)
+		result.Fix = "devmachine machines trust " + machine.Name + " --replace"
+		if flags.check {
+			return reportTrust(out, format, result)
+		}
 		if !flags.replace {
 			return fmt.Errorf("host key changed for machine %q at %s: trusted %s, presented %s; this can mean an attack, a wrong address, or a deliberate rebuild; verify it before using --replace",
 				machine.Name, address, result.CurrentFingerprint, result.PresentedFingerprint)
-		}
-		if flags.check {
-			return reportTrust(out, format, result)
 		}
 		if !flags.yes {
 			ok, err := confirmHostKey(in, out, fmt.Sprintf("Replace the trusted host key for %s from %s to %s?", machine.Name, result.CurrentFingerprint, result.PresentedFingerprint))
@@ -123,6 +132,7 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 			return err
 		}
 		result.Changed = true
+		result.Fix = ""
 		repo.AutoCommit(ctx, dir, "chore(config): replace host key for "+machine.Name)
 		return reportTrust(out, format, result)
 
@@ -132,6 +142,7 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 			return keyErr
 		}
 		result.Status = "missing"
+		result.Fix = "devmachine machines trust " + machine.Name
 		if flags.check {
 			return reportTrust(out, format, result)
 		}
@@ -148,9 +159,27 @@ func runMachinesTrust(ctx context.Context, dir, name string, in io.Reader, out i
 			return err
 		}
 		result.Changed = true
+		result.Fix = ""
 		repo.AutoCommit(ctx, dir, "chore(config): trust host key for "+machine.Name)
 		return reportTrust(out, format, result)
 	}
+}
+
+// hostKeyVerifyCommand returns the command that prints the fingerprint of the
+// server's own key of keyType, or "" for a type with no standard file.
+func hostKeyVerifyCommand(keyType string) string {
+	var file string
+	switch {
+	case keyType == "ssh-ed25519":
+		file = "ed25519"
+	case strings.HasPrefix(keyType, "ecdsa-sha2-"):
+		file = "ecdsa"
+	case keyType == "ssh-rsa" || strings.HasPrefix(keyType, "rsa-sha2-"):
+		file = "rsa"
+	default:
+		return ""
+	}
+	return "ssh-keygen -lf /etc/ssh/ssh_host_" + file + "_key.pub"
 }
 
 func reportTrust(out io.Writer, format string, result trustResult) error {
@@ -174,6 +203,12 @@ func reportTrust(out io.Writer, format string, result trustResult) error {
 		} else {
 			fmt.Fprintln(out, "replaced the trusted host key")
 		}
+	}
+	if result.Fix != "" {
+		if result.Verify != "" {
+			fmt.Fprintf(out, "verify it from the machine's own console: %s\n", result.Verify)
+		}
+		fmt.Fprintf(out, "once it matches: %s\n", result.Fix)
 	}
 	return nil
 }
