@@ -137,13 +137,19 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 	if stdin != nil {
 		sent.r = stdin
 	}
+	var received countingWriter
+	if stdout != nil {
+		received.w = stdout
+	}
 	for _, address := range c.addresses {
 		argv := append(append([]string{}, c.args...), c.user+"@"+address, command)
 		cmd := exec.CommandContext(ctx, c.sshPath, argv...)
 		if stdin != nil {
 			cmd.Stdin = &sent
 		}
-		cmd.Stdout = stdout
+		if stdout != nil {
+			cmd.Stdout = &received
+		}
 
 		var errBuf bytes.Buffer
 		if stderr != nil {
@@ -165,6 +171,10 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 				return fmt.Errorf("machine %q at %s: the connection dropped after part of the input was sent, so it is not sent again to another address: %s",
 					c.machine, address, strings.TrimSpace(errBuf.String()))
 			}
+			if received.n > 0 {
+				return fmt.Errorf("machine %q at %s: the connection dropped after part of the output arrived, so it is not asked again of another address: %s",
+					c.machine, address, strings.TrimSpace(errBuf.String()))
+			}
 			failures = append(failures, fmt.Sprintf("%s (%s)", address, strings.TrimSpace(errBuf.String())))
 			continue
 		}
@@ -183,6 +193,20 @@ type countingReader struct {
 
 func (c *countingReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// countingWriter is countingReader's twin for output: a stream that already
+// reached its writer cannot be asked of another address without the writer
+// holding the first part twice.
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
 	c.n += int64(n)
 	return n, err
 }

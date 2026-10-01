@@ -40,7 +40,7 @@ fi
 export DEVMACHINE_ACCEPT_BIN
 
 if [ "$#" -eq 0 ]; then
-  set -- host-key-pinning setup-git v05-packages-credentials-dns v06-expose-tunnel workspace-secrets upload update network-package
+  set -- host-key-pinning setup-git v05-packages-credentials-dns v06-expose-tunnel workspace-secrets upload download update network-package
 fi
 
 for scenario in "$@"; do

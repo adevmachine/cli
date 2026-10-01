@@ -73,6 +73,7 @@ scripts/accept/run.sh v05-packages-credentials-dns
 scripts/accept/run.sh v06-expose-tunnel
 scripts/accept/run.sh workspace-secrets
 scripts/accept/run.sh upload
+scripts/accept/run.sh download
 scripts/accept/run.sh network-package
 ```
 

@@ -310,3 +310,38 @@ func TestMuxClientDoesNotRetryAnotherAddressAfterSendingPartOfTheInput(t *testin
 		t.Fatalf("ssh ran %d times, want 1: a half-sent input must not go to the next address", n)
 	}
 }
+
+func TestMuxClientDoesNotRetryAnotherAddressAfterReceivingPartOfTheOutput(t *testing.T) {
+	fakeCacheDir(t)
+	m := muxTestMachine(t)
+	m.Hosts = append(m.Hosts, config.Host{Address: "203.0.113.11"})
+	calls := filepath.Join(t.TempDir(), "calls")
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\necho x >> " + calls + "\nprintf abcd\nexit 255\n"
+	if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	origLookPath := lookPath
+	lookPath = func(string) (string, error) { return fakeSSH, nil }
+	t.Cleanup(func() { lookPath = origLookPath })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	err = client.Stream(context.Background(), "cat f", &out, nil)
+	if err == nil || !strings.Contains(err.Error(), "part of the output") {
+		t.Fatalf("got %v, want an error saying part of the output already arrived", err)
+	}
+	if out.String() != "abcd" {
+		t.Fatalf("output %q, want only the first address's bytes", out.String())
+	}
+	body, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(body), "x"); n != 1 {
+		t.Fatalf("ssh ran %d times, want 1: a half-received output must not be appended to by the next address", n)
+	}
+}

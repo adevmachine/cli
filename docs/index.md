@@ -106,6 +106,8 @@ these when something behaves in a way that surprises you.
   up, and what it leaves alone.
 - [How an upload lands](how-it-works/uploads.md) — why `upload` renames
   files, never overwrites one, and stays inside the home.
+- [How a download lands](how-it-works/downloads.md) — why `download` keeps
+  names, never overwrites a file here, and sends a folder as one archive.
 - [Updating](how-it-works/updating.md) — why `update` stops before your
   machines, hands over to the new CLI, and goes through Homebrew when
   Homebrew installed it.

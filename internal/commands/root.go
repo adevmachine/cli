@@ -83,6 +83,7 @@ func NewRootCmd() *cobra.Command {
 		newMoshCmd(opts),
 		newRunCmd(opts),
 		newUploadCmd(opts),
+		newDownloadCmd(opts),
 		newPackagesCmd(opts),
 		newSkillsCmd(opts),
 		newSyncCmd(opts),

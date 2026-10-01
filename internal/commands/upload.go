@@ -59,7 +59,7 @@ func runUpload(cmd *cobra.Command, opts *options, workspace, dir, mode string, f
 	if _, err := upload.Mode(mode); err != nil {
 		return err
 	}
-	tgt, err := uploadTarget(opts, workspace)
+	tgt, err := transferTarget(opts, workspace, "upload")
 	if err != nil {
 		return err
 	}
@@ -101,10 +101,10 @@ func runUpload(cmd *cobra.Command, opts *options, workspace, dir, mode string, f
 	return reportUploads(cmd, opts, results)
 }
 
-// uploadTarget is workspaceTarget, with one more refusal: a workspace named
+// transferTarget is workspaceTarget, with one more refusal: a workspace named
 // together with a --machine it does not live on is a mistake to report, not
 // a choice to make for the person.
-func uploadTarget(opts *options, workspace string) (target, error) {
+func transferTarget(opts *options, workspace, command string) (target, error) {
 	tgt, err := workspaceTarget(opts, workspace)
 	if err != nil {
 		return target{}, err
@@ -113,7 +113,7 @@ func uploadTarget(opts *options, workspace string) (target, error) {
 		return target{}, fmt.Errorf("workspace %s lives on machine %s, not %s: drop --machine or name the right one",
 			workspace, tgt.machine.Name, opts.machine)
 	}
-	if err := requiresAddress(tgt.machine, "upload"); err != nil {
+	if err := requiresAddress(tgt.machine, command); err != nil {
 		return target{}, err
 	}
 	return tgt, nil

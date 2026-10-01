@@ -545,6 +545,41 @@ stdout holds only the paths, so a script or an app can read them. Each
 upload is one line in [the command log](#the-command-log). See
 [how an upload lands](../how-it-works/uploads.md).
 
+## download
+
+```
+devmachine download <remote-path>... [--workspace w] [--to dir]
+```
+
+Brings files or folders from a home on a machine to this computer and
+prints, one per line, the local path each one was saved at. With
+`--format json` it prints
+`[{"remote": "...", "local": "...", "bytes": N, "folder": false}]`; a
+path that failed has an `error` field instead of `local`.
+
+- **Who reads.** `--workspace` reads as that workspace's own account, so
+  it gets exactly what that account can read. Without it, the machine's
+  admin reads, on the machine `--machine` names, or the only one
+  configured. A workspace and a `--machine` it does not live on is
+  refused.
+- **Which path.** Relative to the home (`proj/report.pdf`), starting with
+  `~/`, or absolute (`/home/acme/proj/report.pdf`). Put `--` before a
+  path that starts with `-`.
+- **Where to.** `~/Downloads` by default. `--to` names another folder,
+  which must already exist: a typo is refused before anything connects.
+- **Names.** Each file keeps its name. A name already taken gets `-2`,
+  `-3` and so on before the extension: nothing is ever overwritten.
+- **Folders.** A folder arrives as one `<name>.tar.gz`, with the folder
+  at its top. Unpack it with `tar xzf <name>.tar.gz`, or double-click it
+  in Finder.
+- **Failures.** With several paths, every one is tried; the command exits
+  non-zero if any failed, and names each on stderr. A failed or cut
+  transfer leaves nothing behind.
+
+stdout holds only the paths, so a script or an app can read them. Each
+download is one line in [the command log](#the-command-log). See
+[how a download lands](../how-it-works/downloads.md).
+
 ## dns
 
 ```
@@ -929,7 +964,7 @@ devmachine help [command] [--json]
 
 ## The command log
 
-`run`, `upload` and `sync` each append one line to `<config>/history.log`, mode
+`run`, `upload`, `download` and `sync` each append one line to `<config>/history.log`, mode
 `0600`:
 
 ```
