@@ -330,8 +330,12 @@ func TestDoctorAgainstTheTestMachine(t *testing.T) {
 		t.Skip("no test VPS: run `eval \"$(scripts/fake-vps.sh env)\"` first")
 	}
 
+	user := os.Getenv("DEVMACHINE_TEST_USER")
+	if user == "" {
+		user = "root"
+	}
 	dir := t.TempDir()
-	body := "machines:\n  - name: sandbox\n    hosts: [" + host + "]\n    port: " + port + "\n    user: root\n    key: " + key + "\n"
+	body := "machines:\n  - name: sandbox\n    hosts: [" + host + "]\n    port: " + port + "\n    user: " + user + "\n    key: " + key + "\n"
 	if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -212,10 +212,13 @@ func TestPushAgainstTheThrowawayMachine(t *testing.T) {
 	m := testMachine(t)
 	ctx := context.Background()
 
-	client, _, err := remote.Dial(ctx, m, "")
+	// Elevated as `credentials push` connects: the admin login, through sudo
+	// when it is not root.
+	conn, _, err := remote.Dial(ctx, m, "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	client := remote.Elevated(conn)
 	defer client.Close()
 	defer client.Run(ctx, "rm -rf "+MachineDir("probe"))
 
@@ -254,10 +257,13 @@ func TestPushToAWorkspaceAgainstTheThrowawayMachine(t *testing.T) {
 	m := testMachine(t)
 	ctx := context.Background()
 
-	client, _, err := remote.Dial(ctx, m, "")
+	// Elevated as `credentials push` connects: the admin login, through sudo
+	// when it is not root.
+	conn, _, err := remote.Dial(ctx, m, "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	client := remote.Elevated(conn)
 	defer client.Close()
 
 	if _, err := client.Run(ctx, "id alice >/dev/null 2>&1 || useradd -m alice"); err != nil {
