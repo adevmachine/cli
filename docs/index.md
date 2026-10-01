@@ -108,6 +108,8 @@ these when something behaves in a way that surprises you.
   files, never overwrites one, and stays inside the home.
 - [How a download lands](how-it-works/downloads.md) — why `download` keeps
   names, never overwrites a file here, and sends a folder as one archive.
+- [What a new machine starts with](how-it-works/what-a-new-machine-starts-with.md)
+  — what `essentials` holds, and why the macOS app's package is in it.
 - [Updating](how-it-works/updating.md) — why `update` stops before your
   machines, hands over to the new CLI, and goes through Homebrew when
   Homebrew installed it.

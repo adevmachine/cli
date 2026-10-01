@@ -17,7 +17,8 @@ devmachine ssh acme
 
 `setup` connects to the server and locks it down: it checks who you are
 talking to, installs a key, turns off password logins, and gives the server
-the essentials: base tools, git, a firewall and Caddy. `workspaces new`
+the essentials: base tools, git, a firewall, Caddy and what the macOS app
+reads. `workspaces new`
 adds a workspace to your configuration. `sync` builds it on the server.
 `skills add` teaches your coding agent the CLI, so you can ask for any of
 this from any Claude Code or Codex session.

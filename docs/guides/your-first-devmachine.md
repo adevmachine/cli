@@ -62,7 +62,7 @@ devmachine sync
 
 `workspaces new` adds `acme` to your configuration. `sync` builds it on the
 server, together with the essentials `setup` chose for the machine (base
-tools, git, a firewall and Caddy): `acme` is its own account, with git, the
+tools, git, a firewall, Caddy and what the macOS app reads): `acme` is its own account, with git, the
 GitHub CLI, Node, bun and zsh. It shows the plan and asks before changing
 anything.
 

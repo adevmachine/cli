@@ -86,7 +86,7 @@ devmachine sync --check
 ```
 
 The machine already has the `essentials` package from `setup` (base tools,
-git, a firewall and Caddy). If they asked for a bare server, tell them to run
+git, a firewall, Caddy and what the macOS app reads). If they asked for a bare server, tell them to run
 `devmachine setup --no-essentials` instead. Skip the `claude-code` line if
 they wanted no coding agent. Show them the plan, and
 once they agree run `devmachine sync --yes`. The first sync takes a few

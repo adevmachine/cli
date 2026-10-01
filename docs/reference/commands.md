@@ -34,8 +34,9 @@ Then it gets the server ready, in order: try the key; if that fails, ask
 for the password (never shown on screen); install the key; open a **new
 connection using only the key** to prove it works; turn password login
 off; install Ansible. The new machine is written with the `essentials`
-package (base, git, firewall, ssh_hardening and caddy), so the first `sync`
-installs them; `--no-essentials` leaves it with none. Only a pinned package
+package (base, git, firewall, ssh_hardening, caddy and devmachine-app — see
+[what a new machine starts with](../how-it-works/what-a-new-machine-starts-with.md)),
+so the first `sync` installs them; `--no-essentials` leaves it with none. Only a pinned package
 release that has `essentials` gets it — an older one starts empty and says so. If the proof step fails, nothing is locked down and
 the error says where to look. See [setting up a server for the first
 time](../how-it-works/trust-bootstrap.md) for why the order matters.

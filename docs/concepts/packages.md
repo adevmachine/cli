@@ -32,6 +32,13 @@ devmachine packages add claude-code --workspace acme
 
 Adding the wrong kind to the wrong target is refused, and says why.
 
+## The essentials
+
+`setup` gives a new server one package, `essentials`, which installs nothing
+itself and pulls in others: `base`, `git`, `firewall`, `ssh_hardening`,
+`caddy` and `devmachine-app`. `--no-essentials` starts the server bare. See
+[what a new machine starts with](../how-it-works/what-a-new-machine-starts-with.md).
+
 ## Changing a package's settings
 
 A package reads its own settings, each with a default. Change one on a

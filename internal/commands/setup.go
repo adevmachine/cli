@@ -87,8 +87,8 @@ func (o setupOptions) unattended() bool { return o.address != "" }
 const tailscalePackage = "tailscale"
 
 // essentials is the package a new machine starts with: base tools, git, a
-// firewall, SSH hardening and Caddy. Nearly everyone wants them, so the choice
-// is to leave them out, not to remember to add them.
+// firewall, SSH hardening, Caddy and what the macOS app reads. Nearly everyone
+// wants them, so the choice is to leave them out, not to remember to add them.
 const essentials = "essentials"
 
 // releaseHasPackage answers whether a package release carries a package. A
@@ -242,9 +242,9 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 
 // nextAfterSetup is printed once the machine is reachable.
 func nextAfterSetup(machinePackages []string, sshAliases bool) string {
-	note := "The machine starts with no packages: `devmachine packages add essentials` gives it base tools, git, a firewall and Caddy.\n"
+	note := "The machine starts with no packages: `devmachine packages add essentials` gives it base tools, git, a firewall, Caddy and what the macOS app reads.\n"
 	if slices.Contains(machinePackages, essentials) {
-		note = "The machine starts with the essentials: base tools, git, a firewall and Caddy.\n" +
+		note = "The machine starts with the essentials: base tools, git, a firewall, Caddy and what the macOS app reads.\n" +
 			"To start bare instead, remove `essentials` from config.yml, or run setup with --no-essentials.\n"
 	}
 	reach := "Once a workspace exists: `devmachine ssh <workspace>` (or `mosh`) reaches it from here.\n"

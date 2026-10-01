@@ -40,8 +40,8 @@ know you are talking to your own server. Then it sets up a key and turns off
 password logins, so only you can get in.
 
 `setup` also gives the server the `essentials` package: base tools, git, a
-firewall, SSH with passwords kept off, and Caddy to publish sites with
-HTTPS. Docker is not in it; add it with `devmachine packages add docker` when
+firewall, SSH with passwords kept off, Caddy to publish sites with HTTPS,
+and what the macOS app reads from a server. Docker is not in it; add it with `devmachine packages add docker` when
 you need it. Want a bare server instead? Run `devmachine setup
 --no-essentials`.
 

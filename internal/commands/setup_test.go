@@ -1031,6 +1031,9 @@ func TestSetupGivesTheMachineTheEssentials(t *testing.T) {
 	if !strings.Contains(out, "--no-essentials") {
 		t.Fatalf("setup does not say how to go without them: %q", out)
 	}
+	if !strings.Contains(out, "what the macOS app reads") {
+		t.Fatalf("setup does not say the essentials serve the macOS app: %q", out)
+	}
 }
 
 func TestSetupWithNoEssentialsLeavesTheMachineBare(t *testing.T) {

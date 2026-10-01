@@ -116,7 +116,7 @@ what you last typed.
 ## Adding the essentials to an older machine
 
 A machine set up before the `essentials` package existed has none of it:
-`base`, `git`, `firewall`, `ssh_hardening`, `caddy`. Add it without
+`base`, `git`, `firewall`, `ssh_hardening`, `caddy`, `devmachine-app`. Add it without
 rebuilding anything — what is already installed stays as it is:
 
 ```
