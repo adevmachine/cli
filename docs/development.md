@@ -80,6 +80,24 @@ scripts/accept/run.sh network-package
 so the real Tailscale never runs; it proves `login`, `resolve`, and an alias
 that connects through `ssh-proxy` and falls through a dropped address.
 
+`headscale` is the same proof against the real thing, and is not in the
+default list because it boots three VMs (1 GiB, 2 GiB and 2 GiB of memory):
+a Headscale server, a box set up as a fresh server, and a client that plays
+your computer. The CLI is built for Linux and runs only inside the client,
+which joins Headscale with the real Tailscale client, so the computer running
+the harness keeps its own Tailscale and SSH configuration untouched. It needs
+`go` on that computer, and installs the packages checkout's `tailscale`
+package as a local package. Run it by name:
+
+```
+scripts/accept/run.sh headscale
+```
+
+`HEADSCALE_VERSION` picks the Headscale release (0.29.4 by default); its
+`.deb` is checked against the release's `checksums.txt`. The three VMs share
+Lima's `user-v2` network, because `vzNAT` keeps two VMs from reaching each
+other.
+
 Every run creates uniquely named `devmachine-accept-*` VMs and removes them by
 default, including when a scenario fails. For investigation only,
 `KEEP_ACCEPT_VM=1 make accept` retains its disposable acceptance VM; delete it

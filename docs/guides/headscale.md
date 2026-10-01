@@ -12,10 +12,12 @@ related:
 ---
 # Your own Tailscale with Headscale
 
-**Not yet tested end to end on a devmachine.** The steps below follow
-Headscale's own docs and devmachine's `tailscale` package as written; if
-something does not match what you see, trust what is in front of you over
-this page.
+Tested end to end with Headscale 0.29.4 and Tailscale 1.102.4, on Ubuntu
+24.04, with packages v23: `login tailscale` with a pre-auth key, `resolve`,
+`run`, `doctor` and an SSH alias over the Headscale address with the public
+one blocked, and the fallback to the public address once Tailscale stops on
+your computer. `scripts/accept/headscale.sh` repeats that run on three local
+VMs.
 
 [Headscale](https://headscale.net) is an open source, self-hosted
 replacement for Tailscale's control server. You get the same private
