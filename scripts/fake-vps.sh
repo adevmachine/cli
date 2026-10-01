@@ -33,7 +33,9 @@ KNOWN_HOSTS="${DEVMACHINE_TEST_HOME:-$HOME/.config/devmachine-test}/known_hosts"
 # The admin login the tests use. root is a bought server; any other name is a
 # server whose admin reaches root through passwordless sudo, which is how a
 # home server or a provider's non-root image arrives. Both are first-class:
-# `make test-vps` runs as root, `make test-vps-sudo` as this account.
+# `make test-vps` runs as root, `make test-vps-sudo` as an admin named
+# opsadmin, which is no test workspace's account, so a push into a workspace
+# really crosses accounts.
 ADMIN="${DEVMACHINE_FAKE_VPS_ADMIN:-root}"
 
 # The CLI under test, not one installed somewhere else.

@@ -40,8 +40,8 @@ test-vps: vps-up
 # The same suite with an admin login that is not root and reaches root through
 # passwordless sudo. The suite assumed root until a real machine said otherwise.
 test-vps-sudo:
-	DEVMACHINE_FAKE_VPS_ADMIN=alice scripts/fake-vps.sh up
-	eval "$$(DEVMACHINE_FAKE_VPS_ADMIN=alice scripts/fake-vps.sh env)" && go test -race ./...
+	DEVMACHINE_FAKE_VPS_ADMIN=opsadmin scripts/fake-vps.sh up
+	eval "$$(DEVMACHINE_FAKE_VPS_ADMIN=opsadmin scripts/fake-vps.sh env)" && go test -race ./...
 
 vps-up:
 	scripts/fake-vps.sh up
