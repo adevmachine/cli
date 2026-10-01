@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -450,11 +451,11 @@ func TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise(t *testing.T) {
 		want string
 	}{
 		{"0", "direct:it's here"},
-		{"1000", "sudo:-n sh -c|direct:it's here"},
+		{"1000", "sudo:-n -H sh|direct:it's here"},
 	} {
 		bin := t.TempDir()
 		writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho "+c.uid+"\n")
-		writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nprintf 'sudo:%s %s %s|' \"$1\" \"$2\" \"$3\"\nshift\nexec \"$@\"\n")
+		writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nprintf 'sudo:%s %s %s|' \"$1\" \"$2\" \"$3\"\nshift 2\nexec \"$@\"\n")
 
 		got, err := runShell(t, bin, AsRoot(`printf "direct:%s" "it's here"`))
 		if err != nil {
@@ -471,7 +472,7 @@ func TestAsRootRunsDirectlyForRootAndThroughSudoOtherwise(t *testing.T) {
 func TestAsRootKeepsStdinForTheScript(t *testing.T) {
 	bin := t.TempDir()
 	writeScript(t, filepath.Join(bin, "id"), "#!/bin/sh\necho 1000\n")
-	writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nshift\nexec \"$@\"\n")
+	writeScript(t, filepath.Join(bin, "sudo"), "#!/bin/sh\nshift 2\nexec \"$@\"\n")
 
 	cmd := exec.Command("/bin/sh", "-c", AsRoot("cat"))
 	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
@@ -525,7 +526,7 @@ func TestBootstrapRunsAsRootForAnAdminWhoIsNot(t *testing.T) {
 		if command == OSReleaseCommand {
 			continue
 		}
-		if !strings.Contains(command, "sudo -n sh -c") {
+		if !strings.Contains(command, "sudo -n -H sh -c") {
 			t.Fatalf("it runs without root: %s", command)
 		}
 	}
@@ -544,4 +545,33 @@ func runShell(t *testing.T, bin, command string) (string, error) {
 	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
 	out, err := cmd.Output()
 	return string(out), err
+}
+
+// TestElevatedRunsEveryCommandAsRoot, and only once however often it is
+// wrapped.
+func TestElevatedRunsEveryCommandAsRoot(t *testing.T) {
+	c := &recordingClient{}
+	e := Elevated(Elevated(c))
+	if _, err := e.Run(context.Background(), "id"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.RunInput(context.Background(), "cat", strings.NewReader("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Stream(context.Background(), "ls", io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{AsRoot("id"), AsRoot("cat"), AsRoot("ls")}
+	if !slices.Equal(c.commands, want) {
+		t.Fatalf("got %q", c.commands)
+	}
+}
+
+// TestCheckRootSuggestsAFileSudoReads: sudo skips a sudoers.d file with a dot
+// in its name, so the suggested fix would do nothing for "first.last".
+func TestCheckRootSuggestsAFileSudoReads(t *testing.T) {
+	err := CheckRoot(context.Background(), &recordingClient{failOn: "sudo -n true"}, "first.last")
+	if !strings.Contains(err.Error(), "/etc/sudoers.d/devmachine-first_last") {
+		t.Fatalf("got %v", err)
+	}
 }

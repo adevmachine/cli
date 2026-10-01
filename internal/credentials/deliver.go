@@ -123,7 +123,7 @@ func Push(ctx context.Context, c remote.Client, d Declared, value string) error 
 	}
 
 	script := fmt.Sprintf(writeScript, shellQuote(d.LinuxUser), shellQuote(destination))
-	if _, err := c.RunInput(ctx, remote.Elevate(c, script), strings.NewReader(body)); err != nil {
+	if _, err := c.RunInput(ctx, script, strings.NewReader(body)); err != nil {
 		return fmt.Errorf("delivering credential %q: %w", Key(d), err)
 	}
 	return nil

@@ -306,7 +306,47 @@ func PathFor(cfg config.Config) (string, error) {
 	if cfg.SSHAliasesPath == "" {
 		return DefaultPath()
 	}
-	return ExpandHome(cfg.SSHAliasesPath)
+	return Resolve(cfg.SSHAliasesPath)
+}
+
+// Resolve makes a path the person typed absolute and clean, so two spellings
+// of one file compare equal. A relative path is taken from the current
+// directory once, here, and never again: a refresh run from somewhere else
+// must not write a stray copy there.
+func Resolve(path string) (string, error) {
+	expanded, err := ExpandHome(path)
+	if err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", fmt.Errorf("resolving %s: %w", path, err)
+	}
+	return abs, nil
+}
+
+// SameFile says whether two paths are one file: the same clean path, or two
+// names — a symbolic link, say — for one file that exists.
+func SameFile(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ia, errA := os.Stat(a)
+	ib, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(ia, ib)
+}
+
+// Portable writes a path under the home directory as ~/…, so config.yml
+// stays right on a computer whose home is somewhere else.
+func Portable(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if rest, ok := strings.CutPrefix(path, home+string(filepath.Separator)); ok {
+		return "~/" + filepath.ToSlash(rest)
+	}
+	return path
 }
 
 // ExpandHome turns a leading ~/ into the home directory, the way a person

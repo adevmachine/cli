@@ -76,7 +76,7 @@ func Present(ctx context.Context, c remote.Client, wanted []Declared) (map[strin
 		return present, nil
 	}
 
-	out, err := c.RunInput(ctx, remote.Elevate(c, presentScript), strings.NewReader(list.String()))
+	out, err := c.RunInput(ctx, presentScript, strings.NewReader(list.String()))
 	if err != nil {
 		return nil, fmt.Errorf("looking for the credentials on the machine: %w", err)
 	}

@@ -124,10 +124,10 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 	if path == "" {
 		path = current
 	}
-	if path, err = aliases.ExpandHome(path); err != nil {
+	if path, err = aliases.Resolve(path); err != nil {
 		return err
 	}
-	moving := path != current
+	moving := !aliases.SameFile(path, current)
 
 	written := false
 	if write && !check {
@@ -168,7 +168,7 @@ func runAliases(cmd *cobra.Command, opts *options, write bool, path string, chec
 			recorded = true
 		}
 		if recorded {
-			repo.AutoCommit(cmd.Context(), dir, "chore(config): keep the SSH aliases in "+path)
+			repo.AutoCommit(cmd.Context(), dir, "chore(config): keep the SSH aliases in "+aliases.Portable(path))
 		}
 	}
 
@@ -215,8 +215,8 @@ func moveAliases(dir string, cfg *config.Config, from, to string) error {
 	if err != nil {
 		return err
 	}
-	recorded := to
-	if to == defaultPath {
+	recorded := aliases.Portable(to)
+	if aliases.SameFile(to, defaultPath) {
 		recorded = ""
 	}
 	if err := config.SetSSHAliasesPath(dir, recorded); err != nil {

@@ -50,7 +50,7 @@ func newPackagesHelpCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, _, err := dial(cmd.Context(), tgt.machine, "")
+			client, _, err := dialAdmin(cmd.Context(), tgt.machine)
 			if err != nil {
 				return err
 			}

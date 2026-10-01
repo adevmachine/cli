@@ -523,3 +523,33 @@ func TestRunPackageExplainsARefusedHostKey(t *testing.T) {
 		t.Fatalf("got %v, want the explained host key change", err)
 	}
 }
+
+type recordingAdmin struct{ nopClient }
+
+var adminCommands []string
+
+func (recordingAdmin) Run(_ context.Context, command string) (string, error) {
+	adminCommands = append(adminCommands, command)
+	return "", nil
+}
+
+// TestDialAdminRunsEverythingAsRoot: an admin that is not root reaches root
+// through sudo for every command on an admin connection.
+func TestDialAdminRunsEverythingAsRoot(t *testing.T) {
+	t.Cleanup(swap(&elevate, remote.Elevated))
+	t.Cleanup(swap(&dial, func(context.Context, config.Machine, string) (remote.Client, string, error) {
+		return recordingAdmin{}, "203.0.113.10", nil
+	}))
+	adminCommands = nil
+
+	client, _, err := dialAdmin(context.Background(), config.Machine{Name: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Run(context.Background(), "userdel bob"); err != nil {
+		t.Fatal(err)
+	}
+	if len(adminCommands) != 1 || adminCommands[0] != remote.AsRoot("userdel bob") {
+		t.Fatalf("got %q", adminCommands)
+	}
+}

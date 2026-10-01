@@ -91,7 +91,8 @@ checked, and may not be on the server at all.
 
 So when the server identifies itself as Tailscale, `setup` and
 `machines add` install the key anyway and say why, instead of taking the
-login as proof. Without the key, the machine is unreachable the day
+login as proof — and leave password login as it was, since locking down
+comes after the proof and there was none. Without the key, the machine is unreachable the day
 Tailscale SSH is off, or from anywhere outside the tailnet. Running
 `devmachine setup --machine <name>` again repairs a machine an older CLI
 set up this way.

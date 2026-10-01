@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/mydevmachine/devmachine/internal/remote"
 	"github.com/mydevmachine/devmachine/internal/secrets"
 	agentskills "github.com/mydevmachine/devmachine/internal/skills"
 )
@@ -33,6 +34,9 @@ func TestMain(m *testing.M) {
 	}
 	os.Setenv(secrets.KeychainEnv, "off")
 	aliasCLI = func() string { return "" }
+	// The test clients stand in for a root admin and run commands right here;
+	// TestDialAdminRunsEverythingAsRoot puts the real one back.
+	elevate = func(c remote.Client) remote.Client { return c }
 	if err := isolateGitConfig(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

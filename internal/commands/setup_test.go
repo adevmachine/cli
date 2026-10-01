@@ -1072,6 +1072,10 @@ func TestSetupInstallsTheKeyWhenTailscaleSSHLetItIn(t *testing.T) {
 	if steps.askedForPassword {
 		t.Fatal("it asked for a password it does not need")
 	}
+	// Nothing proved the key past Tailscale SSH, so passwords stay on.
+	if steps.hardened {
+		t.Fatal("it turned password login off on an unproved key")
+	}
 	if !strings.Contains(out, "Tailscale SSH") || strings.Contains(out, "already logs in") {
 		t.Fatalf("got %q", out)
 	}

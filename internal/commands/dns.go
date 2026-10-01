@@ -128,7 +128,7 @@ func newDNSProvidersCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, _, err := dial(cmd.Context(), tgt.machine, "")
+			client, _, err := dialAdmin(cmd.Context(), tgt.machine)
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ func defaultChooseDNS(ctx context.Context, opts *options, name, providerFlag, zo
 		return dns.Choice{}, target{}, err
 	}
 
-	client, _, err := dial(ctx, tgt.machine, "")
+	client, _, err := dialAdmin(ctx, tgt.machine)
 	if err != nil {
 		// A DNS command with the machine down still has manual to fall back
 		// to: dns.Choose treats a nil client as "nothing to ask", not as a

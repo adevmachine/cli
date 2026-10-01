@@ -427,11 +427,7 @@ func installKeyOverTailscaleSSH(ctx context.Context, client remote.Client, out i
 func machinePublicKey(m config.Machine) (string, error) {
 	switch {
 	case m.Key != "":
-		body, err := os.ReadFile(m.Key + ".pub")
-		if err != nil {
-			return "", fmt.Errorf("reading the public half of %s: %w", m.Key, err)
-		}
-		return strings.TrimSpace(string(body)), nil
+		return keys.PublicFor(m.Key)
 	case m.AgentKey != "":
 		return m.AgentKey, nil
 	}
@@ -771,8 +767,10 @@ func askForKey(r *bufio.Reader, out io.Writer, dir, machine string) (chosenKey, 
 func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Writer,
 	m config.Machine, key chosenKey, noHarden bool) error {
 	client, address, err := dialWith(ctx, m, m.User, key.auth())
+	unproved := false
 	switch {
 	case err == nil && tailscaleSSH(client):
+		unproved = true
 		// Tailscale SSH let the connection in by tailnet identity, not by the
 		// key, so "the key already logs in" would be a claim nothing proved.
 		// The key goes in anyway: without it the machine is unreachable the
@@ -804,9 +802,16 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 		return err
 	}
 
-	if noHarden {
+	switch {
+	case noHarden:
 		fmt.Fprintf(out, "--no-harden: password login is left as it was.\n")
-	} else {
+	case unproved:
+		// Locking down comes after the proof, never with it — and nothing
+		// proved the key past Tailscale SSH. Turning passwords off now could
+		// leave no way in the day Tailscale is down.
+		fmt.Fprintf(out, "password login is left as it was: the key could not be proved past Tailscale SSH. "+
+			"Prove it from outside the tailnet before the ssh_hardening package turns passwords off.\n")
+	default:
 		fmt.Fprintf(out, "turning password login off...\n")
 		if err := harden(ctx, client); err != nil {
 			return err

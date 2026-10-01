@@ -568,7 +568,10 @@ func (c *sshClient) Upload(ctx context.Context, dir string, tarball io.Reader) e
 	session.Stdin = tarball
 	// As root: the bundle directory sits under /opt, which an admin login
 	// that reaches root through sudo cannot write to as itself.
-	command := AsRoot("mkdir -p " + quoted + " && tar -C " + quoted + " -xzf -")
+	// --no-same-owner: root's tar would otherwise keep the operator's own
+	// uid from the archive, and hand roles that run as root to whichever
+	// account on the machine happens to share that number.
+	command := AsRoot("mkdir -p " + quoted + " && tar --no-same-owner -C " + quoted + " -xzf -")
 	// tar says what it refused on stderr, and that message is the whole
 	// diagnosis when an upload fails.
 	out, err := session.CombinedOutput(command)
@@ -612,7 +615,7 @@ func (c *sshClient) ServerVersion() string { return string(c.conn.ServerVersion(
 // accepts any key, or none: a login over it proves nothing about the key.
 func IsTailscaleSSH(c Client) bool {
 	v, ok := c.(interface{ ServerVersion() string })
-	return ok && strings.Contains(strings.ToLower(v.ServerVersion()), "tailscale")
+	return ok && strings.HasPrefix(v.ServerVersion(), "SSH-2.0-Tailscale")
 }
 
 // localClient runs commands on your computer instead of over SSH, for a
@@ -669,14 +672,36 @@ func (c *localClient) Upload(_ context.Context, dir string, tarball io.Reader) e
 
 func (c *localClient) Close() error { return nil }
 
-// Elevate runs a script as root on a machine reached over SSH, whatever
-// account the admin login is, and leaves it alone on your own computer: a
-// self machine's steps run as you, and sudo there is not this CLI's to use.
-func Elevate(c Client, script string) string {
+// Elevated wraps a client connected as the machine's admin login, so every
+// command it runs goes through AsRoot. The decision belongs where the
+// connection is opened, because only there is it known whose account it is:
+// a workspace's own connection must never ask for sudo, and an admin's that
+// is not root needs it for nearly everything.
+//
+// Your own computer, as a self machine, is returned untouched: its steps run
+// as you, and sudo there is not this CLI's to use.
+func Elevated(c Client) Client {
 	if _, local := c.(*localClient); local {
-		return script
+		return c
 	}
-	return AsRoot(script)
+	if _, already := c.(elevated); already {
+		return c
+	}
+	return elevated{c}
+}
+
+type elevated struct{ Client }
+
+func (e elevated) Run(ctx context.Context, command string) (string, error) {
+	return e.Client.Run(ctx, AsRoot(command))
+}
+
+func (e elevated) RunInput(ctx context.Context, command string, stdin io.Reader) (string, error) {
+	return e.Client.RunInput(ctx, AsRoot(command), stdin)
+}
+
+func (e elevated) Stream(ctx context.Context, command string, stdout, stderr io.Writer) error {
+	return e.Client.Stream(ctx, AsRoot(command), stdout, stderr)
 }
 
 // extractTarGz writes a gzipped tar's regular files and directories under

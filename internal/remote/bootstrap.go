@@ -87,13 +87,17 @@ func ProveAuth(ctx context.Context, m config.Machine, user string, a Auth) (Clie
 // It asks `id -u` first instead of trying without sudo and retrying with it.
 // A retry would run a half-finished script twice, and would read any failure
 // at all — a full disk, a refused sshd config — as a missing permission.
+// `-H` so HOME is root's, as it is for an admin that is root: a script that
+// writes under $HOME, and Ansible's own ~/.ansible, must not land in the
+// admin's home owned by root.
+//
 // `-n` because nobody is there to type a password: a sudo that wants one
 // fails at once, and CheckRoot is what says so in words.
 //
 // stdin is left to the script, because the hardening drop-in arrives on it.
 func AsRoot(script string) string {
 	quoted := shellQuote(script)
-	return `if [ "$(id -u)" -eq 0 ]; then sh -c ` + quoted + `; else sudo -n sh -c ` + quoted + `; fi`
+	return `if [ "$(id -u)" -eq 0 ]; then sh -c ` + quoted + `; else sudo -n -H sh -c ` + quoted + `; fi`
 }
 
 // ErrNoRoot is an admin login that is not root and has no passwordless sudo.
@@ -111,10 +115,16 @@ func CheckRoot(ctx context.Context, c Client, user string) error {
 	if _, err := c.Run(ctx, rootCheckScript); err != nil {
 		return fmt.Errorf("%w: %q is not root, and `sudo -n true` fails as it. "+
 			"Log in as root, or give it passwordless sudo on the machine: "+
-			"echo '%[2]s ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/devmachine-%[2]s: %[3]w",
-			ErrNoRoot, user, err)
+			"echo '%[2]s ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/devmachine-%[3]s: %[4]w",
+			ErrNoRoot, user, sudoersFileName(user), err)
 	}
 	return nil
+}
+
+// sudoersFileName is a user name made safe for /etc/sudoers.d, which sudo
+// reads only when the file name has no dot and does not end in a tilde.
+func sudoersFileName(user string) string {
+	return strings.NewReplacer(".", "_", "~", "_").Replace(user)
 }
 
 // hardeningDropInPath is where password login is turned off.

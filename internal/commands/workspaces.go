@@ -491,7 +491,7 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 				}
 			}
 
-			client, _, err := dial(cmd.Context(), machine, "")
+			client, _, err := dialAdmin(cmd.Context(), machine)
 			if err != nil {
 				return fmt.Errorf("destroying %s needs the machine: %w; `devmachine workspaces rm %s` "+
 					"forgets it without touching the machine", w.Name, err, w.Name)

@@ -281,8 +281,19 @@ func keepForTheWorkspaces(cmd *cobra.Command, machine config.Machine, d credenti
 	}
 	defer client.Close()
 
-	script := fmt.Sprintf(keepScript, quoteForShell(d.StoredAt), quoteForShell(dir))
-	if _, err := client.Run(cmd.Context(), script); err != nil {
+	// The login ran as the admin, so a ~/ in stored_at is the admin's home.
+	// It is read before elevating: under sudo, $HOME is root's.
+	from := d.StoredAt
+	if rest, ok := strings.CutPrefix(from, "~/"); ok {
+		home, err := client.Run(cmd.Context(), `printf '%s' "$HOME"`)
+		if err != nil {
+			return fmt.Errorf("finding the admin's home on %s: %w", machine.Name, err)
+		}
+		from = strings.TrimRight(strings.TrimSpace(home), "/") + "/" + rest
+	}
+
+	script := fmt.Sprintf(keepScript, quoteForShell(from), quoteForShell(dir))
+	if _, err := elevate(client).Run(cmd.Context(), script); err != nil {
 		return fmt.Errorf("keeping the result in %s: %w", dir, err)
 	}
 	cmd.Printf("logged in, and kept in %s\n", dir)

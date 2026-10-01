@@ -188,7 +188,7 @@ func newCredentialsListCmd(opts *options) *cobra.Command {
 
 			present := map[string]bool{}
 			if len(found.wanted) > 0 {
-				client, _, err := dial(cmd.Context(), found.machine, "")
+				client, _, err := dialAdmin(cmd.Context(), found.machine)
 				if err != nil {
 					return err
 				}
@@ -317,7 +317,7 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 		return reportPush(cmd, opts, pushJSON{Machine: found.machine.Name, Check: check})
 	}
 
-	client, _, err := dial(cmd.Context(), found.machine, "")
+	client, _, err := dialAdmin(cmd.Context(), found.machine)
 	if err != nil {
 		return err
 	}

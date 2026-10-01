@@ -256,6 +256,11 @@ func runPackage(cmd *cobra.Command, opts *options, name, workspace string, args 
 		return err
 	}
 	defer client.Close()
+	if tgt.user == "" {
+		// No workspace: the entrypoint runs over the admin's connection, and
+		// reads what only root can, a credential under /etc/devmachine.
+		client = elevate(client)
+	}
 
 	base, err := provision.Base(tgt.machine)
 	if err != nil {
@@ -286,4 +291,19 @@ func explainHostKey(ctx context.Context, m config.Machine, err error) error {
 		return verr
 	}
 	return err
+}
+
+// elevate makes an admin connection run as root. A seam, because the test
+// clients run commands on the developer's computer as a stand-in for a root
+// admin, where sudo is neither there nor wanted.
+var elevate = remote.Elevated
+
+// dialAdmin connects as the machine's admin login for steps that need root,
+// and runs every command through sudo when that login is not root.
+func dialAdmin(ctx context.Context, m config.Machine) (remote.Client, string, error) {
+	client, address, err := dial(ctx, m, "")
+	if err != nil {
+		return nil, "", err
+	}
+	return elevate(client), address, nil
 }

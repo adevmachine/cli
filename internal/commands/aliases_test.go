@@ -124,7 +124,7 @@ func TestAliasesWriteToACustomPathMakesItTheirOneHome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.SSHAliases || cfg.SSHAliasesPath != path {
+	if !cfg.SSHAliases || cfg.SSHAliasesPath != aliases.Portable(path) {
 		t.Fatalf("ssh_aliases %v, ssh_aliases_path %q", cfg.SSHAliases, cfg.SSHAliasesPath)
 	}
 
@@ -263,5 +263,55 @@ func TestAliasesJSONCarriesTheProxyCommand(t *testing.T) {
 	}
 	if !strings.Contains(out, `"proxy_command": "/opt/homebrew/bin/devmachine --config `) {
 		t.Fatalf("got %s", out)
+	}
+}
+
+// TestAliasesWriteToTheSameFileSpelledDifferentlyKeepsIt: a relative path or a
+// symbolic link to the file the aliases already live in is not a move, and
+// must not empty the block it just wrote.
+func TestAliasesWriteToTheSameFileSpelledDifferentlyKeepsIt(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(filepath.Join(home, ".ssh", "config"), link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(home)
+
+	for _, spelling := range []string{".ssh/config", link} {
+		if _, err := execute(t, "--config", dir, "aliases", "--write", "--path", spelling, "--yes"); err != nil {
+			t.Fatal(err)
+		}
+		body, err := os.ReadFile(filepath.Join(home, ".ssh", "config"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), "Host alice-devmachine") {
+			t.Fatalf("%s emptied the block it had just written:\n%s", spelling, body)
+		}
+	}
+}
+
+// TestAliasesRecordsAPathUnderHomeAsTilde: config.yml travels between
+// computers whose home directories differ.
+func TestAliasesRecordsAPathUnderHomeAsTilde(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := configWithTrustedKey(t, "workspaces:\n  - name: alice\n    machine: main\n")
+
+	if _, err := execute(t, "--config", dir, "aliases", "--write", "--path",
+		filepath.Join(home, ".ssh", "devmachine-aliases"), "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSHAliasesPath != "~/.ssh/devmachine-aliases" {
+		t.Fatalf("recorded %q", cfg.SSHAliasesPath)
 	}
 }
