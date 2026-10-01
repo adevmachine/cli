@@ -215,6 +215,25 @@ func TestRunReportsACommandThatFailed(t *testing.T) {
 	}
 }
 
+func TestRunSaysWhyTheCommandFailed(t *testing.T) {
+	m := testMachine(t)
+
+	client, _, err := Dial(context.Background(), m, "")
+	if err != nil {
+		t.Fatalf("Dial returned %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.Run(context.Background(), "echo 'the reason' >&2; exit 3")
+	if err == nil || !strings.Contains(err.Error(), ": the reason") {
+		t.Fatalf("Run lost the reason: %v", err)
+	}
+	_, err = client.RunInput(context.Background(), "echo 'the reason' >&2; exit 3", strings.NewReader(""))
+	if err == nil || !strings.Contains(err.Error(), ": the reason") {
+		t.Fatalf("RunInput lost the reason: %v", err)
+	}
+}
+
 func TestDialFallsBackToTheNextAddress(t *testing.T) {
 	m := testMachine(t)
 	// An address in the documentation range never answers, so the fallback is

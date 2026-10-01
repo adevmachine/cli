@@ -178,6 +178,9 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 			failures = append(failures, fmt.Sprintf("%s (%s)", address, strings.TrimSpace(errBuf.String())))
 			continue
 		}
+		if reason := strings.TrimSpace(errBuf.String()); reason != "" && stderr == nil {
+			return fmt.Errorf("running %q: %w: %s", command, runErr, reason)
+		}
 		return fmt.Errorf("running %q: %w", command, runErr)
 	}
 	return fmt.Errorf("machine %q: no address answered: %s", c.machine, strings.Join(failures, "; "))

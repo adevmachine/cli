@@ -501,8 +501,19 @@ func (c *sshClient) Run(ctx context.Context, command string) (string, error) {
 	stop := c.closeOnCancel(ctx, session)
 	defer stop()
 
+	return output(session, command)
+}
+
+// output runs a command and returns its stdout, with what it wrote to stderr
+// carried in the error: a script explains a refusal there.
+func output(session *ssh.Session, command string) (string, error) {
+	var stderr bytes.Buffer
+	session.Stderr = &stderr
 	out, err := session.Output(command)
 	if err != nil {
+		if reason := strings.TrimSpace(stderr.String()); reason != "" {
+			return string(out), fmt.Errorf("running %q: %w: %s", command, err, reason)
+		}
 		return string(out), fmt.Errorf("running %q: %w", command, err)
 	}
 	return string(out), nil
@@ -520,11 +531,7 @@ func (c *sshClient) RunInput(ctx context.Context, command string, stdin io.Reade
 	defer stop()
 
 	session.Stdin = stdin
-	out, err := session.Output(command)
-	if err != nil {
-		return string(out), fmt.Errorf("running %q: %w", command, err)
-	}
-	return string(out), nil
+	return output(session, command)
 }
 
 // Stream executes one command with its output reaching the writers as it
@@ -625,8 +632,7 @@ func IsTailscaleSSH(c Client) bool {
 type localClient struct{}
 
 // Run executes one command and returns its standard output, matching
-// sshClient.Run: stderr is not collected, only what the command wrote to
-// stdout.
+// sshClient.Run: stderr reaches only the error, never the output.
 func (c *localClient) Run(ctx context.Context, command string) (string, error) {
 	return c.RunInput(ctx, command, nil)
 }

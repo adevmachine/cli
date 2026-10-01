@@ -182,6 +182,43 @@ func TestMuxClientRunReturnsAnErrorTheSameShapeAsTheProgrammaticClient(t *testin
 	}
 }
 
+// TestMuxClientRunSaysWhyTheCommandFailed: a script explains a refusal on
+// stderr, and that sentence is the error somebody can act on.
+func TestMuxClientRunSaysWhyTheCommandFailed(t *testing.T) {
+	fakeCacheDir(t)
+	m := muxTestMachine(t)
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(fakeSSH, []byte("#!/bin/sh\necho 'escape/leak.env reaches outside the home' >&2\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	origLookPath := lookPath
+	lookPath = func(name string) (string, error) {
+		if name == "ssh" {
+			return fakeSSH, nil
+		}
+		return "", errors.New("not found")
+	}
+	t.Cleanup(func() { lookPath = origLookPath })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatalf("DialMux returned %v", err)
+	}
+	for name, run := range map[string]func() error{
+		"Run": func() error { _, err := client.Run(context.Background(), "true"); return err },
+		"RunInput": func() error {
+			_, err := client.RunInput(context.Background(), "true", strings.NewReader(""))
+			return err
+		},
+	} {
+		err := run()
+		if err == nil || !strings.Contains(err.Error(), "escape/leak.env reaches outside the home") {
+			t.Fatalf("%s: the reason is missing: %v", name, err)
+		}
+	}
+}
+
 // TestDialMuxReusesTheControlSocket runs `run` twice against the disposable
 // Lima VM (see scripts/fake-vps.sh) and proves the second call finds the
 // first one's control socket still alive, which is the whole point of
