@@ -1,0 +1,47 @@
+docs/development.md
+  s_a0cbf6c120c4f8::t_74650ec5adfd53 76
+docs/how-it-works/downloads.md
+  s_a0cbf6c120c4f8::t_e4f169a269ad96 1-48
+docs/index.md
+  s_a0cbf6c120c4f8::t_cbf608cc52e21e 109-110
+docs/reference/commands.md
+  s_a0cbf6c120c4f8::t_0e93afd436413c 548-582,967
+docs/troubleshooting.md
+  s_a0cbf6c120c4f8::t_4f517b3544114d 782-809
+internal/commands/download.go
+  s_a0cbf6c120c4f8::t_31c2a988e7e7cb 1-150
+internal/commands/download_test.go
+  s_a0cbf6c120c4f8::t_e269688965faf7 1-238
+internal/commands/root.go
+  s_a0cbf6c120c4f8::t_c792c1956157b2 86
+internal/commands/upload.go
+  s_a0cbf6c120c4f8::t_4b0b102688d0b8 62,104,107,116
+internal/download/download.go
+  s_a0cbf6c120c4f8::t_dd17cbad98b22c 1-233
+internal/download/download_test.go
+  s_a0cbf6c120c4f8::t_47f42eac89c244 1-261
+internal/remote/mux.go
+  s_a0cbf6c120c4f8::t_9177fd6bbff484 140-143,150-152,174-177,199-212
+internal/remote/mux_test.go
+  s_a0cbf6c120c4f8::t_4ec2c46e543d5a 313-347
+scripts/accept/download.sh
+  s_a0cbf6c120c4f8::t_c6ed6d23d63c6d 1-123
+scripts/accept/run.sh
+  s_a0cbf6c120c4f8::t_c00a5c135daf95 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8cd97af14f523843004528cc4730c16cabf7208e",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
