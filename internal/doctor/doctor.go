@@ -26,8 +26,9 @@ import (
 const (
 	StatusPass = "pass"
 	StatusFail = "fail"
-	// StatusSkip means the check could not run because an earlier one failed.
-	// It is not a pass and not a failure: reporting it as either would lie.
+	// StatusSkip means the check did not run: an earlier one failed, or there
+	// is nothing for it to judge. It is not a pass and not a failure:
+	// reporting it as either would lie.
 	StatusSkip = "skip"
 	// StatusWarn means something is worth fixing but nothing is broken: the
 	// machine still works the way every check after it proves.
@@ -209,16 +210,20 @@ func parseSSHDashG(out string) map[string]string {
 // `devmachine aliases` would write for the configuration today — whatever
 // file it actually lives in.
 //
-// It asks `ssh -G <alias>` rather than reading a fixed file, because a person
-// who manages ~/.ssh/config themselves can pull the generated block in from
-// elsewhere with `Include`. That makes the check work the same way whether
-// devmachine owns the file (`ssh_aliases: true`) or only wrote it once on
-// request.
+// It asks `ssh -G <alias>` rather than reading a fixed file, so the generated
+// block can live in ~/.ssh/config or in a file pulled in with `Include`.
+//
+// With `ssh_aliases` off, devmachine does not keep the aliases, so it has no
+// standard to judge them by: the person's own ~/.ssh/config is not wrong for
+// differing from a block they never asked for.
 //
 // It is a warning, never a failure: a stale or missing alias means `ssh
 // <workspace>-devmachine` does not work from another terminal, not that the
 // machine itself is broken.
 func sshAliasesCheck(cfg config.Config) Check {
+	if !cfg.SSHAliases {
+		return Check{Name: CheckSSHAliases, Status: StatusSkip, Detail: "managed outside devmachine (ssh_aliases: false)"}
+	}
 	found, err := aliases.List(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {
 		return Check{Name: CheckSSHAliases, Status: StatusWarn, Detail: err.Error()}

@@ -32,17 +32,19 @@ Said no at the time, or set up before this existed? Turn it on:
 devmachine aliases --write
 ```
 
-`devmachine doctor` and `devmachine machine doctor` both check every
-workspace alias by asking `ssh -G <alias>` — a local lookup, never a
-connection — and warn when what it resolves to does not match what
-`devmachine aliases` would write, with the same fix.
+With `ssh_aliases: true`, `devmachine doctor` checks every workspace
+alias by asking `ssh -G <alias>` — a local lookup, never a connection —
+and warns when what it resolves to does not match what `devmachine
+aliases` would write, with the same fix. It does not care which file the
+answer came from. `devmachine machine doctor` checks the managed block
+in `~/.ssh/config`.
 
-Manage `~/.ssh/config` yourself and pull the generated block in with
-`Include` instead? Say no to the question, or set `ssh_aliases: false`,
-and write the block to a file of your own with `devmachine aliases
---write --path <file>`. The doctor check still passes, because it asks
-`ssh` to resolve the alias rather than reading a fixed file — it does
-not care which file the answer came from.
+Manage `~/.ssh/config` yourself instead? Say no to the question, or set
+`ssh_aliases: false`, and write the block to a file of your own with
+`devmachine aliases --write --path <file>` if you want it. Both doctors
+then report the aliases as `skip  managed outside devmachine
+(ssh_aliases: false)`: the file is yours, so devmachine does not judge
+it.
 
 ## The public address
 

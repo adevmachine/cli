@@ -124,15 +124,19 @@ non-zero only when a check failed. `--format json` prints the same checks
 with the same statuses (`pass`, `warn`, `fail`, `skip`); its `ok` is `false`
 only when a check failed.
 
-The SSH aliases check runs `ssh -G <alias>` for each workspace alias —
-a local lookup, no connection — and compares the hostname, user, port
-and host key alias against what `devmachine aliases` would write today.
-It passes as soon as every alias resolves correctly, whatever file it
-actually lives in: `~/.ssh/config`'s own managed block, or a file
-someone pulls in with `Include` while keeping `ssh_aliases: false` and
-managing `~/.ssh/config` themselves. Otherwise it **warns**, never
-fails, naming the alias and what is wrong, with the fix `devmachine
-aliases --write`. It is skipped on a self machine — there is no
+The SSH aliases check runs only when `ssh_aliases: true` is set, that
+is, when devmachine keeps the aliases for you. It runs `ssh -G <alias>`
+for each workspace alias — a local lookup, no connection — and compares
+the hostname, user, port and host key alias against what `devmachine
+aliases` would write today. It passes as soon as every alias resolves
+correctly, whatever file it actually lives in. Otherwise it **warns**,
+never fails, naming the alias and what is wrong, with the fix
+`devmachine aliases --write`.
+
+With `ssh_aliases: false` (or left out) it reports `skip  ssh aliases
+managed outside devmachine (ssh_aliases: false)`: you keep
+`~/.ssh/config` yourself, so there is nothing for devmachine to compare
+it to. It is not reported at all on a self machine — there is no
 address to write a Host entry for.
 
 Last come two checks about your computer, not the machine: `cli` (is this
@@ -619,7 +623,9 @@ hand, once.
 
 `doctor` checks `ssh`/`mosh` on `PATH` (mosh is a warning only), an SSH
 agent or configured key, and whether `~/.ssh/config` matches what
-`devmachine aliases --write` would produce now.
+`devmachine aliases --write` would produce now. That last one runs only
+with `ssh_aliases: true`; otherwise it reports `skip` — you keep the file
+yourself.
 
 `setup` installs what is missing via Homebrew on a Mac; on Linux it names
 what to install instead of guessing. Never installs an editor, shell

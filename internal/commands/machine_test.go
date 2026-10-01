@@ -59,7 +59,7 @@ func TestMachineDoctorSaysTheAliasesAreStale(t *testing.T) {
 	}
 
 	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
-		"workspaces:\n  - name: alice\n")
+		"workspaces:\n  - name: alice\nssh_aliases: true\n")
 	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +74,22 @@ func TestMachineDoctorSaysTheAliasesAreStale(t *testing.T) {
 	}
 	if !strings.Contains(out, "aliases") || !strings.Contains(out, "stale") {
 		t.Fatalf("it does not say the aliases are stale: %q", out)
+	}
+}
+
+func TestMachineDoctorDoesNotJudgeAliasesManagedOutsideDevmachine(t *testing.T) {
+	stubTools(t, map[string]bool{"ssh": true, "mosh": true})
+	t.Setenv("SSH_AUTH_SOCK", "/tmp/agent.sock")
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"workspaces:\n  - name: alice\nssh_aliases: false\n")
+
+	out, err := execute(t, "--config", dir, "machine", "doctor")
+	if err != nil {
+		t.Fatalf("aliases devmachine does not keep failed the check: %v\n%s", err, out)
+	}
+	line := lineWith(t, out, "aliases")
+	if !strings.HasPrefix(line, "skip") || !strings.Contains(line, "managed outside devmachine (ssh_aliases: false)") {
+		t.Fatalf("got %q", line)
 	}
 }
 

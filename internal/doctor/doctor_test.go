@@ -755,7 +755,7 @@ func TestDoctorOnASelfMachineRunsNoSSHChecks(t *testing.T) {
 // throwaway $HOME, so a test never depends on the real ~/.ssh/config.
 func aliasesEnvironment(t *testing.T, body string) string {
 	t.Helper()
-	dir := configDir(t, machineWith+body)
+	dir := configDir(t, machineWith+body+"ssh_aliases: true\n")
 	t.Setenv("HOME", t.TempDir())
 	return dir
 }
@@ -868,25 +868,32 @@ func TestSSHAliasesCheckPassesWithNoWorkspace(t *testing.T) {
 	}
 }
 
-// TestSSHAliasesCheckPassesWhenManagedElsewhere covers a person who keeps
-// ~/.ssh/config themselves and pulls the generated block in from another file
-// with `Include`. `ssh_aliases: false` means devmachine never wrote the
-// managed block itself, but the alias still has to resolve correctly.
-func TestSSHAliasesCheckPassesWhenManagedElsewhere(t *testing.T) {
-	dir := aliasesEnvironment(t, "workspaces:\n  - name: alice\n")
-	cfg, err := config.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.SSHAliases {
-		t.Fatal("ssh_aliases defaulted to true; this test needs it off")
-	}
-	withSSHResolve(t, matchingSSHResolve(t, cfg))
+func TestSSHAliasesCheckIsSkippedWhenManagedOutsideDevmachine(t *testing.T) {
+	dir := configDir(t, machineWith+"workspaces:\n  - name: alice\nssh_aliases: false\n")
+	withSSHResolve(t, func(string) (map[string]string, error) {
+		t.Fatal("ssh -G ran for aliases devmachine does not manage")
+		return nil, nil
+	})
 
 	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
 
-	if got := find(t, checks, CheckSSHAliases); got.Status != StatusPass {
-		t.Fatalf("got %#v; ssh_aliases: false should not be warned about when it still resolves", got)
+	got := find(t, checks, CheckSSHAliases)
+	if got.Status != StatusSkip || got.Detail != "managed outside devmachine (ssh_aliases: false)" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestSSHAliasesCheckIsSkippedWhenTheKeyIsLeftOut(t *testing.T) {
+	dir := configDir(t, machineWith+"workspaces:\n  - name: alice\n")
+	withSSHResolve(t, func(string) (map[string]string, error) {
+		t.Fatal("ssh -G ran for aliases devmachine does not manage")
+		return nil, nil
+	})
+
+	checks := Run(context.Background(), dir, "", dialling(fullMachineClient()), nil)
+
+	if got := find(t, checks, CheckSSHAliases); got.Status != StatusSkip {
+		t.Fatalf("got %#v", got)
 	}
 }
 

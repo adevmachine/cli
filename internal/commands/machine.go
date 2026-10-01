@@ -19,6 +19,7 @@ const (
 	machinePass = "pass"
 	machineWarn = "warn"
 	machineFail = "fail"
+	machineSkip = "skip"
 )
 
 // machineCheck is one thing `machine doctor` looked at on your computer.
@@ -85,11 +86,15 @@ func agentCheck(opts *options) machineCheck {
 // aliasesCheck says whether ~/.ssh/config holds the devmachine block, and
 // whether it still matches what the configuration would write today. A
 // workspace added after the last `aliases --write` is not reachable by name,
-// and nothing else would tell you that.
+// and nothing else would tell you that. With `ssh_aliases` off the file is
+// the person's own, and not devmachine's to judge.
 func aliasesCheck(opts *options) machineCheck {
 	cfg, err := loadConfig(opts)
 	if err != nil {
 		return machineCheck{Name: "aliases", Status: machineWarn, Detail: "no configuration to check against"}
+	}
+	if !cfg.SSHAliases {
+		return machineCheck{Name: "aliases", Status: machineSkip, Detail: "managed outside devmachine (ssh_aliases: false)"}
 	}
 	want, err := aliases.Render(cfg, aliases.Options{CLI: aliasCLI()})
 	if err != nil {

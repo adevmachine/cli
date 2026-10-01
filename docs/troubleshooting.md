@@ -196,6 +196,18 @@ that address stops working.
 **What to do:** `devmachine aliases --write`. See
 [SSH aliases that resolve when you connect](how-it-works/addresses-and-fallback.md#ssh-aliases-that-resolve-when-you-connect).
 
+## `doctor` says `skip  ssh aliases  managed outside devmachine (ssh_aliases: false)`
+
+**What it means:** `config.yml` does not have `ssh_aliases: true`, so
+devmachine does not keep your SSH aliases. You manage `~/.ssh/config`
+yourself, and doctor does not judge a file it did not write. Nothing is
+wrong.
+
+**What to do:** Nothing, if you keep `~/.ssh/config` on purpose. To have
+devmachine keep the aliases and check them, run `devmachine aliases
+--write` once and say yes. See
+[SSH aliases](concepts/reaching-your-server.md#ssh-aliases).
+
 ## A setting is accepted, but the package still uses its default
 
 **What it means:** A setting reaches the server as
