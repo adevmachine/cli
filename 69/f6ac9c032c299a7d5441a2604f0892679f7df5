@@ -1,0 +1,24 @@
+scripts/accept/headscale.sh
+  s_a0cbf6c120c4f8::t_bb3eba0812f937 1-227
+  s_a0cbf6c120c4f8::t_17c61141b98c6b 228-229
+docs/development.md
+  s_a0cbf6c120c4f8::t_a62a1155896a02 83-100
+docs/guides/headscale.md
+  s_a0cbf6c120c4f8::t_7c96cd62fbee80 15-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "69f6ac9c032c299a7d5441a2604f0892679f7df5",
+  "prompts": {},
+  "sessions": {
+    "s_a0cbf6c120c4f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7d54e1b-857f-44e4-a7a9-0ca76ea55bb2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
