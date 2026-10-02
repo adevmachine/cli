@@ -37,6 +37,17 @@ const (
 	KindFile = "file"
 )
 
+// The platforms a package can say it runs on. A workspace always lives on a
+// Linux server; macOS is only ever the computer the CLI runs on, as a self
+// machine.
+const (
+	PlatformLinux = "linux"
+	PlatformMacOS = "macos"
+)
+
+// KnownPlatforms is every value `platforms` accepts.
+var KnownPlatforms = []string{PlatformLinux, PlatformMacOS}
+
 // ReadableFormats are the shapes of package.yml this CLI can read. A set, not
 // a number: adding a field is not a new format, so most releases add nothing
 // here, and the ones that do keep reading the old shape for as long as it is
@@ -109,7 +120,11 @@ type Manifest struct {
 	// Category groups the package with others like it on the packages page.
 	// Nothing in the CLI reads it, so no value is refused.
 	Category string `yaml:"category"`
-	Requires struct {
+	// Platforms are the operating systems the package runs on. Left out, it
+	// runs on any of them. It is what lets a client stop offering a macOS
+	// package for a Linux server before a sync finds out the hard way.
+	Platforms []string `yaml:"platforms"`
+	Requires  struct {
 		CLI string `yaml:"cli"`
 	} `yaml:"requires"`
 	// Needs is ordering, declared. Never implied by the order of a list:

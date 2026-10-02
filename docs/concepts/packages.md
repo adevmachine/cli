@@ -100,6 +100,7 @@ from the CLI:
 | `scope` | yes | Where it is installed: "machine" or "workspace". |
 | `summary` | yes | One line saying what it installs. It is what `packages list` prints. |
 | `category` |  | A word or two grouping it with packages like it, such as "Security" or "DNS". The packages page filters by it. |
+| `platforms` |  | The operating systems it runs on: "linux", "macos", or both. Left out, any. |
 | `requires` |  | Which CLI can run it, written as requires.cli: ">= 0.2.0". |
 | `needs` |  | Packages that have to run before this one. It is the only thing that decides order. |
 | `provides` |  | Places other packages may write into, as <place>: <absolute path on the machine>. |

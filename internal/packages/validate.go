@@ -113,6 +113,7 @@ func Validate(dir string) ([]Problem, error) {
 		}
 	}
 
+	problems = append(problems, validatePlatforms(m)...)
 	problems = append(problems, validateEntrypoint(dir, m)...)
 	problems = append(problems, validateCredentials(m)...)
 	problems = append(problems, validateSkills(dir, m)...)
@@ -149,6 +150,28 @@ func Validate(dir string) ([]Problem, error) {
 		return nil, err
 	}
 	return append(problems, taskProblems...), nil
+}
+
+func validatePlatforms(m Manifest) []Problem {
+	var problems []Problem
+	at := func(what string) {
+		problems = append(problems, Problem{File: FileName, Line: m.Lines["platforms"], What: what})
+	}
+	seen := map[string]bool{}
+	for _, p := range m.Platforms {
+		switch {
+		case !slices.Contains(KnownPlatforms, p):
+			at(fmt.Sprintf("platform %q: the platforms are %q and %q", p, PlatformLinux, PlatformMacOS))
+		case seen[p]:
+			at(fmt.Sprintf("platform %q is listed twice", p))
+		}
+		seen[p] = true
+	}
+	if m.Scope == ScopeWorkspace && len(m.Platforms) > 0 && !slices.Contains(m.Platforms, PlatformLinux) {
+		at(fmt.Sprintf("a workspace always lives on a Linux server, so a workspace package has to list %q",
+			PlatformLinux))
+	}
+	return problems
 }
 
 func validateSkills(dir string, m Manifest) []Problem {

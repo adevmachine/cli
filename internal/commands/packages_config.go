@@ -233,7 +233,13 @@ type packageRow struct {
 	Category string `json:"category,omitempty"`
 	// Kind is the contract a callable package answers, such as "dns", which
 	// is how a client finds the DNS providers without knowing their names.
-	Kind        string              `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	// Platforms are the operating systems the package runs on, and an empty
+	// list means any of them.
+	Platforms []string `json:"platforms"`
+	// Needs are the packages it brings in before itself, which is what a
+	// bundle such as essentials is made of.
+	Needs       []string            `json:"needs"`
 	Credentials []packageCredential `json:"credentials"`
 	Installed   []string            `json:"installed_on"`
 }
@@ -329,6 +335,8 @@ func listPackages(ctx context.Context, opts *options) (string, []packageRow, err
 			Summary:     found.Manifest.Summary,
 			Category:    found.Manifest.Category,
 			Kind:        found.Manifest.Kind,
+			Platforms:   onOrNone(found.Manifest.Platforms),
+			Needs:       onOrNone(found.Manifest.Needs),
 			Credentials: credentialsOf(found.Manifest),
 			Installed:   onOrNone(installed[found.Manifest.Name]),
 		})
@@ -336,7 +344,8 @@ func listPackages(ctx context.Context, opts *options) (string, []packageRow, err
 	}
 	for _, name := range slices.Sorted(maps.Keys(installed)) {
 		rows = append(rows, packageRow{
-			Name: name, Source: sourceMissing, Credentials: []packageCredential{}, Installed: installed[name],
+			Name: name, Source: sourceMissing, Platforms: []string{}, Needs: []string{},
+			Credentials: []packageCredential{}, Installed: installed[name],
 		})
 	}
 

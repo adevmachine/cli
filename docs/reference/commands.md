@@ -979,6 +979,8 @@ per package:
   "summary": "DNS zones on Hostinger.",
   "category": "DNS",
   "kind": "dns",
+  "platforms": [],
+  "needs": [],
   "credentials": [
     {"name": "hostinger", "kind": "secret", "scope": "machine", "env": "HOSTINGER_API_TOKEN"}
   ],
@@ -988,7 +990,11 @@ per package:
 
 `kind` is the contract a callable package answers — `dns` marks a
 [DNS provider](../how-it-works/dns-providers.md) — and is left out for an
-ordinary package. `category` is the manifest's grouping, left out when it
+ordinary package. `platforms` are the operating systems it runs on
+(`linux`, `macos`), and `[]` means any — a package that says `["macos"]`
+is for your own computer, never for a server. `needs` are the packages
+it brings in before itself, `[]` when none: for `essentials` that is the
+list it is made of. `category` is the manifest's grouping, left out when it
 has none. `credentials` lists what the package declares, always an array:
 each one's `name`, `kind` (`secret`, `file` or `manual`), `scope`, and
 `env` or `path` where the value is delivered. **It never carries a

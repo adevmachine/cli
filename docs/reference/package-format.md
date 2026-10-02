@@ -53,6 +53,22 @@ A word or two grouping the package with others like it, such as
 does not read it, so any value is accepted, and a package without one is
 listed as `Other`.
 
+### `platforms`
+
+The operating systems the package runs on, as a list of `linux` and
+`macos`:
+
+```yaml
+platforms: [macos]
+```
+
+Left out, the package runs anywhere. A server is always Linux; macOS is
+only ever your own computer, added as a [self machine](../how-it-works/your-computer-as-a-machine.md).
+So a package written for Homebrew says `[macos]`, and an app stops
+offering it for a Linux server — `packages list --format json` reports it
+as `platforms`. A workspace always lives on a Linux server, so a
+`workspace` package that lists platforms has to list `linux`.
+
 ### `requires.cli`
 
 Which version of the CLI can run this package: `">= 0.2.0"`, `"> 0.2.0"`
@@ -247,6 +263,9 @@ What each script receives and must print is in
 | `scope` unknown | `scope must be "machine" or "workspace", got "X"` |
 | `summary` missing | ``every package needs a one-line `summary` `` |
 | `requires.cli` unreadable | `requires.cli "X": write it as ">= 0.2.0", "> 0.2.0" or "= 0.2.0"` |
+| `platforms` has an unknown value | `platform "X": the platforms are "linux" and "macos"` |
+| `platforms` lists one twice | `platform "X" is listed twice` |
+| a `workspace` package leaves out `linux` | `a workspace always lives on a Linux server, so a workspace package has to list "linux"` |
 | `extends` key has no dot | `an extension point is written <package>.<place>` |
 | `extends` file is not there | `extends "X" points at Y, which is not in the package` |
 | `provides` path is relative | `an extension point is an absolute path on the machine` |

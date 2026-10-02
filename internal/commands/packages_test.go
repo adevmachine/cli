@@ -499,3 +499,47 @@ func TestPackagesListSaysWhichPackageIsADNSProviderAndWhatItNeeds(t *testing.T) 
 		t.Fatalf("a package with no credentials should list an empty array: %#v", web["credentials"])
 	}
 }
+
+func TestPackagesListSaysWhereAPackageRunsAndWhatItBringsIn(t *testing.T) {
+	dir := configDir(t)
+	for name, manifest := range map[string]string{
+		"mac-brew":   "format: 1\nname: mac-brew\nscope: machine\nsummary: Homebrew.\nplatforms: [macos]\n",
+		"essentials": "format: 1\nname: essentials\nscope: machine\nsummary: The basics.\nneeds: [base, git]\n",
+	} {
+		pkgDir := filepath.Join(packages.LocalDir(dir), name)
+		if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	out, err := execute(t, "--config", dir, "--format", "json", "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []struct {
+			Name      string   `json:"name"`
+			Platforms []string `json:"platforms"`
+			Needs     []string `json:"needs"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	byName := map[string]int{}
+	for i, p := range got.Packages {
+		byName[p.Name] = i
+	}
+	mac := got.Packages[byName["mac-brew"]]
+	if !slices.Equal(mac.Platforms, []string{"macos"}) || mac.Needs == nil || len(mac.Needs) != 0 {
+		t.Fatalf("mac-brew: %s", out)
+	}
+	essentials := got.Packages[byName["essentials"]]
+	if !slices.Equal(essentials.Needs, []string{"base", "git"}) ||
+		essentials.Platforms == nil || len(essentials.Platforms) != 0 {
+		t.Fatalf("essentials: %s", out)
+	}
+}
