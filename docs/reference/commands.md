@@ -222,6 +222,7 @@ devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]  
 devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file|agent:<SHA256:…>] [--password-stdin] [--tailscale]   the same, asking nothing
 devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]   check or update its SSH fingerprint
+devmachine machines scan --address <a> [--port p]   the SSH fingerprint of a server not added yet; writes nothing
 devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on your computer
@@ -290,7 +291,8 @@ for a machine not trusted yet: with nobody to ask, trusting whatever
 answers would be trust on first use with no one looking. Without it, or
 with a different one, `add` stops before changing anything and prints the
 fingerprint it was shown, to check through the provider console or a
-connection you already trust.
+connection you already trust. `machines scan --address <a>` shows the
+same fingerprint before you run `add` at all.
 
 A key that does not log in yet needs the password once, to install it.
 With nobody to ask, it comes on stdin: `--password-stdin` reads all of
@@ -333,6 +335,17 @@ pinned key), `presented_fingerprint`, `check`, `changed`, and, while the
 key is not yet trusted, `fix` (the command that trusts it, with
 `--expect`) and `verify` (a command that prints the same key's
 fingerprint on the server, to run from its own console).
+
+`scan` reads the host key a server presents, for an address that is not
+a machine yet — the step before `add --fingerprint`, so a person (or an
+app) can compare it with the provider console before anything trusts it.
+It does not log in, trusts nothing and writes nothing, and it needs no
+`config.yml`. It reports the key the server offers for the same
+negotiation `add` makes, so its fingerprint is the one `add` compares
+against. JSON fields: `address` (the one that answered), `port`,
+`key_type`, `fingerprint`, and `verify` — a command that prints the same
+key's fingerprint on the server, to run from its own console (left out
+for a key type with no standard file).
 
 `rm` takes a machine out of `config.yml` and **does nothing to the server
 itself**. Asks first unless `--yes`; refuses to leave a workspace

@@ -25,6 +25,7 @@ func newMachinesCmd(opts *options) *cobra.Command {
 		newMachinesListCmd(opts),
 		newMachinesAddCmd(opts),
 		newMachinesTrustCmd(opts),
+		newMachinesScanCmd(opts),
 		newMachinesEditCmd(opts),
 		newMachinesRmCmd(opts),
 		newMachinesCreateLocalCmd(opts),
