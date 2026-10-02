@@ -673,7 +673,8 @@ Publishes a workspace's port to the internet, over HTTPS, at a hostname
 you choose.
 
 `add` records the site in `config.yml`, points the hostname at the
-machine (same as `dns add`), and then puts it on Caddy at once: it writes
+machine's first public address in `hosts` (same as `dns add`; a private
+network address listed first is skipped, since visitors cannot reach it), and then puts it on Caddy at once: it writes
 the workspace's routes file on the machine and reloads Caddy. That takes
 seconds, not a whole `sync` — and it is the very file `sync` writes, so the
 next `sync` has nothing to change. **Refuses if `caddy` is not on the

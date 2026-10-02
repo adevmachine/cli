@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"path"
 	"slices"
 	"strconv"
@@ -458,13 +459,40 @@ func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string,
 	if err != nil {
 		return err
 	}
-	address, err := firstAddress(tgt.machine, "expose")
+	if err := requiresAddress(tgt.machine, "expose"); err != nil {
+		return err
+	}
+	addresses, err := remote.Resolve(tgt.machine)
 	if err != nil {
 		return err
+	}
+	address, private := publicAddress(addresses)
+	if private {
+		fmt.Fprintf(out, "warning: %s has no public address in `hosts`, so %s points at %s, which only a private network reaches\n",
+			tgt.machine.Name, host, address)
 	}
 	rec := dns.Record{Name: labelFor(host, choice.Zone), Type: "A", Value: address}
 	return choice.Provider.Upsert(ctx, choice.Zone, rec)
 }
+
+// publicAddress is the address a public name should point at: the first one
+// the internet can reach. A machine is often listed with its private network
+// first, because that is the better way in over SSH, and a record pointing
+// there answers nobody. A DNS name counts as public. With none, the first
+// address is used and private says so.
+func publicAddress(addresses []string) (address string, private bool) {
+	for _, a := range addresses {
+		ip, err := netip.ParseAddr(a)
+		if err != nil || (ip.IsGlobalUnicast() && !ip.IsPrivate() && !sharedAddressSpace.Contains(ip)) {
+			return a, false
+		}
+	}
+	return addresses[0], true
+}
+
+// sharedAddressSpace is RFC 6598's 100.64.0.0/10, which Tailscale and
+// carrier-grade NAT use; netip.Addr.IsPrivate does not count it.
+var sharedAddressSpace = netip.MustParsePrefix("100.64.0.0/10")
 
 // site is one row `expose list` reports.
 type site struct {

@@ -363,3 +363,24 @@ func TestSyncBlamesEachSiteOnItsOwnMachine(t *testing.T) {
 		}
 	}
 }
+
+func TestTheNameGetsThePublicAddressWhenAPrivateOneComesFirst(t *testing.T) {
+	for _, tc := range []struct {
+		in   []string
+		want string
+	}{
+		{[]string{"100.64.0.7", "203.0.113.10"}, "203.0.113.10"},
+		{[]string{"192.168.1.4", "10.0.0.2", "198.51.100.3"}, "198.51.100.3"},
+		{[]string{"fd7a::1", "203.0.113.10"}, "203.0.113.10"},
+		{[]string{"100.64.0.7"}, "100.64.0.7"},
+		{[]string{"vps.example.com", "100.64.0.7"}, "vps.example.com"},
+	} {
+		got, private := publicAddress(tc.in)
+		if got != tc.want {
+			t.Fatalf("%v: got %q", tc.in, got)
+		}
+		if want := tc.want == "100.64.0.7"; private != want {
+			t.Fatalf("%v: private %v", tc.in, private)
+		}
+	}
+}
