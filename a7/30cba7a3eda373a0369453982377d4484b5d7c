@@ -1,0 +1,40 @@
+internal/commands/expose_via_test.go
+  s_b040951662cf49::t_23f4f5fd8ac5d6 285-315,319-360,363-365
+  s_b040951662cf49::t_fe8ea76bc8c631 316-318
+  s_b040951662cf49::t_e3088e7a387e54 361-362
+internal/remote/networks_test.go
+  s_b040951662cf49::t_23f4f5fd8ac5d6 301-317
+internal/remote/networks.go
+  s_b040951662cf49::t_67094635d278f3 9,193-196,198,200-209,212-216,225-227
+  s_b040951662cf49::t_31904a6d738eca 228
+internal/config/config_test.go
+  s_b040951662cf49::t_a316bfc0d20123 1835-1836
+  s_b040951662cf49::t_23f4f5fd8ac5d6 1833-1834,1837-1841
+internal/commands/sync.go
+  s_b040951662cf49::t_69774576d0886e 140,147,153-157
+  s_b040951662cf49::t_b4f92ce696e38b 158-159
+internal/config/config.go
+  s_b040951662cf49::t_67094635d278f3 879-886
+docs/how-it-works/published-sites.md
+  s_b040951662cf49::t_ee6647a8fe210a 128-131
+internal/commands/expose.go
+  s_b040951662cf49::t_69774576d0886e 53-55,57-59,62,65-66,69,71-72,75,106,111-119,143,145-150,329,535-537,640-644,702
+internal/commands/workspaces.go
+  s_b040951662cf49::t_69774576d0886e 389-394,528-533
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a730cba7a3eda373a0369453982377d4484b5d7c",
+  "prompts": {},
+  "sessions": {
+    "s_b040951662cf49": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4e3d292-63fb-49a6-b181-1db1a3a0bccb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
