@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,9 +27,15 @@ func muxTestMachine(t *testing.T) config.Machine {
 	return m
 }
 
+// fakeCacheDir is short on purpose: t.TempDir() on macOS is long enough that
+// the sockets would move to the /tmp fallback.
 func fakeCacheDir(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
+	dir, err := os.MkdirTemp("/tmp", "dmc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	orig := userCacheDir
 	userCacheDir = func() (string, error) { return dir, nil }
 	t.Cleanup(func() { userCacheDir = orig })
@@ -59,16 +66,73 @@ func TestDialMuxBuildsTheSameHostKeyPinningAsTheSystemSSHBuilder(t *testing.T) {
 		}
 	}
 
+	argsFile := filepath.Join(t.TempDir(), "args")
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(fakeSSH, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+argsFile+"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	mux.sshPath = fakeSSH
+	if _, err := client.Run(context.Background(), "true"); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 	controlDir := filepath.Join(cache, "devmachine", "cm")
 	for _, want := range []string{
 		"ControlMaster=auto",
-		"ControlPath=" + filepath.Join(controlDir, "%C"),
+		"ControlPath=" + controlSocketPath(controlDir, m.User, m.Hosts[0].Address, m.Port),
 		"ControlPersist=5m",
 		"BatchMode=yes",
 	} {
-		if !strings.Contains(joined, want) {
-			t.Fatalf("missing multiplexing option %q in %#v", want, mux.args)
+		if !strings.Contains(string(body), want+"\n") {
+			t.Fatalf("missing multiplexing option %q in %s", want, body)
 		}
+	}
+}
+
+func TestDialMuxMovesTheSocketsToAShortDirectoryUnderAVeryLongHome(t *testing.T) {
+	long := filepath.Join(t.TempDir(), strings.Repeat("a", 100))
+	orig := userCacheDir
+	userCacheDir = func() (string, error) { return long, nil }
+	t.Cleanup(func() { userCacheDir = orig })
+
+	dir, err := controlPathDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "/tmp/dm-" + strconv.Itoa(os.Getuid()); dir != want {
+		t.Fatalf("dir = %q, want %q", dir, want)
+	}
+	info, err := os.Lstat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o700 {
+		t.Fatalf("mode = %o, want 0700", perm)
+	}
+}
+
+func TestMuxClientExplainsASocketPathTooLong(t *testing.T) {
+	fakeCacheDir(t)
+	m := muxTestMachine(t)
+	fakeSSH := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\necho 'unix_listener: path \"/x/cm/abc.CCjnMgl2FZ5Geq6z\" too long for Unix domain socket' >&2\nexit 255\n"
+	if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	origLookPath := lookPath
+	lookPath = func(string) (string, error) { return fakeSSH, nil }
+	t.Cleanup(func() { lookPath = origLookPath })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Run(context.Background(), "true")
+	if err == nil || !strings.Contains(err.Error(), "longer than this system allows for a socket") {
+		t.Fatalf("got %v, want an error that says what the long path means", err)
 	}
 }
 
@@ -225,10 +289,9 @@ func TestMuxClientRunSaysWhyTheCommandFailed(t *testing.T) {
 // DialMux: `ssh -O check` against the very same ControlPath only succeeds
 // when a master connection from an earlier process is still there.
 func TestDialMuxReusesTheControlSocket(t *testing.T) {
-	// The real cache directory, not a t.TempDir(): macOS temp paths run long
-	// enough on their own to blow the ~104-byte Unix socket limit once %C's
-	// hash is appended, and that is exactly the failure DialMux exists to
-	// avoid in production.
+	// The real cache directory, not a t.TempDir(): macOS temp paths run long,
+	// and choosing a directory that fits the Unix socket limit is part of
+	// what this proves.
 	m := testMachine(t)
 
 	client, _, err := DialMux(context.Background(), m, "")
@@ -257,12 +320,44 @@ func TestDialMuxReusesTheControlSocket(t *testing.T) {
 	}
 	user := m.User
 	args := append(StrictSSHArgs(m),
-		"-o", "ControlPath="+filepath.Join(controlDir, "%C"),
+		"-o", "ControlPath="+controlSocketPath(controlDir, user, m.Hosts[0].Address, m.Port),
 		"-O", "check", user+"@"+m.Hosts[0].Address)
 	check := exec.CommandContext(context.Background(), "ssh", args...)
 	out, err := check.CombinedOutput()
 	if err != nil {
 		t.Fatalf("ssh -O check found no live master: %v: %s", err, out)
+	}
+}
+
+// TestDialMuxConnectsUnderAVeryLongHome is the bug a long home directory hit:
+// ssh refused to create the master socket because its path was over the
+// Unix socket limit, so no address ever answered.
+func TestDialMuxConnectsUnderAVeryLongHome(t *testing.T) {
+	m := testMachine(t)
+	long := filepath.Join(t.TempDir(), strings.Repeat("a", 60), "Library", "Caches")
+	orig := userCacheDir
+	userCacheDir = func() (string, error) { return long, nil }
+	t.Cleanup(func() { userCacheDir = orig })
+
+	client, _, err := DialMux(context.Background(), m, "")
+	if err != nil {
+		t.Fatalf("DialMux returned %v", err)
+	}
+	if _, err := client.Run(context.Background(), "true"); err != nil {
+		t.Fatalf("run under a long home returned %v", err)
+	}
+
+	controlDir, err := controlPathDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	socket := controlSocketPath(controlDir, m.User, m.Hosts[0].Address, m.Port)
+	t.Cleanup(func() {
+		_ = exec.Command("ssh", "-o", "ControlPath="+socket, "-O", "exit", m.User+"@"+m.Hosts[0].Address).Run()
+	})
+	args := append(StrictSSHArgs(m), "-o", "ControlPath="+socket, "-O", "check", m.User+"@"+m.Hosts[0].Address)
+	if out, err := exec.CommandContext(context.Background(), "ssh", args...).CombinedOutput(); err != nil {
+		t.Fatalf("ssh -O check found no live master at %s: %v: %s", socket, err, out)
 	}
 }
 

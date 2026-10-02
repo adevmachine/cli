@@ -53,37 +53,46 @@ func DialMux(ctx context.Context, m config.Machine, user string) (Client, string
 		return nil, "", err
 	}
 
-	args := append(StrictSSHArgs(m), muxArgs(controlDir)...)
 	client := &muxClient{
-		sshPath:   sshPath,
-		args:      args,
-		addresses: addresses,
-		user:      user,
-		machine:   m.Name,
+		sshPath:    sshPath,
+		args:       StrictSSHArgs(m),
+		controlDir: controlDir,
+		port:       m.Port,
+		addresses:  addresses,
+		user:       user,
+		machine:    m.Name,
 	}
 	return client, addresses[0], nil
 }
 
 // controlPathDir is where every ControlMaster socket lives, one directory
-// shared by every machine: ssh's own %C in ControlPath hashes the
-// host/port/user into the filename, which is what keeps each socket path
-// under the ~104-byte Unix socket limit.
+// shared by every machine. See controlSocketDir for why it is not always the
+// cache directory.
 func controlPathDir() (string, error) {
 	cache, err := userCacheDir()
 	if err != nil {
 		return "", fmt.Errorf("finding the cache directory: %w", err)
 	}
-	dir := filepath.Join(cache, "devmachine", "cm")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("creating %s: %w", dir, err)
+	dir, err := controlSocketDir(cache, os.Getuid(), unixSocketPathLimit())
+	if err != nil {
+		return "", err
+	}
+	if dir == filepath.Join(cache, "devmachine", "cm") {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", fmt.Errorf("creating %s: %w", dir, err)
+		}
+		return dir, nil
+	}
+	if err := ensurePrivateDir(dir); err != nil {
+		return "", err
 	}
 	return dir, nil
 }
 
-func muxArgs(controlDir string) []string {
+func muxArgs(controlPath string) []string {
 	return []string{
 		"-o", "ControlMaster=auto",
-		"-o", "ControlPath=" + filepath.Join(controlDir, "%C"),
+		"-o", "ControlPath=" + controlPath,
 		"-o", "ControlPersist=" + controlPersist,
 		"-o", "BatchMode=yes",
 	}
@@ -93,11 +102,13 @@ func muxArgs(controlDir string) []string {
 // command, relying on ControlMaster/ControlPersist to make every process
 // after the first reuse an already-authenticated connection.
 type muxClient struct {
-	sshPath   string
-	args      []string
-	addresses []string
-	user      string
-	machine   string
+	sshPath    string
+	args       []string
+	controlDir string
+	port       int
+	addresses  []string
+	user       string
+	machine    string
 }
 
 func (c *muxClient) Run(ctx context.Context, command string) (string, error) {
@@ -142,7 +153,8 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 		received.w = stdout
 	}
 	for _, address := range c.addresses {
-		argv := append(append([]string{}, c.args...), c.user+"@"+address, command)
+		controlPath := controlSocketPath(c.controlDir, c.user, address, c.port)
+		argv := append(append(append([]string{}, c.args...), muxArgs(controlPath)...), c.user+"@"+address, command)
 		cmd := exec.CommandContext(ctx, c.sshPath, argv...)
 		if stdin != nil {
 			cmd.Stdin = &sent
@@ -166,6 +178,10 @@ func (c *muxClient) exec(ctx context.Context, command string, stdin io.Reader, s
 		if errors.As(runErr, &exitErr) && exitErr.ExitCode() == 255 {
 			if strings.Contains(errBuf.String(), "Host key verification failed") {
 				return fmt.Errorf("machine %q at %s: %w", c.machine, address, ErrHostKeyRejected)
+			}
+			if strings.Contains(errBuf.String(), "too long for Unix domain socket") {
+				return fmt.Errorf("machine %q: the file ssh shares one connection through, %s, makes a path longer than this system allows for a socket (%d bytes), so ssh could not start; this is a devmachine bug, please report it: %s",
+					c.machine, controlPath, unixSocketPathLimit(), strings.TrimSpace(errBuf.String()))
 			}
 			if sent.n > 0 {
 				return fmt.Errorf("machine %q at %s: the connection dropped after part of the input was sent, so it is not sent again to another address: %s",

@@ -117,8 +117,11 @@ case "$(uname -s)" in
   Darwin) CONTROL_DIR="$HOME/Library/Caches/devmachine/cm" ;;
   *) CONTROL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/devmachine/cm" ;;
 esac
-ssh -o ControlPath="$CONTROL_DIR/%C" -p "$PORT" -O exit root@127.0.0.1 \
-  >"$SCENARIO_DIR/close-master.log" 2>&1 || true
+CONTROL_NAME=$(printf '%s' "root@127.0.0.1:$PORT" | shasum -a 256 | cut -c1-16)
+for dir in "$CONTROL_DIR" "/tmp/dm-$(id -u)"; do
+  ssh -o ControlPath="$dir/$CONTROL_NAME" -p "$PORT" -O exit root@127.0.0.1 \
+    >>"$SCENARIO_DIR/close-master.log" 2>&1 || true
+done
 
 CHANGED=$("$DEVMACHINE_ACCEPT_BIN" run --machine "$VM" -- true 2>&1)
 CHANGED_STATUS=$?

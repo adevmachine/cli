@@ -1003,15 +1003,43 @@ reuses it (see [the `run` reference](reference/commands.md#run)). If the
 server it was talking to changed address, was rebuilt, or was deleted, that
 old connection can be left open and never answer again.
 
-**What to do:** Close it:
+**What to do:** Close it. The connection lives in a socket file in
+`<user cache dir>/devmachine/cm/` — or in `/tmp/dm-<uid>/` when that path
+would be too long (see the next section). Its name is the first 16
+characters of the SHA-256 of `<user>@<address>:<port>`:
 
 ```
-ssh -O exit -o ControlPath=<user cache dir>/devmachine/cm/%C <user>@<address>
+name=$(printf '%s' '<user>@<address>:<port>' | shasum -a 256 | cut -c1-16)
+ssh -O exit -o ControlPath=<that directory>/$name <user>@<address>
 ```
 
-If you do not have the exact address, delete the stale connection file
-directly from `<user cache dir>/devmachine/cm/` instead. Either way, the next
-`run` opens a fresh connection.
+If you do not have the exact address, delete the stale socket file
+directly from that directory instead. Either way, the next `run` opens a
+fresh connection.
+
+## "unix_listener: path … too long for Unix domain socket"
+
+Shown as `machine "x": the file ssh shares one connection through, …,
+makes a path longer than this system allows for a socket`, or in older
+versions as `no address answered: … (unix_listener: path "…" too long for
+Unix domain socket)`.
+
+**What it means:** `run` and the other short commands share one SSH
+connection through a socket file. A socket's full path has a size limit
+set by the operating system: 104 bytes on macOS, 108 on Linux. While ssh
+creates the socket it adds 17 more characters to the name. With a long home
+folder, the path went over the limit, and ssh gave up before it connected.
+Nothing is wrong with the machine or the network.
+
+Versions after 0.7.27 use a 16-character name, and when even that does not
+fit under your cache directory they use `/tmp/dm-<uid>/` instead. So on a
+current version you should not see this. If you do, it is a bug: report it
+with the path from the message.
+
+**What to do:** update devmachine (`devmachine update`). If it then says
+`/tmp/dm-<uid>` "is owned by another account" or "has mode …", that folder
+is not safe to hold your connections: remove it (or `chmod 700` it if it is
+yours) and try again.
 
 ## `upload` refuses a file or a folder
 
