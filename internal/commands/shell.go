@@ -76,6 +76,17 @@ func loadConfig(opts *options) (config.Config, error) {
 	return cfg, cfg.Validate()
 }
 
+// loadConfigIfAny is loadConfig for a command that only reads: with no
+// config.yml yet nothing is configured, which is an answer and not a failure.
+// The bool says whether a configuration was found.
+func loadConfigIfAny(opts *options) (config.Config, bool, error) {
+	cfg, err := loadConfig(opts)
+	if errors.Is(err, os.ErrNotExist) {
+		return config.Config{}, false, nil
+	}
+	return cfg, err == nil, err
+}
+
 // record writes one line in the command log.
 //
 // It is called once the machine has been reached, so the log holds what was

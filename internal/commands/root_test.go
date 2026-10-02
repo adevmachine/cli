@@ -156,12 +156,6 @@ func TestConfigShowAsJSONCarriesTheAgentKey(t *testing.T) {
 	}
 }
 
-func TestConfigShowFailsWhenThereIsNoConfig(t *testing.T) {
-	if _, err := execute(t, "--config", t.TempDir(), "config", "show"); err == nil {
-		t.Fatal("expected an error when config.yml is missing")
-	}
-}
-
 func TestConfigShowReportsAnInvalidConfig(t *testing.T) {
 	dir := writeConfigDir(t, "domain: example.com\n")
 

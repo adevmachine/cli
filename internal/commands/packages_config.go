@@ -266,15 +266,16 @@ func newPackagesListCmd(opts *options) *cobra.Command {
 			"for it.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rows, err := listPackages(cmd.Context(), opts)
+			release, rows, err := listPackages(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
 
 			if opts.format == formatJSON {
 				return writeJSON(cmd.OutOrStdout(), struct {
+					Release  string       `json:"release"`
 					Packages []packageRow `json:"packages"`
-				}{rows})
+				}{release, rows})
 			}
 
 			cmd.Printf("%-16s %-10s %-8s %-28s %s\n", "NAME", "SCOPE", "SOURCE", "INSTALLED ON", "SUMMARY")
@@ -290,22 +291,32 @@ func newPackagesListCmd(opts *options) *cobra.Command {
 	}
 }
 
-func listPackages(ctx context.Context, opts *options) ([]packageRow, error) {
+// listPackages returns the release the packages were read from, and the
+// packages. With no configuration yet, that is the latest release: it is the
+// one `setup` would pin, so it is what a new machine can choose from.
+func listPackages(ctx context.Context, opts *options) (string, []packageRow, error) {
 	dir, _, err := config.Dir(opts.configDir)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	cfg, err := loadConfig(opts)
+	cfg, found, err := loadConfigIfAny(opts)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	store, err := openStore(ctx, dir, cfg.Packages)
+	release := cfg.Packages
+	if !found {
+		if release, err = latestPackagesRelease(ctx); err != nil {
+			return "", nil, fmt.Errorf("there is no configuration yet, so the packages come from the "+
+				"latest packages release, and it could not be found: %w", err)
+		}
+	}
+	store, err := openStore(ctx, dir, release)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	available, err := store.All()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	installed := installedOn(cfg)
@@ -319,7 +330,7 @@ func listPackages(ctx context.Context, opts *options) ([]packageRow, error) {
 			Category:    found.Manifest.Category,
 			Kind:        found.Manifest.Kind,
 			Credentials: credentialsOf(found.Manifest),
-			Installed:   installed[found.Manifest.Name],
+			Installed:   onOrNone(installed[found.Manifest.Name]),
 		})
 		delete(installed, found.Manifest.Name)
 	}
@@ -330,7 +341,15 @@ func listPackages(ctx context.Context, opts *options) ([]packageRow, error) {
 	}
 
 	slices.SortFunc(rows, func(a, b packageRow) int { return strings.Compare(a.Name, b.Name) })
-	return rows, nil
+	return release, rows, nil
+}
+
+// onOrNone keeps `installed_on` a list in the JSON, never null.
+func onOrNone(targets []string) []string {
+	if targets == nil {
+		return []string{}
+	}
+	return targets
 }
 
 // installedOn maps a package name onto the targets that ask for it, in the

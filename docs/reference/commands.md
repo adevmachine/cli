@@ -210,6 +210,10 @@ devmachine config show      machines, workspaces and their effective values
 Shows where your configuration lives and what is in it. `show` validates
 as it prints, so it is the quickest way to find what is wrong.
 
+With no `config.yml` yet, `show` is not an error: it says there is no
+configuration, and `--format json` prints `{"machines": [], "workspaces":
+[]}`. `machines` and `workspaces` are always arrays, never `null`.
+
 ## machines
 
 ```
@@ -227,6 +231,9 @@ devmachine machines delete-local <name> [--yes]   destroy it and everything on i
 ```
 
 Manages the list of machines devmachine knows about.
+
+With no `config.yml` yet, `list` is not an error: it says how to add the
+first machine, and `--format json` prints `[]`.
 
 `list --format json` prints each machine with `name`, `hosts`,
 `admin_user`, `port`, `key`, `agent_key`, `workspaces`, and `self: true`
@@ -957,7 +964,10 @@ package format](package-format.md).
 `list` shows each package once with every machine and workspace that
 uses it; one nothing provides is listed as `missing`.
 
-`list --format json` prints `{"packages": [...]}`, one entry per package:
+`list --format json` prints `{"release": "v17", "packages": [...]}`:
+`release` is the packages release the list was read from (empty when
+nothing is pinned, so only your own packages are listed), and one entry
+per package:
 
 ```json
 {
@@ -981,8 +991,12 @@ has none. `credentials` lists what the package declares, always an array:
 each one's `name`, `kind` (`secret`, `file` or `manual`), `scope`, and
 `env` or `path` where the value is delivered. **It never carries a
 value** — it is there so a client knows the name to store with `secrets
-set` before the package is added. `installed_on` is `null` when nothing
+set` before the package is added. `installed_on` is `[]` when nothing
 uses the package.
+
+With no `config.yml` yet, `list` reads the **latest** packages release —
+the one `setup` would pin — so a new user sees what a first machine can
+start with. With no network to find it, it fails and says so.
 
 `add`/`rm` only edit `config.yml` — `sync` applies the change. Pass
 `--machine` or `--workspace`; with one configured machine, that is the

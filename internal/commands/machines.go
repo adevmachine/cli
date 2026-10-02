@@ -41,13 +41,17 @@ func newMachinesListCmd(opts *options) *cobra.Command {
 		Short: "List the configured machines and the workspaces on each",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(opts)
+			cfg, found, err := loadConfigIfAny(opts)
 			if err != nil {
 				return err
 			}
 
 			if opts.format == formatJSON {
 				return writeJSON(cmd.OutOrStdout(), asJSON(cfg).Machines)
+			}
+			if !found {
+				cmd.Println("No machines yet: `devmachine setup` adds the first one.")
+				return nil
 			}
 
 			for _, m := range cfg.Machines {

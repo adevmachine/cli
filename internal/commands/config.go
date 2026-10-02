@@ -44,13 +44,21 @@ func newConfigShowCmd(opts *options) *cobra.Command {
 		Short: "Print the machines and workspaces this run would use",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(opts)
+			cfg, found, err := loadConfigIfAny(opts)
 			if err != nil {
 				return err
 			}
 
 			if opts.format == formatJSON {
 				return writeJSON(cmd.OutOrStdout(), asJSON(cfg))
+			}
+			if !found {
+				dir, _, err := config.Dir(opts.configDir)
+				if err != nil {
+					return err
+				}
+				cmd.Printf("no configuration at %s yet: `devmachine setup` writes it.\n", dir)
+				return nil
 			}
 
 			for _, m := range cfg.Machines {
@@ -111,7 +119,10 @@ type workspaceJSON struct {
 }
 
 func asJSON(cfg config.Config) configJSON {
-	out := configJSON{Domain: cfg.Domain, DNSProvider: cfg.DNSProvider}
+	out := configJSON{
+		Machines: []machineJSON{}, Workspaces: []workspaceJSON{},
+		Domain: cfg.Domain, DNSProvider: cfg.DNSProvider,
+	}
 
 	for _, m := range cfg.Machines {
 		addresses := make([]string, 0, len(m.Hosts))
