@@ -236,8 +236,10 @@ With no `config.yml` yet, `list` is not an error: it says how to add the
 first machine, and `--format json` prints `[]`.
 
 `list --format json` prints each machine with `name`, `hosts`,
-`admin_user`, `port`, `key`, `agent_key`, `workspaces`, and `self: true`
-on your own computer. **Your computer is never picked by default** — a
+`admin_user`, `port`, `key`, `agent_key`, `workspaces`, `packages` (the
+machine's own package list from `config.yml`, `[]` when it has none), and
+`self: true` on your own computer. `config show --format json` carries the
+same machine entries. **Your computer is never picked by default** — a
 command with no `--machine` still acts on the server, even with a self
 machine also configured.
 

@@ -119,3 +119,31 @@ func TestPackagesListReportsThePinnedRelease(t *testing.T) {
 		t.Fatalf("an unpinned configuration does not say so: %s", out)
 	}
 }
+
+func TestMachinesListJSONCarriesEachMachinesPackages(t *testing.T) {
+	dir := writeConfigDir(t, `machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [essentials, docker]
+  - name: bare
+    hosts: [203.0.113.11]
+`)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "machines", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []struct {
+		Name     string   `json:"name"`
+		Packages []string `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	if len(got) != 2 || strings.Join(got[0].Packages, ",") != "essentials,docker" {
+		t.Fatalf("got %s", out)
+	}
+	if got[1].Packages == nil || len(got[1].Packages) != 0 {
+		t.Fatalf("a machine with no packages is not []: %s", out)
+	}
+}

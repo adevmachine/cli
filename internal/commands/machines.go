@@ -500,7 +500,7 @@ func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine) err
 	if opts.format == formatJSON {
 		return writeJSON(cmd.OutOrStdout(), machineJSON{
 			Name: m.Name, Hosts: addresses, AdminUser: m.User,
-			Port: m.Port, Key: m.Key, Workspaces: []string{},
+			Port: m.Port, Key: m.Key, Workspaces: []string{}, Packages: onOrNone(m.Packages),
 		})
 	}
 
