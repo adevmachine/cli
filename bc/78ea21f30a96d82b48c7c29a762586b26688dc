@@ -1,0 +1,41 @@
+SURFACE.txt
+  s_b040951662cf49::t_522db1340ac48e 31
+cmd/settings/main.go
+  s_b040951662cf49::t_e487d9f17e9b21 42
+docs/how-it-works/dns-providers.md
+  s_b040951662cf49::t_0960047a8cf4fb 66-70
+docs/reference/commands.md
+  s_b040951662cf49::t_12e38251f4d7e8 221,237-244,317,341
+docs/reference/settings.md
+  s_b040951662cf49::t_820ad4d59dd9e5 23
+docs/troubleshooting.md
+  s_b040951662cf49::t_52a65d853853b0 328-339,483-484
+internal/commands/machines.go
+  s_b040951662cf49::t_55a0ffff704edd 10,28,159-254
+internal/commands/machines_test.go
+  s_b040951662cf49::t_1d812d9a130950 375-493
+internal/commands/workspaces.go
+  s_b040951662cf49::t_4ae94d65af4257 604,622,638,670,799-813,817-823,826-829,832,838-847
+internal/commands/workspaces_test.go
+  s_b040951662cf49::t_a4c93730cf71e3 675-687
+internal/config/config.go
+  s_b040951662cf49::t_d45446301ddee4 1024-1044
+internal/config/config_test.go
+  s_b040951662cf49::t_c3814bcb4b8579 1842-1917
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bc78ea21f30a96d82b48c7c29a762586b26688dc",
+  "prompts": {},
+  "sessions": {
+    "s_b040951662cf49": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4e3d292-63fb-49a6-b181-1db1a3a0bccb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
