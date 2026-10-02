@@ -8,6 +8,7 @@ import (
 
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
+	"github.com/mydevmachine/devmachine/internal/keys"
 )
 
 const oneMachine = "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"
@@ -137,6 +138,64 @@ func TestMachinesAddWithFlagsAndNoPasswordSaysHowToGiveOne(t *testing.T) {
 
 	_, err := executeWithInput(t, "", unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey))...)
 	if err == nil || !strings.Contains(err.Error(), "--password-stdin") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestMachinesAddWithFlagsUsesAKeyTheAgentHolds(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true, agent: []keys.Offered{
+		{Fingerprint: "SHA256:aaaa", Comment: "alice key", PublicKey: "ssh-ed25519 AAAAalice alice key"},
+		{Fingerprint: "SHA256:bbbb", Comment: "bob key", PublicKey: "ssh-ed25519 AAAAbob bob key"},
+	}})
+
+	if out, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--key", "agent:SHA256:bbbb")...); err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := cfg.Machine("sandbox")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Key != "" || m.AgentKey != "ssh-ed25519 AAAAbob bob key" {
+		t.Fatalf("key = %q, agent_key = %q", m.Key, m.AgentKey)
+	}
+	if _, err := os.Stat(m.AgentKeyFile); err != nil {
+		t.Fatalf("the agent key file was not written: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(keys.Dir(dir), "sandbox")); err == nil {
+		t.Fatal("it made a key of its own instead")
+	}
+}
+
+func TestMachinesAddWithFlagsRefusesAnAgentKeyItDoesNotHold(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	before := readConfigFile(t, dir)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true, agent: []keys.Offered{
+		{Fingerprint: "SHA256:aaaa", Comment: "alice key", PublicKey: "ssh-ed25519 AAAAalice alice key"},
+	}})
+
+	_, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--key", "agent:SHA256:zzzz")...)
+	if err == nil || !strings.Contains(err.Error(), "SHA256:zzzz") || !strings.Contains(err.Error(), "SHA256:aaaa") {
+		t.Fatalf("got %v", err)
+	}
+	if readConfigFile(t, dir) != before || steps.installedKey {
+		t.Fatalf("it went on anyway: %q", steps.events)
+	}
+}
+
+func TestMachinesAddWithFlagsSaysWhenTheAgentHoldsNothing(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	_, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--key", "agent:SHA256:zzzz")...)
+	if err == nil || !strings.Contains(err.Error(), "SSH_AUTH_SOCK") {
 		t.Fatalf("got %v", err)
 	}
 }

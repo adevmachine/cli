@@ -220,7 +220,7 @@ configuration, and `--format json` prints `{"machines": [], "workspaces":
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
-devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--password-stdin] [--tailscale]   the same, asking nothing
+devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file|agent:<SHA256:…>] [--password-stdin] [--tailscale]   the same, asking nothing
 devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]   check or update its SSH fingerprint
 devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
@@ -273,10 +273,17 @@ is left out takes its default:
 | `--address` | — | an IP, a hostname, or `tailscale:<name>` |
 | `--user` | `root` | the admin login: root, or an account with passwordless sudo |
 | `--port` | `22` | the SSH port |
-| `--key` | `new` | a key of the CLI's own for this machine (made, or reused when it exists), or a private key file |
+| `--key` | `new` | a key of the CLI's own for this machine (made, or reused when it exists), a private key file, or `agent:<SHA256:…>` for a key your SSH agent holds |
 | `--fingerprint` | — | the host key to trust on first contact |
 | `--tailscale` | off | also add the `tailscale` package |
 | `--password-stdin` | off | read the admin password from stdin, for a server that takes nothing else yet |
+
+`--key agent:SHA256:…` picks one key from the SSH agent by its
+fingerprint (`ssh-add -l` lists them), the way choosing an agent key does
+in the questions: its public half is recorded as `agent_key:`, and only
+that key is offered from then on. If the agent does not hold it — a
+locked password manager, another `SSH_AUTH_SOCK` — `add` stops before
+changing anything and lists the fingerprints the agent does hold.
 
 SSH aliases are written unless `--no-aliases`. `--fingerprint` is required
 for a machine not trusted yet: with nobody to ask, trusting whatever

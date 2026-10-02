@@ -118,7 +118,8 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 		"the admin login: root, or an account with passwordless sudo")
 	c.Flags().IntVar(&s.port, "port", config.DefaultPort, "the SSH port")
 	c.Flags().StringVar(&s.key, "key", "new",
-		"`new` for a key of the CLI's own for this machine (made or reused), or a private key file")
+		"`new` for a key of the CLI's own for this machine (made or reused), a private key file, "+
+			"or agent:<SHA256 fingerprint> for a key the SSH agent holds")
 	c.Flags().StringVar(&s.fingerprint, "fingerprint", "",
 		"the host key fingerprint to trust on first contact (SHA256:…), checked through another channel")
 	c.Flags().BoolVar(&s.tailscale, "tailscale", false, "also add the tailscale package")

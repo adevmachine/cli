@@ -657,9 +657,17 @@ func recordKey(dir string, m *config.Machine, key chosenKey) error {
 	return nil
 }
 
+// agentKeyPrefix is how --key names a key the SSH agent holds, by its SHA256
+// fingerprint: `agent:SHA256:…`.
+const agentKeyPrefix = "agent:"
+
 // keyFromFlag is askForKey's answer for an unattended run: the CLI's own key
-// for the machine — made now, or reused — or the key file --key names.
+// for the machine — made now, or reused — the key file --key names, or the
+// key the SSH agent holds with the fingerprint --key names.
 func keyFromFlag(out io.Writer, dir, machine, path string) (chosenKey, error) {
+	if fingerprint, ok := strings.CutPrefix(path, agentKeyPrefix); ok {
+		return keyFromAgent(fingerprint)
+	}
 	if path != "" && path != "new" {
 		expanded, err := expandHome(path)
 		if err != nil {
@@ -685,6 +693,30 @@ func keyFromFlag(out io.Writer, dir, machine, path string) (chosenKey, error) {
 	}
 	fmt.Fprintf(out, "made %s\n", generated)
 	return chosenKey{Path: generated, Public: public}, nil
+}
+
+// keyFromAgent is the key the SSH agent holds with this fingerprint. Only its
+// public half is recorded, so from then on that one key is offered and never
+// everything the agent holds.
+func keyFromAgent(fingerprint string) (chosenKey, error) {
+	held, err := agentKeys()
+	if err != nil {
+		return chosenKey{}, err
+	}
+	if len(held) == 0 {
+		return chosenKey{}, fmt.Errorf("--key %s%s names a key in the SSH agent, and no agent answered "+
+			"with any key: check SSH_AUTH_SOCK, and that the password manager holding it is unlocked",
+			agentKeyPrefix, fingerprint)
+	}
+	offered := make([]string, 0, len(held))
+	for _, k := range held {
+		if k.Fingerprint == fingerprint {
+			return chosenKey{Public: k.PublicKey}, nil
+		}
+		offered = append(offered, k.Fingerprint)
+	}
+	return chosenKey{}, fmt.Errorf("the SSH agent holds no key %s; it holds %s",
+		fingerprint, strings.Join(offered, ", "))
 }
 
 // askForKey offers the three ways in: a key of the CLI's own, a key file, or
