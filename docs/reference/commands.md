@@ -957,6 +957,33 @@ package format](package-format.md).
 `list` shows each package once with every machine and workspace that
 uses it; one nothing provides is listed as `missing`.
 
+`list --format json` prints `{"packages": [...]}`, one entry per package:
+
+```json
+{
+  "name": "hostinger",
+  "scope": "machine",
+  "source": "release",
+  "summary": "DNS zones on Hostinger.",
+  "category": "DNS",
+  "kind": "dns",
+  "credentials": [
+    {"name": "hostinger", "kind": "secret", "scope": "machine", "env": "HOSTINGER_API_TOKEN"}
+  ],
+  "installed_on": ["machine main"]
+}
+```
+
+`kind` is the contract a callable package answers — `dns` marks a
+[DNS provider](../how-it-works/dns-providers.md) — and is left out for an
+ordinary package. `category` is the manifest's grouping, left out when it
+has none. `credentials` lists what the package declares, always an array:
+each one's `name`, `kind` (`secret`, `file` or `manual`), `scope`, and
+`env` or `path` where the value is delivered. **It never carries a
+value** — it is there so a client knows the name to store with `secrets
+set` before the package is added. `installed_on` is `null` when nothing
+uses the package.
+
 `add`/`rm` only edit `config.yml` — `sync` applies the change. Pass
 `--machine` or `--workspace`; with one configured machine, that is the
 target. Comments in `config.yml` survive.

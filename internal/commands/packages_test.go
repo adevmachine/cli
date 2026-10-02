@@ -441,3 +441,61 @@ func TestPackagesRmRefusesToRemoveTheAccount(t *testing.T) {
 		t.Fatalf("got %v, want a refusal that says why", err)
 	}
 }
+
+func TestPackagesListSaysWhichPackageIsADNSProviderAndWhatItNeeds(t *testing.T) {
+	dir := configDir(t)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	pkgDir := filepath.Join(packages.LocalDir(dir), "caddy")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "format: 1\nname: caddy\nscope: machine\nsummary: A web server.\ncategory: web\n"
+	if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := execute(t, "--config", dir, "--format", "json", "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []map[string]any `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	byName := map[string]map[string]any{}
+	for _, p := range got.Packages {
+		byName[p["name"].(string)] = p
+	}
+
+	dns := byName["hostinger"]
+	if dns["kind"] != "dns" {
+		t.Fatalf("the provider does not say it is one: %#v", dns)
+	}
+	creds, ok := dns["credentials"].([]any)
+	if !ok || len(creds) != 1 {
+		t.Fatalf("the credentials it declares are not listed: %#v", dns)
+	}
+	want := map[string]any{"name": "hostinger", "kind": "secret", "env": "HOSTINGER_TOKEN"}
+	cred := creds[0].(map[string]any)
+	for key, value := range want {
+		if cred[key] != value {
+			t.Fatalf("credential %s: got %#v, want %q", key, cred[key], value)
+		}
+	}
+	if _, leaked := cred["value"]; leaked {
+		t.Fatalf("a credential carries a value: %#v", cred)
+	}
+
+	web := byName["caddy"]
+	if web["category"] != "web" {
+		t.Fatalf("the category is missing: %#v", web)
+	}
+	if _, ok := web["kind"]; ok {
+		t.Fatalf("a package with no kind reports one: %#v", web)
+	}
+	if creds, ok := web["credentials"].([]any); !ok || len(creds) != 0 {
+		t.Fatalf("a package with no credentials should list an empty array: %#v", web["credentials"])
+	}
+}

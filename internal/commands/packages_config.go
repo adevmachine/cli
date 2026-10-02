@@ -226,11 +226,35 @@ func reportEdit(cmd *cobra.Command, opts *options, name string, target packageTa
 // packageRow is one package in the listing: it appears once, whatever how many
 // targets asked for it.
 type packageRow struct {
-	Name      string   `json:"name"`
-	Scope     string   `json:"scope,omitempty"`
-	Source    string   `json:"source"`
-	Summary   string   `json:"summary,omitempty"`
-	Installed []string `json:"installed_on"`
+	Name     string `json:"name"`
+	Scope    string `json:"scope,omitempty"`
+	Source   string `json:"source"`
+	Summary  string `json:"summary,omitempty"`
+	Category string `json:"category,omitempty"`
+	// Kind is the contract a callable package answers, such as "dns", which
+	// is how a client finds the DNS providers without knowing their names.
+	Kind        string              `json:"kind,omitempty"`
+	Credentials []packageCredential `json:"credentials"`
+	Installed   []string            `json:"installed_on"`
+}
+
+// packageCredential is a credential a package declares: where its value goes,
+// so a client can store it before the package is added. It never carries the
+// value.
+type packageCredential struct {
+	Name  string `json:"name"`
+	Kind  string `json:"kind"`
+	Scope string `json:"scope,omitempty"`
+	Env   string `json:"env,omitempty"`
+	Path  string `json:"path,omitempty"`
+}
+
+func credentialsOf(m packages.Manifest) []packageCredential {
+	out := make([]packageCredential, 0, len(m.Credentials))
+	for _, c := range m.Credentials {
+		out = append(out, packageCredential{Name: c.Name, Kind: c.Kind, Scope: c.Scope, Env: c.Env, Path: c.Path})
+	}
+	return out
 }
 
 func newPackagesListCmd(opts *options) *cobra.Command {
@@ -288,16 +312,21 @@ func listPackages(ctx context.Context, opts *options) ([]packageRow, error) {
 	rows := make([]packageRow, 0, len(available))
 	for _, found := range available {
 		rows = append(rows, packageRow{
-			Name:      found.Manifest.Name,
-			Scope:     found.Manifest.Scope,
-			Source:    found.Source,
-			Summary:   found.Manifest.Summary,
-			Installed: installed[found.Manifest.Name],
+			Name:        found.Manifest.Name,
+			Scope:       found.Manifest.Scope,
+			Source:      found.Source,
+			Summary:     found.Manifest.Summary,
+			Category:    found.Manifest.Category,
+			Kind:        found.Manifest.Kind,
+			Credentials: credentialsOf(found.Manifest),
+			Installed:   installed[found.Manifest.Name],
 		})
 		delete(installed, found.Manifest.Name)
 	}
 	for _, name := range slices.Sorted(maps.Keys(installed)) {
-		rows = append(rows, packageRow{Name: name, Source: sourceMissing, Installed: installed[name]})
+		rows = append(rows, packageRow{
+			Name: name, Source: sourceMissing, Credentials: []packageCredential{}, Installed: installed[name],
+		})
 	}
 
 	slices.SortFunc(rows, func(a, b packageRow) int { return strings.Compare(a.Name, b.Name) })
