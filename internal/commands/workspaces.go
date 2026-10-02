@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"path"
 	"regexp"
@@ -430,7 +431,7 @@ var linuxUserName = regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
 
 func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 	var confirmName string
-	var check bool
+	var check, keepDNS bool
 
 	c := &cobra.Command{
 		Use:   "destroy <name>",
@@ -442,7 +443,7 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			"The DNS record of each of its sites goes too, the way `expose rm` " +
 			"removes one: only while it still points at the machine that " +
 			"serves the site, and printed to remove by hand when no provider " +
-			"can do it.",
+			"can do it. --keep-dns leaves every record alone.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _, err := config.Dir(opts.configDir)
@@ -477,6 +478,10 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			cmd.Printf("This deletes, on %s:\n", machine.Name)
 			cmd.Printf("  the account %s and everything under /home/%s\n", user, user)
 			for _, r := range w.Routes {
+				if keepDNS {
+					cmd.Printf("  https://%s, which will stop answering (its DNS record stays: --keep-dns)\n", r.Host)
+					continue
+				}
 				cmd.Printf("  https://%s, which will stop answering, and its DNS record while it points at %s\n",
 					r.Host, cfg.ServingMachine(w, r))
 			}
@@ -484,7 +489,11 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 
 			if check {
 				cmd.Printf("would destroy %s\n", w.Name)
-				unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, nil, true)
+				if keepDNS {
+					keptSites(cmd.OutOrStdout(), cfg, w)
+				} else {
+					unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, nil, true)
+				}
 				return nil
 			}
 
@@ -577,7 +586,11 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			for _, c := range elsewhere {
 				clients[c.machine] = c.client
 			}
-			unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, clients, false)
+			if keepDNS {
+				keptSites(cmd.OutOrStdout(), cfg, w)
+			} else {
+				unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, clients, false)
+			}
 
 			updated, err := config.Load(dir)
 			if err != nil {
@@ -588,7 +601,22 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 	}
 	c.Flags().StringVar(&confirmName, "confirm", "", "the workspace name, to skip the interactive prompt")
 	c.Flags().BoolVar(&check, "check", false, "say what would be destroyed, and destroy nothing")
+	c.Flags().BoolVar(&keepDNS, "keep-dns", false, "leave the DNS record of each of its sites alone")
 	return c
+}
+
+// keptSites says, for each site of w, how to remove the DNS record
+// --keep-dns left, on the machine that serves it.
+func keptSites(out io.Writer, cfg config.Config, w config.Workspace) {
+	for _, r := range w.Routes {
+		m, err := cfg.Machine(cfg.ServingMachine(w, r))
+		if err != nil {
+			continue
+		}
+		if note := dnsLeftNote(m, r.Host, "--keep-dns"); note != "" {
+			fmt.Fprintln(out, note)
+		}
+	}
 }
 
 func newWorkspacesEditCmd(opts *options) *cobra.Command {

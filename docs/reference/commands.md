@@ -421,7 +421,7 @@ devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--us
 devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--unset k] [--share c=machine|own] [--check] [--yes]
 devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]
 devmachine workspaces rm <name> [--yes]
-devmachine workspaces destroy <name> [--confirm <name>] [--check]
+devmachine workspaces destroy <name> [--confirm <name>] [--check] [--keep-dns]
 ```
 
 A workspace is one Linux account on one machine. See
@@ -464,7 +464,10 @@ of its sites goes too, with the same rules as `expose rm`: only an A
 record that still points at the machine serving the site (the `via`
 machine for one published through it), through the provider that holds
 the zone. Anything else is printed, and a DNS failure never stops the
-destroy. `--check` also prints those DNS removals.
+destroy. `--check` also prints those DNS removals. The list it shows
+before asking names each record it would remove; `--keep-dns` leaves
+every one alone instead, and prints the `dns rm` that removes each
+later.
 
 `defaults` only changes `defaults.workspace`, which new workspaces
 inherit; existing ones are unchanged.
@@ -784,7 +787,7 @@ only you should reach, uses [`devmachine tunnel`](#tunnel) instead.
 ```
 devmachine expose add <workspace> <port> --host <host> [--via <machine>] [--check] [--publish] [--no-apply]
 devmachine expose list
-devmachine expose rm <host> [--check] [--yes] [--no-apply]
+devmachine expose rm <host> [--check] [--yes] [--no-apply] [--keep-dns]
 ```
 
 Publishes a workspace's port to the internet, over HTTPS, at a hostname
@@ -864,6 +867,12 @@ through one):
 - When the provider cannot list the zone or refuses the delete, nothing
   is deleted, the site still comes off Caddy, the record to remove by
   hand is printed, and the JSON carries `dns_error`.
+- The question it asks says so: "Stop publishing https://<host>, and
+  remove its DNS record while it points at <machine>?".
+- `--keep-dns` takes the site off Caddy and leaves the record alone, for
+  a name you will point somewhere else yourself. It prints the `devmachine
+  dns rm … --machine <machine>` that removes it later, and the question
+  no longer mentions DNS.
 - `--check` also prints the DNS removal it would make.
 - `--no-apply` touches no machine, so no DNS either: it prints the
   `devmachine dns rm <host> A <address> --machine <serving machine>` to

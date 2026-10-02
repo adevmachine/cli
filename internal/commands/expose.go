@@ -653,9 +653,10 @@ func unpointSites(ctx context.Context, out io.Writer, dir string, cfg config.Con
 	}
 }
 
-// dnsLeftNote says how to take the name's record off later, for an `expose
-// rm --no-apply` that touches no machine, and so no DNS provider either.
-func dnsLeftNote(machine config.Machine, host string) string {
+// dnsLeftNote says how to take the name's record off later, when flag kept
+// the DNS provider out of it: `--no-apply`, which touches no machine, or
+// `--keep-dns`.
+func dnsLeftNote(machine config.Machine, host, flag string) string {
 	if machine.Self {
 		return ""
 	}
@@ -663,8 +664,8 @@ func dnsLeftNote(machine config.Machine, host string) string {
 	if err != nil {
 		address = "<address>"
 	}
-	return fmt.Sprintf("The DNS record for %s is left alone (--no-apply): remove it with "+
-		"`devmachine dns rm %s A %s --machine %s`.", host, host, address, machine.Name)
+	return fmt.Sprintf("The DNS record for %s is left alone (%s): remove it with "+
+		"`devmachine dns rm %s A %s --machine %s`.", host, flag, host, address, machine.Name)
 }
 
 // publicAddress is the address a public name should point at: the first one
@@ -884,7 +885,7 @@ func servingTarget(opts *options, cfg config.Config, host string) (target, error
 }
 
 func newExposeRmCmd(opts *options) *cobra.Command {
-	var check, yes, noApply bool
+	var check, yes, noApply, keepDNS bool
 
 	c := &cobra.Command{
 		Use:   "rm <host>",
@@ -896,7 +897,7 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 			"Then it removes the name's A record that `expose add` created, " +
 			"through the DNS provider that holds the zone — only while it " +
 			"still points at the serving machine. With no provider, it prints " +
-			"the record to remove by hand.",
+			"the record to remove by hand. --keep-dns leaves the record alone.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := args[0]
@@ -917,6 +918,16 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				return err
 			}
 			question := fmt.Sprintf("Stop publishing https://%s ?", host)
+			leftBy := ""
+			switch {
+			case noApply:
+				leftBy = "--no-apply"
+			case keepDNS:
+				leftBy = "--keep-dns"
+			case !tgt.machine.Self:
+				question = fmt.Sprintf("Stop publishing https://%s, and remove its DNS record while it points at %s?",
+					host, tgt.machine.Name)
+			}
 			if check {
 				cmd.Println("would " + question)
 				owner, route, ok := cfg.RouteOwner(host)
@@ -925,7 +936,7 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				}
 				cmd.Printf("%s, workspace %s, routes:\n- %s\n", config.FileName, owner.Name, routeLine(route))
 				if noApply {
-					if note := dnsLeftNote(tgt.machine, host); note != "" {
+					if note := dnsLeftNote(tgt.machine, host, leftBy); note != "" {
 						cmd.Println(note)
 					}
 					return nil
@@ -934,6 +945,12 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 					cmd.Printf("nothing to change on %s: %v\n", tgt.machine.Name, err)
 				} else if err := previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withoutRoute(cfg, host), tgt.machine, owner.Name); err != nil {
 					return err
+				}
+				if keepDNS {
+					if note := dnsLeftNote(tgt.machine, host, leftBy); note != "" {
+						cmd.Println(note)
+					}
+					return nil
 				}
 				previewUnpointDNS(cmd.Context(), cmd.OutOrStdout(), dir, tgt.machine, host)
 				return nil
@@ -973,7 +990,7 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				result.Note = "recorded only (--no-apply)"
 				fmt.Fprintf(notes, "%s is no longer in the configuration (it was %s's). Run `devmachine sync` to take it off %s.\n",
 					host, owner, tgt.machine.Name)
-				if note := dnsLeftNote(tgt.machine, host); note != "" {
+				if note := dnsLeftNote(tgt.machine, host, leftBy); note != "" {
 					fmt.Fprintln(notes, note)
 				}
 			default:
@@ -1004,7 +1021,11 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 					applyErr = fmt.Errorf("%w\n%s is out of the configuration, and %s still serves it until `devmachine sync`",
 						applyErr, host, tgt.machine.Name)
 				}
-				if dnsErr := unpointDNS(cmd.Context(), dir, tgt.machine, host, client, notes, false); dnsErr != nil {
+				if keepDNS {
+					if note := dnsLeftNote(tgt.machine, host, leftBy); note != "" {
+						fmt.Fprintln(notes, note)
+					}
+				} else if dnsErr := unpointDNS(cmd.Context(), dir, tgt.machine, host, client, notes, false); dnsErr != nil {
 					result.DNSError = dnsErr.Error()
 				}
 			}
@@ -1019,5 +1040,6 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 	c.Flags().BoolVar(&check, "check", false, "show the configuration, Caddy and DNS changes, and change nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "remove without asking")
 	c.Flags().BoolVar(&noApply, "no-apply", false, "only forget the route; the next sync takes it off the machine, and DNS is left alone")
+	c.Flags().BoolVar(&keepDNS, "keep-dns", false, "take the site off Caddy, and leave its DNS record alone")
 	return c
 }

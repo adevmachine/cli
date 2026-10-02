@@ -75,3 +75,73 @@ func TestWorkspacesDestroyWithNoProviderWarnsTheRecordWasNotRemoved(t *testing.T
 		t.Fatalf("%s", out)
 	}
 }
+
+func TestExposeRmAsksAboutTheDNSRecordToo(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	out, err := executeWithInput(t, "n\n", "--config", dir, "expose", "rm", "app.example.com")
+	if err == nil {
+		t.Fatal("a no went ahead")
+	}
+	if !strings.Contains(out, "and remove its DNS record while it points at main") {
+		t.Fatalf("the question does not mention the DNS record: %q", out)
+	}
+}
+
+func TestExposeRmKeepDNSLeavesTheRecordAndSaysHowToRemoveIt(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	out, err := executeWithInput(t, "y\n", "--config", dir, "expose", "rm", "app.example.com", "--keep-dns")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 0 || client.lists != 0 {
+		t.Fatalf("--keep-dns asked the DNS provider: %d lists, %q", client.lists, client.deleted)
+	}
+	if strings.Contains(out, "remove its DNS record") {
+		t.Fatalf("the question still offers to remove the record: %q", out)
+	}
+	if !strings.Contains(out, "left alone (--keep-dns)") ||
+		!strings.Contains(out, "devmachine dns rm app.example.com A 203.0.113.10 --machine main") {
+		t.Fatalf("%s", out)
+	}
+}
+
+func TestExposeRmCheckWithKeepDNSShowsNoDNSRemoval(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--check", "--keep-dns")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if strings.Contains(out, "would remove app A") || !strings.Contains(out, "left alone (--keep-dns)") {
+		t.Fatalf("%s", out)
+	}
+}
+
+func TestWorkspacesDestroyKeepDNSLeavesTheRecords(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configDestroying(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice", "--keep-dns")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 0 || client.lists != 0 {
+		t.Fatalf("--keep-dns asked the DNS provider: %d lists, %q", client.lists, client.deleted)
+	}
+	if strings.Contains(out, "and its DNS record while") || !strings.Contains(out, "left alone (--keep-dns)") {
+		t.Fatalf("%s", out)
+	}
+}
