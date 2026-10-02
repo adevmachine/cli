@@ -250,7 +250,7 @@ devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]  
 devmachine machines scan --address <a> [--port p]   the SSH fingerprint of a server not added yet; writes nothing
 devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
-devmachine machines create-local <name>   a machine on your computer
+devmachine machines create-local <name> [--add [--key k] [--no-essentials] [--no-aliases]]   a machine on your computer
 devmachine machines start <name>          start a local machine
 devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
@@ -382,7 +382,21 @@ server, `delete-local` erases a machine on your computer.
 `create-local` builds a machine on your computer, arriving password-only
 like a bought server — `devmachine setup` still has to run against it.
 Root password `devmachine`, public on purpose: this VM holds no real
-data. `start`, `stop` and `delete-local` only act on a local machine.
+data.
+
+`create-local <name> --add` does both steps at once: it creates the VM,
+then adds it the way `machines add --address` adds a server — installs a
+key with that password, proves the key, turns password login off,
+installs Ansible, and writes the machine (and, with no `config.yml` yet,
+a new configuration). No second command, and no question. Its host key
+is trusted as it answers, without `--fingerprint`: the command made the
+VM a moment ago and it answers only on this computer's loopback. `--key`,
+`--no-essentials` and `--no-aliases` mean what they mean for `machines
+add`, and are refused without `--add`. The name is checked against the
+configuration before any VM is made. If adding fails, the VM keeps
+running and nothing is written; the error says how to add it by hand.
+`--format json` prints the machine as `machines list` does, with its
+`key` once added; the progress goes to stderr. `start`, `stop` and `delete-local` only act on a local machine.
 
 Two limits: needs [Lima](https://lima-vm.io) (`brew install lima`), macOS
 and Linux only; not reachable from the internet, so `dns`, HTTPS and

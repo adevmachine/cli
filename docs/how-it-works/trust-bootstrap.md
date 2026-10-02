@@ -49,6 +49,16 @@ asked for.
 `setup` is different on purpose: it writes `config.yml` first, and
 running it again resumes from that file instead of starting over.
 
+## A local machine trusts its first host key
+
+Everywhere else, an unattended run needs `--fingerprint`: trusting
+whatever answers, with nobody looking, is how a wrong server gets your
+key. `machines create-local <name> --add` is the one exception. It
+trusts the key the VM presents, because the same command created that VM
+a moment ago and the VM answers only on `127.0.0.1`, through a port Lima
+forwards on your own computer — there is no network in between for
+anybody to stand on.
+
 Locking down means writing one file that turns password login off,
 checking it is valid, and only reloading SSH if it passes — **an invalid
 file is deleted**, since a bad file left behind would break the next SSH

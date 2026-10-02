@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/local"
 	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
@@ -473,25 +474,94 @@ func machineFromFlags(opts setupOptions) config.Machine {
 	}
 }
 
+// createLocal is the seam a test replaces so no VM is booted.
+var createLocal = local.Create
+
 func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
-	return &cobra.Command{
+	var (
+		add bool
+		s   setupOptions
+	)
+	c := &cobra.Command{
 		Use:   "create-local <name>",
 		Short: "Create a machine on your computer, as a bought server arrives",
 		Long: "Create a machine on your computer, as a bought server arrives.\n\n" +
 			"It needs Lima. The machine comes up with root reachable over SSH by " +
 			"password and no key installed, which is where `devmachine setup` starts.\n\n" +
-			"Nothing is written to the configuration: `setup` does that.",
+			"Without --add, nothing is written to the configuration: `setup` or " +
+			"`machines add` does that. With --add, it is added at once, the way " +
+			"`machines add --address` adds a server.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Progress belongs on stderr, so `--format json` leaves a
-			// document on stdout and nothing else.
-			m, err := local.Create(cmd.Context(), args[0], cmd.ErrOrStderr())
+			for _, flag := range []string{"key", "no-essentials", "no-aliases"} {
+				if !add && cmd.Flags().Changed(flag) {
+					return fmt.Errorf("--%s only applies with --add", flag)
+				}
+			}
+			if !add {
+				m, err := createLocal(cmd.Context(), args[0], cmd.ErrOrStderr())
+				if err != nil {
+					return err
+				}
+				return reportLocalMachine(cmd, opts, m, false)
+			}
+			dir, _, err := config.Dir(opts.configDir)
 			if err != nil {
 				return err
 			}
-			return reportLocalMachine(cmd, opts, m)
+			m, err := createAndAddLocal(cmd.Context(), dir, cmd.ErrOrStderr(), args[0], s)
+			if err != nil {
+				return err
+			}
+			return reportLocalMachine(cmd, opts, m, true)
 		},
 	}
+	c.Flags().BoolVar(&add, "add", false,
+		"also add it to the configuration: install a key with its password, prove it, and write it")
+	c.Flags().StringVar(&s.key, "key", "new",
+		"with --add: `new`, a private key file, or agent:<SHA256 fingerprint>, as `machines add --key`")
+	c.Flags().BoolVar(&s.noEssentials, "no-essentials", false, "with --add: start the machine with no packages")
+	c.Flags().BoolVar(&s.noAliases, "no-aliases", false, "with --add: do not write SSH host entries")
+	return c
+}
+
+// createAndAddLocal creates a local machine and adds it, as one step.
+//
+// Progress goes to out, which is stderr, so `--format json` leaves a document
+// on stdout and nothing else.
+func createAndAddLocal(ctx context.Context, dir string, out io.Writer, name string, s setupOptions) (config.Machine, error) {
+	current, err := config.Load(dir)
+	if err == nil {
+		if _, err := current.Machine(name); err == nil {
+			return config.Machine{}, fmt.Errorf("a machine named %q is already configured: pick another name", name)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return config.Machine{}, err
+	}
+
+	m, err := createLocal(ctx, name, out)
+	if err != nil {
+		return config.Machine{}, err
+	}
+	// The host key is trusted as it answers: this command made the VM a
+	// moment ago, and it answers only on this computer's loopback.
+	presented, _, err := scanHostKey(ctx, m)
+	if err != nil {
+		return config.Machine{}, fmt.Errorf("the local machine %q is running, and was not added: %w", name, err)
+	}
+	s.name, s.address, s.user, s.port = m.Name, m.Hosts[0].Address, m.User, m.Port
+	s.fingerprint = hostkeys.Fingerprint(presented)
+	s.passwordStdin = true
+	if err := runMachinesAdd(ctx, dir, strings.NewReader(local.Password), out, s); err != nil {
+		return config.Machine{}, fmt.Errorf("the local machine %q is running, and was not added: %w; "+
+			"add it with `devmachine machines add --address %s --port %d` once the cause is fixed",
+			name, err, m.Hosts[0].Address, m.Port)
+	}
+	added, err := config.Load(dir)
+	if err != nil {
+		return config.Machine{}, err
+	}
+	return added.Machine(name)
 }
 
 func newMachinesStartCmd() *cobra.Command {
@@ -565,7 +635,7 @@ func newMachinesDeleteLocalCmd() *cobra.Command {
 
 // reportLocalMachine prints a new local machine the way `machines list` prints
 // a configured one, so the same fields mean the same thing.
-func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine) error {
+func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine, added bool) error {
 	addresses := make([]string, 0, len(m.Hosts))
 	for _, h := range m.Hosts {
 		addresses = append(addresses, h.Address)
@@ -574,13 +644,18 @@ func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine) err
 	if opts.format == formatJSON {
 		return writeJSON(cmd.OutOrStdout(), machineJSON{
 			Name: m.Name, Hosts: addresses, AdminUser: m.User,
-			Port: m.Port, Key: m.Key, Workspaces: []string{}, Packages: onOrNone(m.Packages),
+			Port: m.Port, Key: m.Key, AgentKey: m.AgentKey, Workspaces: []string{}, Packages: onOrNone(m.Packages),
 		})
 	}
 
 	cmd.Printf("%-12s %-28s port %-6d admin: %s\n",
 		m.Name, strings.Join(addresses, ","), m.Port, m.User)
+	if added {
+		cmd.Printf("It is in the configuration, and logs in with %s.\n", chosenKey{Path: m.Key, Public: m.AgentKey}.describe())
+		return nil
+	}
 	cmd.Printf("It has no key on it yet, and the root password is %q.\n", local.Password)
 	cmd.Printf("Set it up with `devmachine setup` (or `devmachine machines add` if you already have a machine).\n")
+	cmd.Printf("Next time, `create-local %s --add` does both in one step.\n", m.Name)
 	return nil
 }

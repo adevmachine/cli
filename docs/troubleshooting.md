@@ -91,6 +91,20 @@ Or put the key's public half (`<key>.pub`) in the admin's
 `authorized_keys` through the provider's console, and run the same
 command again.
 
+## `create-local --add`: "the local machine … is running, and was not added"
+
+**What it means:** The VM was created and is running, but adding it
+failed — the error after the colon says which step. Nothing was written
+to `config.yml`, so nothing points at a half-added machine.
+
+**What to do:** Fix the cause, then add the running VM with the address
+and port the error printed: `devmachine machines add --name <name>
+--address 127.0.0.1 --port <port> --fingerprint <SHA256:…>
+--password-stdin`, with `devmachine` on stdin (`machines scan --address
+127.0.0.1 --port <port>` prints the fingerprint). Or throw it away with
+`devmachine machines delete-local <name>` and run `create-local --add`
+again.
+
 ## It used to connect, and now it does not
 
 **What it means:** If you recently added keys to your SSH agent, that is very

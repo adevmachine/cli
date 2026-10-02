@@ -26,15 +26,18 @@ everything after that is the same.
 
 ```
 curl -fsSL https://mydevmachine.sh/install.sh | sh
-devmachine machines create-local sandbox
-devmachine setup
+devmachine machines create-local sandbox --add
 devmachine skills add
 devmachine workspaces new acme --machine sandbox
 devmachine sync
 ```
 
-`create-local` prints the machine's address, its port and the root
-password:
+`--add` creates the machine and adds it in one go: it logs in with the
+public root password, installs a key, proves it, turns password login off
+and writes the machine to your configuration — a new one if you had none.
+
+Without `--add`, `create-local` only creates the machine, and prints its
+address, its port and the root password:
 
 ```
 sandbox      127.0.0.1                    port 60022  admin: root
