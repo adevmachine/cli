@@ -15,7 +15,7 @@ So the record moved. A route is a field of the workspace that owns it:
 `expose add` writes that line. `sync` renders one file per workspace,
 `acme-routes.caddy`, into the `sites.d` folder the `caddy` package
 provides, and reloads Caddy when the file changed. `expose rm` deletes
-the line. There is one direction — configuration to machine — devmachine
+the line (and the name's DNS record, see below). There is one direction — configuration to machine — devmachine
 never reads the machine to learn what should be published, only to check
 it agrees.
 
@@ -81,6 +81,30 @@ A name that does not resolve fails minutes later, in Caddy's certificate
 log, where nobody is looking — so `add` points the name in the same
 breath, printing the record to create by hand if the machine is
 unreachable.
+
+## Why `rm` removes the record only while it points at the machine
+
+A name left pointing at a machine that no longer serves it still
+resolves: visitors reach Caddy, which has no site for it and refuses the
+TLS handshake. So `rm` takes the record off too, right after Caddy.
+
+But the record is not in the configuration, so `rm` cannot know it made
+it. It works out the record `add` would have made — the serving
+machine's first public address, the same one `add` uses — and asks the
+provider that holds the zone for the name's A records. Only a record
+with exactly that value is deleted. A different value means somebody
+repointed the name, maybe at a new server, and deleting it would take
+that down. A provider that cannot list the zone deletes nothing: a
+delete it cannot check first is a guess.
+
+The DNS step never undoes or blocks the Caddy step. When it fails, the
+site is still off Caddy, and the record to remove by hand is printed.
+
+`--no-apply` means "touch no machine", and a DNS provider runs on the
+machine, so `rm --no-apply` leaves the record and prints the `dns rm`
+to run later. `add --no-apply` still points the name: a name that
+resolves early does no harm, and one that does not stops the
+certificate on the next `sync`.
 
 ## Publishing through another machine
 

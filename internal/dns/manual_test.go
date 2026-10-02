@@ -39,3 +39,14 @@ func TestManualSaysHowToStopBeingManual(t *testing.T) {
 		t.Fatalf("it does not mention installing a provider:\n%s", out.String())
 	}
 }
+
+func TestManualPrintsTheFullNameToRemove(t *testing.T) {
+	var out bytes.Buffer
+	if err := NewManual(&out).Delete(context.Background(), "app.example.com",
+		Record{Name: "@", Type: "A", Value: "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "app.example.com\tA\t203.0.113.10") {
+		t.Fatalf("with no provider the zone is a guess, so the full name is printed:\n%s", out.String())
+	}
+}

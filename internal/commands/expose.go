@@ -134,6 +134,7 @@ type exposeResult struct {
 	Note   string `json:"note,omitempty"`
 	// DNSError says the name was not pointed at the machine, and why: the
 	// site is on Caddy, but nobody finds it until the printed record exists.
+	// For `expose rm` it says the record was not taken off, and why.
 	DNSError string `json:"dns_error,omitempty"`
 }
 
@@ -461,14 +462,10 @@ func routeLine(r config.Route) string {
 // record to create by hand, and Caddy still gets the route. Stopping here left
 // a route recorded and on no machine, with an error about DNS only.
 func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out io.Writer) (dnsErr, err error) {
-	if err := requiresAddress(tgt.machine, "expose"); err != nil {
-		return nil, err
-	}
-	addresses, err := remote.Resolve(tgt.machine)
+	address, private, err := nameAddress(tgt.machine)
 	if err != nil {
 		return nil, err
 	}
-	address, private := publicAddress(addresses)
 	if private {
 		fmt.Fprintf(out, "warning: %s has no public address in `hosts`, so %s points at %s, which only a private network reaches\n",
 			tgt.machine.Name, host, address)
@@ -499,6 +496,128 @@ func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string,
 		return byHand(choice.Zone, fmt.Errorf("%s refused it: %w", choice.Name, err))
 	}
 	return nil, nil
+}
+
+// nameAddress is the address `expose add` points a name at for machine m.
+func nameAddress(m config.Machine) (address string, private bool, err error) {
+	if err := requiresAddress(m, "expose"); err != nil {
+		return "", false, err
+	}
+	addresses, err := remote.Resolve(m)
+	if err != nil {
+		return "", false, err
+	}
+	address, private = publicAddress(addresses)
+	return address, private, nil
+}
+
+// unpointDNS takes off the A record `expose add` pointed at the machine,
+// through the same dns.Choose path, and only when its value is still the
+// machine's address. A name that points elsewhere now was repointed by
+// somebody, and deleting it would take down whatever answers there. A
+// provider that cannot list the zone deletes nothing, for the same reason.
+//
+// It runs after Caddy dropped the site and never undoes that: a provider
+// that refuses says why, and the record to remove by hand is printed.
+func unpointDNS(ctx context.Context, dir string, machine config.Machine, host string, client remote.Client,
+	out io.Writer, dryRun bool) error {
+	if machine.Self {
+		return nil
+	}
+	address, _, err := nameAddress(machine)
+	if err != nil {
+		fmt.Fprintf(out, "warning: the DNS record for %s was not checked: %v\n", host, err)
+		return err
+	}
+	byHand := func(zone string, why error) error {
+		name := host
+		if zone != host {
+			name = labelFor(host, zone) + " (in " + zone + ")"
+		}
+		outcome := "was not removed"
+		if dryRun {
+			outcome = "cannot be removed"
+		}
+		fmt.Fprintf(out, "warning: the DNS record for %s %s: %v\n", host, outcome, why)
+		fmt.Fprintf(out, "Remove this record by hand, if it is still there:\n\n  %s\tA\t%s\n\n", name, address)
+		return why
+	}
+	base, err := provision.Base(machine)
+	if err != nil {
+		return byHand(host, err)
+	}
+	choice, err := dns.Choose(ctx, dir, machine.Name, base, host, "", client, out)
+	if err != nil {
+		return byHand(host, fmt.Errorf("the DNS provider setup is broken: %w", err))
+	}
+	rec := dns.Record{Name: labelFor(host, choice.Zone), Type: "A", Value: address}
+	if choice.Name == dns.ProviderManual {
+		if dryRun {
+			fmt.Fprintf(out, "would print %s A %s to remove by hand (%s)\n", host, address, choice.Why)
+			return nil
+		}
+		return choice.Provider.Delete(ctx, choice.Zone, rec)
+	}
+
+	records, err := choice.Provider.List(ctx, choice.Zone)
+	if err != nil {
+		return byHand(choice.Zone, fmt.Errorf("%s could not list %s, so nothing was deleted: %w", choice.Name, choice.Zone, err))
+	}
+	found := false
+	var elsewhere []string
+	for _, r := range records {
+		if r.Name != rec.Name || !strings.EqualFold(r.Type, rec.Type) {
+			continue
+		}
+		if r.Value == address {
+			found = true
+		} else {
+			elsewhere = append(elsewhere, r.Value)
+		}
+	}
+	line := fmt.Sprintf("remove %s A %s from %s (provider %s)", rec.Name, address, choice.Zone, choice.Name)
+	switch {
+	case !found && len(elsewhere) > 0:
+		fmt.Fprintf(out, "%s points at %s, not at %s (%s): its DNS record is left alone\n",
+			host, strings.Join(elsewhere, ", "), machine.Name, address)
+		return nil
+	case !found:
+		fmt.Fprintf(out, "%s has no A record in %s (provider %s): nothing to remove from DNS\n", host, choice.Zone, choice.Name)
+		return nil
+	case dryRun:
+		fmt.Fprintf(out, "would %s\n", line)
+		return nil
+	}
+	if err := choice.Provider.Delete(ctx, choice.Zone, rec); err != nil {
+		return byHand(choice.Zone, fmt.Errorf("%s refused it: %w", choice.Name, err))
+	}
+	fmt.Fprintf(out, "removed %s A %s from %s (provider %s)\n", rec.Name, address, choice.Zone, choice.Name)
+	return nil
+}
+
+// previewUnpointDNS prints what `expose rm` would do to the name's record,
+// changing nothing.
+func previewUnpointDNS(ctx context.Context, out io.Writer, dir string, machine config.Machine, host string) {
+	var client remote.Client
+	if c, _, err := dialMux(ctx, machine, ""); err == nil {
+		client = c
+		defer client.Close()
+	}
+	_ = unpointDNS(ctx, dir, machine, host, client, out, true)
+}
+
+// dnsLeftNote says how to take the name's record off later, for an `expose
+// rm --no-apply` that touches no machine, and so no DNS provider either.
+func dnsLeftNote(machine config.Machine, host string) string {
+	if machine.Self {
+		return ""
+	}
+	address, _, err := nameAddress(machine)
+	if err != nil {
+		address = "<address>"
+	}
+	return fmt.Sprintf("The DNS record for %s is left alone (--no-apply): remove it with `devmachine dns rm %s A %s`.",
+		host, host, address)
 }
 
 // publicAddress is the address a public name should point at: the first one
@@ -726,7 +845,11 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 		Long: "Forgets the route in the configuration, then rewrites the " +
 			"workspace's routes file on the machine without it and reloads " +
 			"Caddy. A machine that cannot be reached keeps serving the site " +
-			"until the next `devmachine sync`.",
+			"until the next `devmachine sync`.\n\n" +
+			"Then it removes the name's A record that `expose add` created, " +
+			"through the DNS provider that holds the zone — only while it " +
+			"still points at the serving machine. With no provider, it prints " +
+			"the record to remove by hand.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := args[0]
@@ -755,13 +878,18 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				}
 				cmd.Printf("%s, workspace %s, routes:\n- %s\n", config.FileName, owner.Name, routeLine(route))
 				if noApply {
+					if note := dnsLeftNote(tgt.machine, host); note != "" {
+						cmd.Println(note)
+					}
 					return nil
 				}
 				if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
 					cmd.Printf("nothing to change on %s: %v\n", tgt.machine.Name, err)
-					return nil
+				} else if err := previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withoutRoute(cfg, host), tgt.machine, owner.Name); err != nil {
+					return err
 				}
-				return previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withoutRoute(cfg, host), tgt.machine, owner.Name)
+				previewUnpointDNS(cmd.Context(), cmd.OutOrStdout(), dir, tgt.machine, host)
+				return nil
 			}
 			if !yes {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), question)
@@ -798,15 +926,21 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				result.Note = "recorded only (--no-apply)"
 				fmt.Fprintf(notes, "%s is no longer in the configuration (it was %s's). Run `devmachine sync` to take it off %s.\n",
 					host, owner, tgt.machine.Name)
+				if note := dnsLeftNote(tgt.machine, host); note != "" {
+					fmt.Fprintln(notes, note)
+				}
 			default:
 				var client remote.Client
-				if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
-					applyErr = errNotApplied{err.Error()}
-				} else if c, _, err := dialMux(cmd.Context(), tgt.machine, ""); err != nil {
-					applyErr = errNotApplied{fmt.Sprintf("%s could not be reached (%v)", tgt.machine.Name, err)}
-				} else {
+				c, _, dialErr := dialMux(cmd.Context(), tgt.machine, "")
+				if dialErr == nil {
 					client = c
 					defer client.Close()
+				}
+				if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
+					applyErr = errNotApplied{err.Error()}
+				} else if dialErr != nil {
+					applyErr = errNotApplied{fmt.Sprintf("%s could not be reached (%v)", tgt.machine.Name, dialErr)}
+				} else {
 					applyErr = applyRoutes(cmd.Context(), client, dir, tgt.machine, owner)
 				}
 				if applyErr == nil {
@@ -823,6 +957,13 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 					applyErr = fmt.Errorf("%w\n%s is out of the configuration, and %s still serves it until `devmachine sync`",
 						applyErr, host, tgt.machine.Name)
 				}
+				if dialErr != nil && !tgt.machine.Self {
+					fmt.Fprintf(notes, "%s could not be reached, so its DNS provider could not be asked; the DNS record is printed to remove by hand\n",
+						tgt.machine.Name)
+				}
+				if dnsErr := unpointDNS(cmd.Context(), dir, tgt.machine, host, client, notes, false); dnsErr != nil {
+					result.DNSError = dnsErr.Error()
+				}
 			}
 			if opts.format == formatJSON {
 				if err := writeJSON(cmd.OutOrStdout(), result); err != nil {
@@ -832,8 +973,8 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 			return applyErr
 		},
 	}
-	c.Flags().BoolVar(&check, "check", false, "show the configuration and Caddy changes, and change nothing")
+	c.Flags().BoolVar(&check, "check", false, "show the configuration, Caddy and DNS changes, and change nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "remove without asking")
-	c.Flags().BoolVar(&noApply, "no-apply", false, "only forget the route; the next sync takes it off the machine")
+	c.Flags().BoolVar(&noApply, "no-apply", false, "only forget the route; the next sync takes it off the machine, and DNS is left alone")
 	return c
 }

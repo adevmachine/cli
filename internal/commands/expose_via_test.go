@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
 	"github.com/mydevmachine/devmachine/internal/expose"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/remote"
@@ -415,5 +416,44 @@ func TestExposeAddStillPublishesWhenTheProviderRefusesTheRecord(t *testing.T) {
 	}
 	if !strings.Contains(out, "hostinger") {
 		t.Fatalf("and which provider refused, and why:\n%s", out)
+	}
+}
+
+func TestExposeRmViaRemovesTheRecordThatPointsAtTheServingMachine(t *testing.T) {
+	edge := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	lab := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "100.64.0.7"}}}
+	dialMachines(t, map[string]*exposeClient{"edge": edge, "lab": lab})
+	dir := configWithEdge(t, "    routes: [{host: app.example.com, port: 8080, via: edge}]\n")
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "edge", "hostinger")
+
+	if out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes"); err != nil {
+		t.Fatal(err, out)
+	}
+	if len(edge.deleted) != 1 || !strings.Contains(edge.deleted[0], `"value":"203.0.113.10"`) {
+		t.Fatalf("the record pointing at edge is not the one deleted: %q", edge.deleted)
+	}
+	if len(lab.deleted) != 0 || lab.lists != 0 {
+		t.Fatal("lab serves nothing, so its address is never the record's")
+	}
+}
+
+func TestExposeRmRemovesTheRecordOfThePublicAddressWhenAPrivateOneComesFirst(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [100.64.0.7, 203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+
+	if out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes"); err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 1 || !strings.Contains(client.deleted[0], `"value":"203.0.113.10"`) {
+		t.Fatalf("%q", client.deleted)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
 	"github.com/mydevmachine/devmachine/internal/expose"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/remote"
@@ -56,7 +57,7 @@ func configWithoutCaddy(t *testing.T) string {
 
 // exposeClient is a remote.Client a test drives by hand: it answers `expose`'s
 // own shell (mkdir/cat/ls/rm/systemctl) and, when asked, a DNS provider's
-// entrypoint (zones/upsert), without ever touching a real machine.
+// entrypoint (zones/list/upsert/delete), without ever touching a real machine.
 type exposeClient struct {
 	files map[string]string // sites.d file name -> its content
 	// zones is what a locked DNS provider claims to hold, empty meaning no
@@ -74,6 +75,15 @@ type exposeClient struct {
 	// upsertErr is what the DNS provider answers a write with, nil when it
 	// takes it.
 	upsertErr error
+	// records is what the DNS provider lists for its zone, and lists how many
+	// times it was asked.
+	records []dns.Record
+	lists   int
+	listErr error
+	// deleted is every record the DNS provider was asked to delete, as the
+	// command line carried it; deleteErr is what it answers with.
+	deleted   []string
+	deleteErr error
 }
 
 var (
@@ -163,6 +173,21 @@ func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
 			Zones []string `json:"zones"`
 		}{c.zones})
 		return string(body), nil
+	case strings.Contains(command, " list "):
+		c.lists++
+		if c.listErr != nil {
+			return `{"error":{"kind":"unauthenticated","message":"request failed (HTTP 403)"}}`, c.listErr
+		}
+		body, _ := json.Marshal(struct {
+			Records []dns.Record `json:"records"`
+		}{c.records})
+		return string(body), nil
+	case strings.Contains(command, " delete "):
+		c.deleted = append(c.deleted, command)
+		if c.deleteErr != nil {
+			return `{"error":{"kind":"forbidden","message":"request failed (HTTP 403)"}}`, c.deleteErr
+		}
+		return "{}", nil
 	case strings.Contains(command, " upsert "):
 		c.upserts++
 		if c.upsertErr != nil {
@@ -782,5 +807,164 @@ func TestExposeListWorksWhenCaddyLeftTheMachine(t *testing.T) {
 	}
 	if !strings.Contains(out, "app.example.com") || !strings.Contains(out, "unknown") {
 		t.Fatalf("the configuration's row must still print, as unknown: %q", out)
+	}
+}
+
+// configPublishing is configWithCaddy with app.example.com already published
+// by alice, and the hostinger provider installed on the machine.
+func configPublishing(t *testing.T) string {
+	t.Helper()
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+	return dir
+}
+
+func rmJSON(t *testing.T, dir string, args ...string) (exposeResult, string) {
+	t.Helper()
+	out, err := execute(t, append([]string{"--config", dir, "--format", "json", "expose", "rm"}, args...)...)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	var got exposeResult
+	if err := json.Unmarshal([]byte(lastJSON(out)), &got); err != nil {
+		t.Fatal(err, out)
+	}
+	return got, out
+}
+
+func TestExposeRmRemovesTheRecordAddPointed(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}, {Name: "www", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	got, out := rmJSON(t, dir, "app.example.com", "--yes")
+
+	if got.Status != "removed" || got.DNSError != "" {
+		t.Fatalf("%+v\n%s", got, out)
+	}
+	if len(client.deleted) != 1 || !strings.Contains(client.deleted[0], `{"name":"app","type":"A","value":"203.0.113.10"}`) {
+		t.Fatalf("exactly app's A record pointing at the machine is deleted: %q", client.deleted)
+	}
+	if !strings.Contains(out, "removed app A 203.0.113.10 from example.com") {
+		t.Fatalf("it does not say what it removed:\n%s", out)
+	}
+}
+
+func TestExposeRmLeavesARecordThatPointsElsewhere(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "198.51.100.7"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	got, out := rmJSON(t, dir, "app.example.com", "--yes")
+
+	if len(client.deleted) != 0 {
+		t.Fatalf("a name somebody repointed was deleted: %q", client.deleted)
+	}
+	if got.DNSError != "" || !strings.Contains(out, "points at 198.51.100.7, not at main (203.0.113.10)") {
+		t.Fatalf("it does not say why the record stays: %+v\n%s", got, out)
+	}
+}
+
+func TestExposeRmWithNoRecordLeftDeletesNothing(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	got, _ := rmJSON(t, dir, "app.example.com", "--yes")
+
+	if len(client.deleted) != 0 || got.DNSError != "" {
+		t.Fatalf("nothing was there to delete: %q %+v", client.deleted, got)
+	}
+}
+
+func TestExposeRmWithNoProviderPrintsTheRecordToRemoveByHand(t *testing.T) {
+	client := &exposeClient{files: map[string]string{"alice-routes.caddy": "app.example.com {\n}\n"}}
+	dialExpose(t, client)
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "Remove this record by hand") || !strings.Contains(out, "app.example.com\tA\t203.0.113.10") {
+		t.Fatalf("it does not print the record to remove by hand:\n%s", out)
+	}
+}
+
+func TestExposeRmStillTakesTheSiteOffCaddyWhenTheProviderRefuses(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records:   []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}},
+		deleteErr: errors.New("exit status 1")}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	got, out := rmJSON(t, dir, "app.example.com", "--yes")
+
+	if got.Status != "removed" || !got.Applied {
+		t.Fatalf("Caddy still drops the site: %+v", got)
+	}
+	if !strings.Contains(got.DNSError, "hostinger refused it") {
+		t.Fatalf("the JSON must say the record was not removed: %+v", got)
+	}
+	if !strings.Contains(out, "Remove this record by hand") || !strings.Contains(out, "app (in example.com)\tA\t203.0.113.10") {
+		t.Fatalf("it does not print the record to remove by hand:\n%s", out)
+	}
+}
+
+func TestExposeRmDeletesNothingWhenTheProviderCannotList(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}, listErr: errors.New("exit status 1")}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	got, _ := rmJSON(t, dir, "app.example.com", "--yes")
+
+	if len(client.deleted) != 0 {
+		t.Fatalf("a record it could not see was deleted: %q", client.deleted)
+	}
+	if got.Status != "removed" || got.DNSError == "" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestExposeRmCheckShowsTheDNSRemovalAndDeletesNothing(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--check")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "would remove app A 203.0.113.10 from example.com (provider hostinger)") {
+		t.Fatalf("--check does not show the DNS removal:\n%s", out)
+	}
+	if len(client.deleted) != 0 {
+		t.Fatalf("--check deleted %q", client.deleted)
+	}
+}
+
+func TestExposeRmNoApplyLeavesTheRecordAndSaysHowToRemoveIt(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configPublishing(t)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes", "--no-apply")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 0 || client.lists != 0 {
+		t.Fatalf("--no-apply asked the DNS provider: %d lists, %q", client.lists, client.deleted)
+	}
+	if !strings.Contains(out, "devmachine dns rm app.example.com A 203.0.113.10") {
+		t.Fatalf("it does not say how to remove the record later:\n%s", out)
 	}
 }

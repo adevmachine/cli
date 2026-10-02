@@ -725,7 +725,26 @@ it (or removed, with no route left) and Caddy reloads. With the machine
 out of reach it keeps serving the site until the next `sync`.
 `--no-apply` and `--check` work as for `add`; in JSON, `status` is
 `removed` or `pending`. A host the configuration does not know is
-refused, with how to adopt or remove it by hand. See
+refused, with how to adopt or remove it by hand.
+
+After Caddy, `rm` removes the A record `add` created — through the
+provider that holds the zone, and only while its value is still the
+serving machine's address (the `via` machine for a site published
+through one):
+
+- A record that points somewhere else now is left alone, and the command
+  says where it points. Somebody repointed the name; deleting it would
+  take down whatever answers there.
+- With no provider installed, or the machine out of reach, it prints the
+  record to remove by hand.
+- When the provider cannot list the zone or refuses the delete, nothing
+  is deleted, the site still comes off Caddy, the record to remove by
+  hand is printed, and the JSON carries `dns_error`.
+- `--check` also prints the DNS removal it would make.
+- `--no-apply` touches no machine, so no DNS either: it prints the
+  `devmachine dns rm <host> A <address>` to run later. (`add --no-apply`
+  still points the name, since a name that does not resolve yet stops
+  the certificate on the next `sync`.) See
 [Publishing](../concepts/publishing.md) for the cases this question
 exists to catch.
 

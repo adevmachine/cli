@@ -52,7 +52,7 @@ func (m *Manual) Upsert(_ context.Context, zone string, r Record) error {
 // Delete prints the record to remove by hand.
 func (m *Manual) Delete(_ context.Context, zone string, r Record) error {
 	fmt.Fprintf(m.out, "No installed provider holds %s. Remove this record by hand:\n\n", zone)
-	fmt.Fprintf(m.out, "  %s\t%s\t%s\n", r.Name, r.Type, r.Value)
+	fmt.Fprintf(m.out, "  %s\t%s\t%s\n", fullName(r.Name, zone), r.Type, r.Value)
 	return nil
 }
 

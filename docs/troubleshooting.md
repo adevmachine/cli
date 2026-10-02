@@ -473,6 +473,27 @@ cannot find the site and Caddy cannot get its certificate.
 **What to do:** Create the record the command printed, or fix the provider
 (see the table above) and run `devmachine dns add <name> A <address>`.
 
+## `expose rm` said "the DNS record for … was not removed"
+
+**What it means:** The site is off Caddy, but the record that pointed
+the name at the machine is still there: the DNS provider could not list
+the zone, refused the delete, or its setup is broken. The reason is on
+the same line. The name still resolves, and visitors get a TLS error
+instead of nothing.
+
+**What to do:** Remove the record the command printed, or fix the
+provider (see the table above) and run
+`devmachine dns rm <name> A <address>`.
+
+## `expose rm` says a name "points at …, not at …: its DNS record is left alone"
+
+**What it means:** The name's A record no longer holds the serving
+machine's address, so `expose rm` did not touch it. Somebody repointed
+the name after `expose add`, maybe at a new server.
+
+**What to do:** Nothing, if the new value is right. If the name should
+go, remove it with `devmachine dns rm <name> A <value>`.
+
 ## A certificate never arrives after `expose add`
 
 **What it means:** First check `devmachine expose list`: a `pending` site
