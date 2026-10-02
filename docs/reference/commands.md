@@ -692,6 +692,9 @@ get a yes. `--publish` is the non-interactive way past that.
 - `--check` changes nothing. It prints the line `config.yml` would gain
   and the routes file as it is on the machine against what it would
   become (`+` added, `-` removed).
+- When a DNS provider refuses the record (a rejected token, a zone it
+  cannot change), the site is still put on Caddy: the command says which
+  provider refused and why, and prints the record to create by hand.
 - With `--format json` it prints `host`, `port`, `workspace`, `applied`
   (`true` once Caddy serves it) and `status` (`published` or `pending`),
   with a `note` saying why when it is pending. A site published with
@@ -882,9 +885,12 @@ missing. Every row names the fixing command. `unknown` means the package
 never said where its tool keeps the result — not the same as missing.
 Never prints a value.
 
-`push` delivers only missing values, skipping logins (nobody can push a
-browser session) and naming any secret never stored; exits non-zero if
-it found one. A workspace's own value (`<workspace>/<name>`) wins over
+`push` delivers the values that are missing, and those the machine holds
+an older copy of: it asks the machine only for a SHA-256 of each file, so
+a token rotated with `secrets set` reaches the machine on the next push
+(reported as `replaced`) without a value ever crossing back. It skips
+logins (nobody can push a browser session) and names any secret never
+stored; exits non-zero if it found one. A workspace's own value (`<workspace>/<name>`) wins over
 the shared one. `--check` previews and writes nothing.
 
 It also delivers every workspace's own secret set with `secrets set

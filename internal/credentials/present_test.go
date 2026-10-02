@@ -2,6 +2,10 @@ package credentials
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -164,5 +168,36 @@ func workspaceLogin(workspace, name string) Declared {
 			Command: name + " /login", StoredAt: "~/.claude/.credentials.json",
 		},
 		Package: name, Workspace: workspace, LinuxUser: workspace,
+	}
+}
+
+func TestThePresentScriptReportsTheDigestOfWhatIsThere(t *testing.T) {
+	dir := t.TempDir()
+	file := dir + "/env"
+	body := "# Written by the devmachine CLI. Sourced, never edited by hand.\nPROBE='v'\n"
+	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", presentScript)
+	cmd.Stdin = strings.NewReader("probe\x1f\x1f" + file + "\nmissing\x1f\x1f" + dir + "/nope\n")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte(body))
+	want := "probe\tyes\t" + hex.EncodeToString(sum[:]) + "\nmissing\tno\t\n"
+	if string(out) != want {
+		t.Fatalf("got %q, want %q", out, want)
+	}
+}
+
+func TestLookReadsTheDigestBack(t *testing.T) {
+	c := &recordingClient{answer: "gh\tyes\tabc123\nalice/claude\tno\t\n"}
+	present, digests, err := Look(context.Background(), c, []Declared{machineLogin("gh"), workspaceLogin("alice", "claude")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !present["gh"] || present["alice/claude"] || digests["gh"] != "abc123" || digests["alice/claude"] != "" {
+		t.Fatalf("%v %v", present, digests)
 	}
 }

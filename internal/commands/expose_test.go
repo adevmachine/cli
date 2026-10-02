@@ -71,6 +71,9 @@ type exposeClient struct {
 	// probe is what the machine answers when asked whether it reaches
 	// another machine's port; empty means it does.
 	probe string
+	// upsertErr is what the DNS provider answers a write with, nil when it
+	// takes it.
+	upsertErr error
 }
 
 var (
@@ -162,6 +165,9 @@ func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
 		return string(body), nil
 	case strings.Contains(command, " upsert "):
 		c.upserts++
+		if c.upsertErr != nil {
+			return `{"error":{"kind":"unauthenticated","message":"request failed (HTTP 403)"}}`, c.upsertErr
+		}
 		return "{}", nil
 	default:
 		return "", nil

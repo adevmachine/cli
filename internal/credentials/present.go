@@ -26,7 +26,10 @@ func Place(d Declared) string {
 	return Destination(d)
 }
 
-// presentScript answers, for each line it reads, whether the place exists.
+// presentScript answers, for each line it reads, whether the place exists
+// and, when it is a file root can read, the SHA-256 of what it holds: enough
+// to tell a rotated value from the one delivered, without the value ever
+// leaving the machine.
 //
 // One command for every credential: three of them must not be three
 // connections, because `doctor` and `credentials list` both ask about the lot.
@@ -47,9 +50,17 @@ while IFS="$sep" read -r key user place; do
 	'~/'*) path="$home/${path#'~/'}" ;;
 	esac
 	if [ -n "$home" ] && [ -e "$path" ]; then
-		printf '%s%syes\n' "$key" "$tab"
+		sum=
+		if [ -f "$path" ] && [ -r "$path" ]; then
+			if command -v sha256sum >/dev/null 2>&1; then
+				sum=$(sha256sum "$path" | cut -d' ' -f1)
+			elif command -v shasum >/dev/null 2>&1; then
+				sum=$(shasum -a 256 "$path" | cut -d' ' -f1)
+			fi
+		fi
+		printf '%s%syes%s%s\n' "$key" "$tab" "$tab" "$sum"
 	else
-		printf '%s%sno\n' "$key" "$tab"
+		printf '%s%sno%s\n' "$key" "$tab" "$tab"
 	fi
 done
 `
@@ -60,7 +71,16 @@ done
 // its tool keeps the session — is left out of the answer rather than reported
 // missing. "I cannot tell" and "it is not there" are different things.
 func Present(ctx context.Context, c remote.Client, wanted []Declared) (map[string]bool, error) {
+	present, _, err := Look(ctx, c, wanted)
+	return present, err
+}
+
+// Look is Present together with the SHA-256 of each file that is there. A
+// digest is empty when the machine could not say: a directory, a file root
+// cannot read, or no tool to hash with.
+func Look(ctx context.Context, c remote.Client, wanted []Declared) (map[string]bool, map[string]string, error) {
 	present := map[string]bool{}
+	digests := map[string]string{}
 
 	var list strings.Builder
 	asked := 0
@@ -73,20 +93,23 @@ func Present(ctx context.Context, c remote.Client, wanted []Declared) (map[strin
 		asked++
 	}
 	if asked == 0 {
-		return present, nil
+		return present, digests, nil
 	}
 
 	out, err := c.RunInput(ctx, presentScript, strings.NewReader(list.String()))
 	if err != nil {
-		return nil, fmt.Errorf("looking for the credentials on the machine: %w", err)
+		return nil, nil, fmt.Errorf("looking for the credentials on the machine: %w", err)
 	}
 
 	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
-		key, answer, ok := strings.Cut(strings.TrimSpace(line), "\t")
-		if !ok {
+		fields := strings.Split(strings.TrimSpace(line), "\t")
+		if len(fields) < 2 {
 			continue
 		}
-		present[key] = answer == "yes"
+		present[fields[0]] = fields[1] == "yes"
+		if len(fields) > 2 {
+			digests[fields[0]] = fields[2]
+		}
 	}
-	return present, nil
+	return present, digests, nil
 }

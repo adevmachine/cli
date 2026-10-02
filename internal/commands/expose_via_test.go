@@ -384,3 +384,33 @@ func TestTheNameGetsThePublicAddressWhenAPrivateOneComesFirst(t *testing.T) {
 		}
 	}
 }
+
+func TestExposeAddStillPublishesWhenTheProviderRefusesTheRecord(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}, upsertErr: errors.New("exit status 1")}
+	dialExpose(t, client)
+	dir := configWithCaddy(t)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "expose", "add", "alice", "8080",
+		"--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatalf("a refused record must not stop the publish: %v\n%s", err, out)
+	}
+	var got exposeResult
+	if err := json.Unmarshal([]byte(lastJSON(out)), &got); err != nil {
+		t.Fatal(err, out)
+	}
+	if got.Status != "published" || !got.Applied {
+		t.Fatalf("Caddy still gets the route: %+v", got)
+	}
+	if !strings.Contains(out, "Create this record by hand") || !strings.Contains(out, "203.0.113.10") {
+		t.Fatalf("the output must say what to create by hand:\n%s", out)
+	}
+	if !strings.Contains(out, "app\tA\t203.0.113.10") {
+		t.Fatalf("the record is named inside the provider's zone:\n%s", out)
+	}
+	if !strings.Contains(out, "hostinger") {
+		t.Fatalf("and which provider refused, and why:\n%s", out)
+	}
+}

@@ -448,17 +448,12 @@ func routeLine(r config.Route) string {
 // installed, the exact record to create by hand is printed instead of
 // refusing. A name that does not resolve yet fails minutes later, in Caddy's
 // certificate log, where nobody is looking.
-func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out interface {
-	Write([]byte) (int, error)
-}) error {
-	base, err := provision.Base(tgt.machine)
-	if err != nil {
-		return err
-	}
-	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, base, host, "", client, out)
-	if err != nil {
-		return err
-	}
+//
+// The route is already in the configuration when this runs, so a provider
+// that refuses the write does not stop the publish: it says why, prints the
+// record to create by hand, and Caddy still gets the route. Stopping here left
+// a route recorded and on no machine, with an error about DNS only.
+func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out io.Writer) error {
 	if err := requiresAddress(tgt.machine, "expose"); err != nil {
 		return err
 	}
@@ -471,8 +466,28 @@ func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string,
 		fmt.Fprintf(out, "warning: %s has no public address in `hosts`, so %s points at %s, which only a private network reaches\n",
 			tgt.machine.Name, host, address)
 	}
+
+	manual := func(zone string, why error) error {
+		fmt.Fprintf(out, "the DNS record for %s was not written (%v)\n", host, why)
+		rec := dns.Record{Name: labelFor(host, zone), Type: "A", Value: address}
+		return dns.NewManual(out).Upsert(ctx, zone, rec)
+	}
+	base, err := provision.Base(tgt.machine)
+	if err != nil {
+		return manual(host, err)
+	}
+	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, base, host, "", client, out)
+	if err != nil {
+		return manual(host, err)
+	}
 	rec := dns.Record{Name: labelFor(host, choice.Zone), Type: "A", Value: address}
-	return choice.Provider.Upsert(ctx, choice.Zone, rec)
+	if err := choice.Provider.Upsert(ctx, choice.Zone, rec); err != nil {
+		if choice.Name == dns.ProviderManual {
+			return err
+		}
+		return manual(choice.Zone, fmt.Errorf("%s refused it: %w", choice.Name, err))
+	}
+	return nil
 }
 
 // publicAddress is the address a public name should point at: the first one

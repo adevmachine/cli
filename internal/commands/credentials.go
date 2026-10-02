@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -249,10 +250,13 @@ func reportCredentials(cmd *cobra.Command, opts *options, rows []credentialJSON)
 
 // pushJSON is what a push did, and it never carries a value.
 type pushJSON struct {
-	Machine   string        `json:"machine"`
-	Check     bool          `json:"check"`
-	Delivered []string      `json:"delivered"`
-	Skipped   []skippedJSON `json:"skipped"`
+	Machine   string   `json:"machine"`
+	Check     bool     `json:"check"`
+	Delivered []string `json:"delivered"`
+	// Replaced names the delivered values that were already there with
+	// another value: rotated since the last push.
+	Replaced []string      `json:"replaced,omitempty"`
+	Skipped  []skippedJSON `json:"skipped"`
 	// NoValue names the credentials nobody stored a value for.
 	NoValue []string `json:"no_value,omitempty"`
 	// RemovedFromFile names the workspace secrets removed from their
@@ -276,8 +280,11 @@ func newCredentialsPushCmd(opts *options) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "push",
-		Short: "Deliver the values a machine is missing",
-		Long: "Only what is missing is written. A login is skipped — nobody " +
+		Short: "Deliver the values a machine is missing or holds an old copy of",
+		Long: "Only what is missing, or differs from the value stored here, is " +
+			"written: a rotated token reaches the machine on the next push. " +
+			"The machine is asked only for a SHA-256 of each file, never the " +
+			"value. A login is skipped — nobody " +
 			"can push a browser session — and a credential nobody stored a " +
 			"value for is named, because a push that quietly does nothing is " +
 			"the failure this command exists to prevent.\n\n" +
@@ -323,9 +330,9 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	}
 	defer client.Close()
 
-	present := map[string]bool{}
+	present, digests := map[string]bool{}, map[string]string{}
 	if len(found.wanted) > 0 {
-		present, err = credentials.Present(cmd.Context(), client, found.wanted)
+		present, digests, err = credentials.Look(cmd.Context(), client, found.wanted)
 		if err != nil {
 			return err
 		}
@@ -341,7 +348,16 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 				"a login cannot be pushed: run `" + credentials.LoginCommand(d) + "`",
 			})
 		case present[credentials.Key(d)]:
-			report.Skipped = append(report.Skipped, skippedJSON{credentials.Key(d), "already there"})
+			changed, err := rotated(found.dir, d, stored, digests[credentials.Key(d)])
+			if err != nil {
+				return err
+			}
+			if !changed {
+				report.Skipped = append(report.Skipped, skippedJSON{credentials.Key(d), "already there"})
+				continue
+			}
+			report.Replaced = append(report.Replaced, credentials.Key(d))
+			work = append(work, deliverable{d: d, secret: secretName(d, stored)})
 		case credentials.Destination(d) == "":
 			report.Skipped = append(report.Skipped, skippedJSON{
 				credentials.Key(d),
@@ -457,6 +473,21 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 	return nil
 }
 
+// rotated says whether the value stored here differs from the file on the
+// machine. A machine that could not hash the file, or a value nobody stored
+// here, is never taken for a difference: an unknown is not a change.
+func rotated(dir string, d credentials.Declared, stored map[string]bool, digest string) (bool, error) {
+	name := secretName(d, stored)
+	if digest == "" || d.Kind == packages.KindManual || !stored[name] {
+		return false, nil
+	}
+	value, err := secrets.Get(dir, name)
+	if err != nil {
+		return false, err
+	}
+	return credentials.Digest(d, value) != digest, nil
+}
+
 func pushCommandLine(check bool) string {
 	if check {
 		return "credentials push --check"
@@ -475,6 +506,10 @@ func reportPush(cmd *cobra.Command, opts *options, report pushJSON) error {
 		verb = "would deliver"
 	}
 	for _, key := range report.Delivered {
+		if slices.Contains(report.Replaced, key) {
+			fmt.Fprintf(out, "%s %s, replacing the older value on the machine\n", verb, key)
+			continue
+		}
 		fmt.Fprintf(out, "%s %s\n", verb, key)
 	}
 	for _, s := range report.Skipped {

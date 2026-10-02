@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/credentials"
 	"github.com/mydevmachine/devmachine/internal/doctor"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/packages"
@@ -503,5 +504,48 @@ func TestDoctorSaysNothingAboutCredentialsOnAMachineWithNoPackages(t *testing.T)
 	}
 	if strings.Contains(out, "credential:") {
 		t.Fatalf("a machine with nothing declared reported a credential:\n%s", out)
+	}
+}
+
+func TestPushReplacesAValueThatChangedAndLeavesAnEqualOneAlone(t *testing.T) {
+	dir := configWithTwoSecrets(t, "probe-rotated", "probe-same")
+	storeSecret(t, dir, "probe-rotated", "new-token")
+	storeSecret(t, dir, "probe-same", "same-token")
+	declared := func(name string) credentials.Declared {
+		return credentials.Declared{
+			Credential: packages.Credential{Name: name, Kind: packages.KindSecret, Env: "PROBE_TOKEN"},
+			Workspace:  "alice",
+		}
+	}
+	client := answering(t, "gh\tyes",
+		"alice/probe-rotated\tyes\t"+credentials.Digest(declared("probe-rotated"), "old-token"),
+		"alice/probe-same\tyes\t"+credentials.Digest(declared("probe-same"), "same-token"))
+
+	out, err := execute(t, "--config", dir, "--format", "json", "credentials", "push", "--yes")
+	if err != nil {
+		t.Fatalf("credentials push returned %v\n%s", err, out)
+	}
+	if len(client.delivered) != 1 || !strings.Contains(client.delivered[0], "new-token") {
+		t.Fatalf("only the rotated value is written again: %#v", client.delivered)
+	}
+	if !strings.Contains(out, `"replaced"`) || !strings.Contains(out, "alice/probe-rotated") {
+		t.Fatalf("the report must say the value was replaced:\n%s", out)
+	}
+	if strings.Contains(out, "new-token") || strings.Contains(out, "old-token") {
+		t.Fatalf("a value was printed:\n%s", out)
+	}
+}
+
+func TestPushLeavesAValueAloneWhenTheMachineCannotSayWhatItHolds(t *testing.T) {
+	dir := configWithTwoSecrets(t, "probe-old-machine", "probe-other")
+	storeSecret(t, dir, "probe-old-machine", "x")
+	storeSecret(t, dir, "probe-other", "y")
+	client := answering(t, "gh\tyes", "alice/probe-old-machine\tyes", "alice/probe-other\tyes")
+
+	if out, err := execute(t, "--config", dir, "credentials", "push", "--yes"); err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.delivered) != 0 {
+		t.Fatalf("nothing is known to differ, so nothing is written: %#v", client.delivered)
 	}
 }

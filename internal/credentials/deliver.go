@@ -2,6 +2,8 @@ package credentials
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path"
 	"strings"
@@ -41,6 +43,21 @@ func isEnvDelivery(d Declared) bool {
 func EnvBody(d Declared, value string) string {
 	return "# Written by the devmachine CLI. Sourced, never edited by hand.\n" +
 		d.Env + "=" + shellQuote(value) + "\n"
+}
+
+// Body is exactly what lands in the file for a value.
+func Body(d Declared, value string) string {
+	if isEnvDelivery(d) {
+		return EnvBody(d, value)
+	}
+	return value
+}
+
+// Digest is the SHA-256 the machine reports for a file holding this value,
+// so a push can tell a rotated value apart without reading it back.
+func Digest(d Declared, value string) string {
+	sum := sha256.Sum256([]byte(Body(d, value)))
+	return hex.EncodeToString(sum[:])
 }
 
 func shellQuote(s string) string {
@@ -113,10 +130,7 @@ func Push(ctx context.Context, c remote.Client, d Declared, value string) error 
 			"so there is nowhere to deliver it", d.Package, d.Name)
 	}
 
-	body := value
-	if isEnvDelivery(d) {
-		body = EnvBody(d, value)
-	}
+	body := Body(d, value)
 
 	if rel, inHome := strings.CutPrefix(destination, "~/"); inHome && d.LinuxUser != "" {
 		return pushIntoHome(ctx, c, d, rel, body)

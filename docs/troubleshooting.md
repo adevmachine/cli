@@ -433,7 +433,7 @@ words:
 | Error | What it means |
 | --- | --- |
 | `zone not found, or the token cannot see it` | This domain does not exist under this provider, or your token cannot see it. |
-| `the token was rejected` | Your credential is wrong or expired. Push a fresh one with `devmachine secrets set` and `devmachine credentials push`. |
+| `the token was rejected` | Your credential is wrong or expired. Store the new one with `devmachine secrets set` and run `devmachine credentials push`: it replaces the old copy on the machine. On Hostinger, a 403 before packages v26 was the provider itself, not your token — see below. |
 | `the token cannot change this zone` | Your token can read the domain but not write to it. |
 | `the record was rejected` | The registrar refused the value — a bad type, a bad value, or a name it will not accept. |
 | `rate limited` | The registrar's API is temporarily blocking this token from making more requests. devmachine never retries this on its own; wait and run the command again. |
@@ -450,6 +450,28 @@ Two more lines that are not errors, but change what a command does:
   a bug in the provider package, not in devmachine itself. The package sent
   back something that does not match the [DNS provider
   contract](reference/dns-provider-contract.md).
+
+## Hostinger answers every call with HTTP 403, but the token works with `curl`
+
+**What it means:** Before packages `v26`, the `hostinger` provider sent
+Python's default User-Agent, and Hostinger's firewall answers that with a
+403 — the same status a token without DNS access gets. Every `dns` command
+said the token was rejected, and `expose add` fell back to printing the
+record by hand.
+
+**What to do:** `devmachine packages pin v26` (or later) and
+`devmachine sync --tags hostinger`. A token without "Domains portfolio"
+permission also needs the zones listed: `hostinger.zones: [example.com]` in
+the machine's settings.
+
+## `expose add` said "the DNS record for … was not written"
+
+**What it means:** The site is on Caddy, but the DNS provider refused the
+record; the reason is on the same line. Until the record exists, visitors
+cannot find the site and Caddy cannot get its certificate.
+
+**What to do:** Create the record the command printed, or fix the provider
+(see the table above) and run `devmachine dns add <name> A <address>`.
 
 ## A certificate never arrives after `expose add`
 
