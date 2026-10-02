@@ -91,6 +91,17 @@ Or put the key's public half (`<key>.pub`) in the admin's
 `authorized_keys` through the provider's console, and run the same
 command again.
 
+## `create-local` refuses `--cpus`, `--memory` or `--disk`
+
+**What it means:** The size you asked for does not fit this computer, so no
+VM was made. The CPUs can be at most the computer's cores. The memory must
+be less than the computer's, because macOS or Linux needs some for itself
+while the VM runs. The disk must be at least 10 GiB, or the first `sync`
+fills it.
+
+**What to do:** Run it again with a number inside the range the message
+gives.
+
 ## `create-local --add`: "the local machine … is running, and was not added"
 
 **What it means:** The VM was created and is running, but adding it

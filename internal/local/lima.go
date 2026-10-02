@@ -77,7 +77,7 @@ func Available() error {
 //
 // Progress goes to out as it arrives: the first run downloads an image and
 // boots it, which looks stuck when nothing is printed.
-func Create(ctx context.Context, instance string, out io.Writer) (config.Machine, error) {
+func Create(ctx context.Context, instance string, size Size, out io.Writer) (config.Machine, error) {
 	if err := Available(); err != nil {
 		return config.Machine{}, err
 	}
@@ -85,13 +85,16 @@ func Create(ctx context.Context, instance string, out io.Writer) (config.Machine
 		return config.Machine{}, fmt.Errorf(
 			"%q cannot be a machine name: use lower-case letters, digits and dashes", instance)
 	}
+	if err := checkHostSize(size); err != nil {
+		return config.Machine{}, err
+	}
 	if exists(ctx, instance) {
 		return config.Machine{}, fmt.Errorf(
 			"a local machine named %q is already there: remove it with `devmachine machines delete-local %s`",
 			instance, instance)
 	}
 
-	path, remove, err := writeTemplate()
+	path, remove, err := writeTemplate(size)
 	if err != nil {
 		return config.Machine{}, err
 	}
@@ -169,11 +172,15 @@ func exists(ctx context.Context, instance string) bool {
 	return err == nil
 }
 
-// writeTemplate puts the embedded template where limactl can read it, and
+// writeTemplate puts the template, at size, where limactl can read it, and
 // returns the function that takes it away again.
 //
 // The extension matters: it is how limactl knows what the file is.
-func writeTemplate() (string, func(), error) {
+func writeTemplate(size Size) (string, func(), error) {
+	body, err := Render(size)
+	if err != nil {
+		return "", nil, err
+	}
 	dir, err := os.MkdirTemp("", "devmachine-local-")
 	if err != nil {
 		return "", nil, fmt.Errorf("writing the machine template: %w", err)
@@ -181,7 +188,7 @@ func writeTemplate() (string, func(), error) {
 	remove := func() { _ = os.RemoveAll(dir) }
 
 	path := filepath.Join(dir, "machine.yaml")
-	if err := os.WriteFile(path, machineTemplate, 0o600); err != nil {
+	if err := os.WriteFile(path, body, 0o600); err != nil {
 		remove()
 		return "", nil, fmt.Errorf("writing the machine template: %w", err)
 	}

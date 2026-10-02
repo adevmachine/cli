@@ -259,7 +259,7 @@ devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]  
 devmachine machines scan --address <a> [--port p]   the SSH fingerprint of a server not added yet; writes nothing
 devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
-devmachine machines create-local <name> [--add [--key k] [--no-essentials] [--no-aliases]]   a machine on your computer
+devmachine machines create-local <name> [--cpus n] [--memory GiB] [--disk GiB] [--add [--key k] [--no-essentials] [--no-aliases]]   a machine on your computer
 devmachine machines start <name>          start a local machine
 devmachine machines stop <name>           stop a local machine
 devmachine machines delete-local <name> [--yes]   destroy it and everything on it
@@ -393,6 +393,14 @@ like a bought server — `devmachine setup` still has to run against it.
 Root password `devmachine`, public on purpose: this VM holds no real
 data.
 
+By default the VM gets 2 CPUs, 4 GiB of memory and a 20 GiB disk.
+`--cpus <n>`, `--memory <GiB>` and `--disk <GiB>` change that, in whole
+numbers. Each is checked against this computer before Lima starts:
+`--cpus` from 1 to its number of cores, `--memory` from 1 GiB to less than
+its memory (the computer needs some for itself), `--disk` at least 10 GiB.
+The disk is a sparse file, so a large one only uses the space the VM
+writes. The output says the size the VM got.
+
 `create-local <name> --add` does both steps at once: it creates the VM,
 then adds it the way `machines add --address` adds a server — installs a
 key with that password, proves the key, turns password login off,
@@ -407,7 +415,7 @@ running and nothing is written; the error ends with the exact `machines
 add` command that adds it by hand, ready to copy. The host key is read
 once, and that same key is the one trusted.
 `--format json` prints the machine as `machines list` does, with its
-`key` once added; the progress goes to stderr. `start`, `stop` and `delete-local` only act on a local machine.
+`key` once added and its `size` (`cpus`, `memory_gib`, `disk_gib`); the progress goes to stderr. `start`, `stop` and `delete-local` only act on a local machine.
 
 Two limits: needs [Lima](https://lima-vm.io) (`brew install lima`), macOS
 and Linux only; not reachable from the internet, so `dns`, HTTPS and

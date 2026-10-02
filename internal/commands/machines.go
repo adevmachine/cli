@@ -537,8 +537,9 @@ var createLocal = local.Create
 
 func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 	var (
-		add bool
-		s   setupOptions
+		add  bool
+		s    setupOptions
+		size = local.DefaultSize
 	)
 	c := &cobra.Command{
 		Use:   "create-local <name>",
@@ -548,7 +549,8 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 			"password and no key installed, which is where `devmachine setup` starts.\n\n" +
 			"Without --add, nothing is written to the configuration: `setup` or " +
 			"`machines add` does that. With --add, it is added at once, the way " +
-			"`machines add --address` adds a server.",
+			"`machines add --address` adds a server.\n\n" +
+			"--cpus, --memory and --disk size the VM; each must fit this computer.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, flag := range []string{"key", "no-essentials", "no-aliases"} {
@@ -557,21 +559,21 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 				}
 			}
 			if !add {
-				m, err := createLocal(cmd.Context(), args[0], cmd.ErrOrStderr())
+				m, err := createLocal(cmd.Context(), args[0], size, cmd.ErrOrStderr())
 				if err != nil {
 					return err
 				}
-				return reportLocalMachine(cmd, opts, m, false)
+				return reportLocalMachine(cmd, opts, m, size, false)
 			}
 			dir, _, err := config.Dir(opts.configDir)
 			if err != nil {
 				return err
 			}
-			m, err := createAndAddLocal(cmd.Context(), dir, opts.configDir, cmd.ErrOrStderr(), args[0], s)
+			m, err := createAndAddLocal(cmd.Context(), dir, opts.configDir, cmd.ErrOrStderr(), args[0], size, s)
 			if err != nil {
 				return err
 			}
-			return reportLocalMachine(cmd, opts, m, true)
+			return reportLocalMachine(cmd, opts, m, size, true)
 		},
 	}
 	c.Flags().BoolVar(&add, "add", false,
@@ -580,6 +582,11 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 		"with --add: `new`, a private key file, or agent:<SHA256 fingerprint>, as `machines add --key`")
 	c.Flags().BoolVar(&s.noEssentials, "no-essentials", false, "with --add: start the machine with no packages")
 	c.Flags().BoolVar(&s.noAliases, "no-aliases", false, "with --add: do not write SSH host entries")
+	c.Flags().IntVar(&size.CPUs, "cpus", local.DefaultSize.CPUs, "CPUs for the VM, at most this computer's cores")
+	c.Flags().IntVar(&size.MemoryGiB, "memory", local.DefaultSize.MemoryGiB,
+		"memory for the VM in GiB, less than this computer has")
+	c.Flags().IntVar(&size.DiskGiB, "disk", local.DefaultSize.DiskGiB,
+		fmt.Sprintf("disk for the VM in GiB, at least %d", local.MinDiskGiB))
 	return c
 }
 
@@ -588,7 +595,7 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 // Progress goes to out, which is stderr, so `--format json` leaves a document
 // on stdout and nothing else.
 func createAndAddLocal(ctx context.Context, dir, configFlag string, out io.Writer, name string,
-	s setupOptions) (config.Machine, error) {
+	size local.Size, s setupOptions) (config.Machine, error) {
 	current, err := config.Load(dir)
 	if err == nil {
 		if _, err := current.Machine(name); err == nil {
@@ -598,7 +605,7 @@ func createAndAddLocal(ctx context.Context, dir, configFlag string, out io.Write
 		return config.Machine{}, err
 	}
 
-	m, err := createLocal(ctx, name, out)
+	m, err := createLocal(ctx, name, size, out)
 	if err != nil {
 		return config.Machine{}, err
 	}
@@ -715,7 +722,7 @@ func newMachinesDeleteLocalCmd() *cobra.Command {
 
 // reportLocalMachine prints a new local machine the way `machines list` prints
 // a configured one, so the same fields mean the same thing.
-func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine, added bool) error {
+func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine, size local.Size, added bool) error {
 	addresses := make([]string, 0, len(m.Hosts))
 	for _, h := range m.Hosts {
 		addresses = append(addresses, h.Address)
@@ -725,11 +732,13 @@ func reportLocalMachine(cmd *cobra.Command, opts *options, m config.Machine, add
 		return writeJSON(cmd.OutOrStdout(), machineJSON{
 			Name: m.Name, Hosts: addresses, AdminUser: m.User,
 			Port: m.Port, Key: m.Key, AgentKey: m.AgentKey, Workspaces: []string{}, Packages: onOrNone(m.Packages),
+			Size: &sizeJSON{CPUs: size.CPUs, MemoryGiB: size.MemoryGiB, DiskGiB: size.DiskGiB},
 		})
 	}
 
 	cmd.Printf("%-12s %-28s port %-6d admin: %s\n",
 		m.Name, strings.Join(addresses, ","), m.Port, m.User)
+	cmd.Printf("Size: %d CPUs, %d GiB memory, %d GiB disk.\n", size.CPUs, size.MemoryGiB, size.DiskGiB)
 	if added {
 		cmd.Printf("It is in the configuration, and logs in with %s.\n", chosenKey{Path: m.Key, Public: m.AgentKey}.describe())
 		return nil

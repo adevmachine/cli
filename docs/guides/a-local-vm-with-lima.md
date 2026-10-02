@@ -21,6 +21,16 @@ runs the virtual machine: `brew install lima`. The VM runs Ubuntu 24.04 with
 2 CPUs, 4 GiB of memory and a 20 GiB disk; the first one downloads the image,
 which takes a few minutes.
 
+Need a bigger one? Give the size when you create it:
+
+```
+devmachine machines create-local lab --cpus 4 --memory 8 --disk 40 --add
+```
+
+Memory and disk are in GiB. The CPUs cannot be more than your computer has,
+and the memory must be less than it has. devmachine sets the size only when
+it creates the VM: to change it, delete the VM and create it again.
+
 ## Before you start: machine, skills, workspace
 
 A local VM is not a bought server, so it is made and added differently, but

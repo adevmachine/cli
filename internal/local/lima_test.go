@@ -81,6 +81,7 @@ func stub(t *testing.T, r *recorder) *recorder {
 	lookPath = func(string) (string, error) { return "/usr/local/bin/limactl", nil }
 	run = r.run
 	t.Cleanup(func() { lookPath, run = realLookPath, realRun })
+	stubHost(t, 8, 16*gib)
 	return r
 }
 
@@ -108,7 +109,7 @@ func TestAvailableIsQuietWhenLimaIsInstalled(t *testing.T) {
 func TestCreateReturnsAMachineTheCLICanAlreadyUse(t *testing.T) {
 	stub(t, nil)
 
-	m, err := Create(context.Background(), "alpha", io.Discard)
+	m, err := Create(context.Background(), "alpha", DefaultSize, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +124,7 @@ func TestCreateReturnsAMachineTheCLICanAlreadyUse(t *testing.T) {
 func TestCreateLeavesNoKeyOnTheMachine(t *testing.T) {
 	r := stub(t, nil)
 
-	m, err := Create(context.Background(), "alpha", io.Discard)
+	m, err := Create(context.Background(), "alpha", DefaultSize, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +148,7 @@ func TestCreateLeavesNoKeyOnTheMachine(t *testing.T) {
 func TestCreateRefusesToTakeOverAnExistingMachine(t *testing.T) {
 	r := stub(t, &recorder{replies: map[string]string{"{{.Status}}": "Running"}, fails: map[string]error{}})
 
-	_, err := Create(context.Background(), "alpha", io.Discard)
+	_, err := Create(context.Background(), "alpha", DefaultSize, io.Discard)
 	if err == nil {
 		t.Fatal("it created over a machine that was already there")
 	}
@@ -162,7 +163,7 @@ func TestCreateRefusesToTakeOverAnExistingMachine(t *testing.T) {
 func TestCreateGivesLimaTheTemplateAsAFileItCanRead(t *testing.T) {
 	r := stub(t, nil)
 
-	if _, err := Create(context.Background(), "alpha", io.Discard); err != nil {
+	if _, err := Create(context.Background(), "alpha", DefaultSize, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if len(r.paths) != 1 {
@@ -185,7 +186,7 @@ func TestCreateRejectsANameLimaWillNotTake(t *testing.T) {
 	stub(t, nil)
 
 	for _, name := range []string{"", "--tty=false", "Alpha One", "../escape"} {
-		if _, err := Create(context.Background(), name, io.Discard); err == nil {
+		if _, err := Create(context.Background(), name, DefaultSize, io.Discard); err == nil {
 			t.Fatalf("it accepted %q", name)
 		}
 	}
@@ -241,7 +242,7 @@ func TestEveryCommandSaysHowToInstallLima(t *testing.T) {
 	t.Cleanup(func() { lookPath = realLookPath })
 
 	for _, call := range []func() error{
-		func() error { _, err := Create(context.Background(), "alpha", io.Discard); return err },
+		func() error { _, err := Create(context.Background(), "alpha", DefaultSize, io.Discard); return err },
 		func() error { return Start(context.Background(), "alpha") },
 		func() error { return Stop(context.Background(), "alpha") },
 		func() error { return Delete(context.Background(), "alpha") },
@@ -307,7 +308,7 @@ func TestCreateReallyMakesAMachineReachableByPasswordOnly(t *testing.T) {
 		}
 	})
 
-	m, err := Create(ctx, name, os.Stderr)
+	m, err := Create(ctx, name, DefaultSize, os.Stderr)
 	if err != nil {
 		t.Fatal(err)
 	}

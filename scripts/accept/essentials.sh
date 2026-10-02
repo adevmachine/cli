@@ -2,7 +2,9 @@
 # The essentials acceptance proof: a machine fresh from `setup` gets the
 # essentials, and once synced the macOS app's package answers with no other
 # step. Before that, `sync --tags devmachine-app` locks only what it ran, so a
-# plain `sync --check` still sees the rest as pending.
+# plain `sync --check` still sees the rest as pending. The VM is created with a
+# size other than the default, to prove create-local's --cpus, --memory and
+# --disk reach Lima.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -45,7 +47,7 @@ if [ -z "${PACKAGES:-}" ] || [ ! -d "$PACKAGES/packages" ]; then
   die "PACKAGES must name a packages checkout"
 fi
 
-"$DEVMACHINE_ACCEPT_BIN" machines create-local "$VM" \
+"$DEVMACHINE_ACCEPT_BIN" machines create-local "$VM" --cpus 3 --memory 5 --disk 25 \
   >"$SCENARIO_LOG_DIR/create.log" 2>&1 || die "could not create $VM"
 CLOUD_INIT=$(limactl shell "$VM" -- cloud-init status --wait 2>&1 || true)
 printf '%s\n' "$CLOUD_INIT" > "$SCENARIO_LOG_DIR/cloud-init.log"
@@ -53,6 +55,14 @@ case "$CLOUD_INIT" in
   *"status: done"*) ;;
   *) die "$VM did not finish cloud-init: $CLOUD_INIT" ;;
 esac
+
+contains "$(cat "$SCENARIO_LOG_DIR/create.log")" "Size: 3 CPUs, 5 GiB memory, 25 GiB disk." \
+  "create-local reports the size it was given" || true
+equals "$(limactl shell "$VM" -- nproc 2>&1)" "3" "the VM boots with the CPUs --cpus asked for" || true
+equals "$(limactl list --format '{{.Memory}}' "$VM")" "$((5 * 1024 * 1024 * 1024))" \
+  "the VM boots with the memory --memory asked for" || true
+equals "$(limactl shell "$VM" -- lsblk -bdno SIZE /dev/vda 2>&1)" "$((25 * 1024 * 1024 * 1024))" \
+  "the VM boots with the disk --disk asked for" || true
 
 PORT=$(limactl list --format '{{.SSHLocalPort}}' "$VM")
 [ -n "$PORT" ] || die "$VM never received an SSH port"
@@ -107,4 +117,4 @@ LOGS=$("$DEVMACHINE_ACCEPT_BIN" run --package devmachine-app --machine "$VM" -- 
 printf '%s\n' "$LOGS" > "$SCENARIO_LOG_DIR/caddy-logs.log"
 contains "$LOGS" "caddy" "caddy-logs reads Caddy's journal" || true
 
-scenario_done 10 "essentials"
+scenario_done 14 "essentials"

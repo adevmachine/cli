@@ -95,15 +95,24 @@ func newConfigShowCmd(opts *options) *cobra.Command {
 // from the configuration structs so a change to how config.yml is written does
 // not silently change what every consumer reads.
 type machineJSON struct {
-	Name       string   `json:"name"`
-	Hosts      []string `json:"hosts"`
-	AdminUser  string   `json:"admin_user"`
-	Port       int      `json:"port"`
-	Key        string   `json:"key,omitempty"`
-	AgentKey   string   `json:"agent_key,omitempty"`
-	Workspaces []string `json:"workspaces"`
-	Packages   []string `json:"packages"`
-	Self       bool     `json:"self,omitempty"`
+	Name       string    `json:"name"`
+	Hosts      []string  `json:"hosts"`
+	AdminUser  string    `json:"admin_user"`
+	Port       int       `json:"port"`
+	Key        string    `json:"key,omitempty"`
+	AgentKey   string    `json:"agent_key,omitempty"`
+	Workspaces []string  `json:"workspaces"`
+	Packages   []string  `json:"packages"`
+	Self       bool      `json:"self,omitempty"`
+	Size       *sizeJSON `json:"size,omitempty"`
+}
+
+// sizeJSON is the size create-local gave a VM. Only create-local reports it:
+// the configuration does not record it.
+type sizeJSON struct {
+	CPUs      int `json:"cpus"`
+	MemoryGiB int `json:"memory_gib"`
+	DiskGiB   int `json:"disk_gib"`
 }
 
 type configJSON struct {

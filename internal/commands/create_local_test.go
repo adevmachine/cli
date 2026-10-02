@@ -17,14 +17,60 @@ import (
 
 func stubCreateLocal(t *testing.T) *[]string {
 	t.Helper()
+	created, _ := stubCreateLocalSized(t)
+	return created
+}
+
+func stubCreateLocalSized(t *testing.T) (*[]string, *[]local.Size) {
+	t.Helper()
 	created := &[]string{}
-	t.Cleanup(swap(&createLocal, func(_ context.Context, name string, _ io.Writer) (config.Machine, error) {
+	sizes := &[]local.Size{}
+	t.Cleanup(swap(&createLocal, func(_ context.Context, name string, size local.Size, _ io.Writer) (config.Machine, error) {
 		*created = append(*created, name)
+		*sizes = append(*sizes, size)
 		return config.Machine{
 			Name: name, Hosts: []config.Host{{Address: local.Address}}, User: local.AdminUser, Port: 60022,
 		}, nil
 	}))
-	return created
+	return created, sizes
+}
+
+func TestCreateLocalKeepsTheDefaultSizeWithoutFlags(t *testing.T) {
+	_, sizes := stubCreateLocalSized(t)
+
+	out, err := executeWithInput(t, "", "--config", filepath.Join(t.TempDir(), "devmachine"),
+		"machines", "create-local", "sandbox")
+	if err != nil {
+		t.Fatalf("create-local returned %v (%s)", err, out)
+	}
+	if len(*sizes) != 1 || (*sizes)[0] != local.DefaultSize {
+		t.Fatalf("sizes = %#v, want the default", *sizes)
+	}
+	if !strings.Contains(out, "2 CPUs, 4 GiB memory, 20 GiB disk") {
+		t.Fatalf("the size is not reported: %q", out)
+	}
+}
+
+func TestCreateLocalPassesTheChosenSizeAndReportsIt(t *testing.T) {
+	_, sizes := stubCreateLocalSized(t)
+
+	out, err := executeWithInput(t, "", "--config", filepath.Join(t.TempDir(), "devmachine"), "--format", "json",
+		"machines", "create-local", "sandbox", "--cpus", "3", "--memory", "6", "--disk", "30")
+	if err != nil {
+		t.Fatalf("create-local returned %v (%s)", err, out)
+	}
+	want := local.Size{CPUs: 3, MemoryGiB: 6, DiskGiB: 30}
+	if len(*sizes) != 1 || (*sizes)[0] != want {
+		t.Fatalf("sizes = %#v, want %#v", *sizes, want)
+	}
+	start := strings.Index(out, "{")
+	var got machineJSON
+	if start < 0 || json.Unmarshal([]byte(out[start:]), &got) != nil {
+		t.Fatalf("no JSON at the end: %q", out)
+	}
+	if got.Size == nil || *got.Size != (sizeJSON{CPUs: 3, MemoryGiB: 6, DiskGiB: 30}) {
+		t.Fatalf("reported size %#v", got.Size)
+	}
 }
 
 func TestCreateLocalWithAddAddsTheMachineWithItsPassword(t *testing.T) {
