@@ -415,3 +415,49 @@ func TestAnyCallsALocalPackageWhereAnsibleUnpackedIt(t *testing.T) {
 		t.Fatalf("ran %q, want the entrypoint under roles.local", client.commands)
 	}
 }
+
+func TestManualFromAnUnreachableMachineSaysSo(t *testing.T) {
+	var out strings.Builder
+	got, err := Choose(context.Background(), configDirWith(t), "main", provision.RemoteDir, "www.example.com", "", nil, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := got.Provider.Upsert(context.Background(), got.Zone, Record{Name: "@", Type: "A", Value: "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "main could not be reached") || strings.Contains(out.String(), "No installed provider holds") {
+		t.Fatalf("the reason is the machine, not the providers:\n%s", out.String())
+	}
+}
+
+func TestManualWithNoProviderInstalledSaysSo(t *testing.T) {
+	var out strings.Builder
+	got, err := Choose(context.Background(), configDirWith(t), "main", provision.RemoteDir, "www.example.com", "", &recordingClient{}, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got.Why, "no DNS provider is installed") {
+		t.Fatalf("got %#v", got)
+	}
+	if err := got.Provider.Delete(context.Background(), got.Zone, Record{Name: "@", Type: "A", Value: "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "No DNS provider is installed on main") || strings.Contains(out.String(), "No installed provider holds") {
+		t.Fatalf("the reason is that none is installed:\n%s", out.String())
+	}
+}
+
+func TestManualWhenNoInstalledProviderHoldsTheZoneSaysSo(t *testing.T) {
+	dir, client := configDirWithProvidersHolding(t, map[string][]string{"hostinger": {"example.com"}})
+	var out strings.Builder
+	got, err := Choose(context.Background(), dir, "main", provision.RemoteDir, "www.example.org", "", client, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := got.Provider.Upsert(context.Background(), got.Zone, Record{Name: "@", Type: "A", Value: "203.0.113.10"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "No installed provider holds www.example.org") {
+		t.Fatalf("%s", out.String())
+	}
+}

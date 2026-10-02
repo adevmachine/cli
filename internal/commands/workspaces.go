@@ -439,8 +439,10 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			"everything under that account's home directory, its Caddy routes " +
 			"and its entry in the configuration. It asks for the workspace's " +
 			"name typed again, because there is no undo.\n\n" +
-			"DNS records for its routes are left as they are; take those down " +
-			"by hand if they should go too.",
+			"The DNS record of each of its sites goes too, the way `expose rm` " +
+			"removes one: only while it still points at the machine that " +
+			"serves the site, and printed to remove by hand when no provider " +
+			"can do it.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _, err := config.Dir(opts.configDir)
@@ -475,12 +477,14 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			cmd.Printf("This deletes, on %s:\n", machine.Name)
 			cmd.Printf("  the account %s and everything under /home/%s\n", user, user)
 			for _, r := range w.Routes {
-				cmd.Printf("  https://%s, which will stop answering (its DNS record is left as it is)\n", r.Host)
+				cmd.Printf("  https://%s, which will stop answering, and its DNS record while it points at %s\n",
+					r.Host, cfg.ServingMachine(w, r))
 			}
 			cmd.Printf("and removes %s from the configuration. None of it can be put back.\n", w.Name)
 
 			if check {
 				cmd.Printf("would destroy %s\n", w.Name)
+				unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, nil, true)
 				return nil
 			}
 
@@ -569,6 +573,11 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			} else {
 				cmd.Printf("%s is destroyed: the account, its home and its configuration are gone.\n", w.Name)
 			}
+			clients := map[string]remote.Client{machine.Name: client}
+			for _, c := range elsewhere {
+				clients[c.machine] = c.client
+			}
+			unpointSites(cmd.Context(), cmd.OutOrStdout(), dir, cfg, w, clients, false)
 
 			updated, err := config.Load(dir)
 			if err != nil {

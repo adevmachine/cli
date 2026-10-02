@@ -606,6 +606,39 @@ func previewUnpointDNS(ctx context.Context, out io.Writer, dir string, machine c
 	_ = unpointDNS(ctx, dir, machine, host, client, out, true)
 }
 
+// unpointSites does for every site of w what `expose rm` does to one name,
+// each on the machine that serves it. A machine with no client in clients is
+// dialled as its admin login, the way `dns` commands reach a provider, and one
+// that cannot be reached gets the record printed.
+func unpointSites(ctx context.Context, out io.Writer, dir string, cfg config.Config, w config.Workspace,
+	clients map[string]remote.Client, dryRun bool) {
+	var dialled []remote.Client
+	defer func() {
+		for _, c := range dialled {
+			_ = c.Close()
+		}
+	}()
+	for _, r := range w.Routes {
+		m, err := cfg.Machine(cfg.ServingMachine(w, r))
+		if err != nil {
+			fmt.Fprintf(out, "warning: the DNS record for %s was not checked: %v\n", r.Host, err)
+			continue
+		}
+		client, ok := clients[m.Name]
+		if !ok {
+			if c, _, err := dialAdmin(ctx, m); err == nil {
+				client = c
+				dialled = append(dialled, c)
+			}
+			if clients == nil {
+				clients = map[string]remote.Client{}
+			}
+			clients[m.Name] = client
+		}
+		_ = unpointDNS(ctx, dir, m, r.Host, client, out, dryRun)
+	}
+}
+
 // dnsLeftNote says how to take the name's record off later, for an `expose
 // rm --no-apply` that touches no machine, and so no DNS provider either.
 func dnsLeftNote(machine config.Machine, host string) string {
@@ -956,10 +989,6 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 					result.Note = applyErr.Error()
 					applyErr = fmt.Errorf("%w\n%s is out of the configuration, and %s still serves it until `devmachine sync`",
 						applyErr, host, tgt.machine.Name)
-				}
-				if dialErr != nil && !tgt.machine.Self {
-					fmt.Fprintf(notes, "%s could not be reached, so its DNS provider could not be asked; the DNS record is printed to remove by hand\n",
-						tgt.machine.Name)
 				}
 				if dnsErr := unpointDNS(cmd.Context(), dir, tgt.machine, host, client, notes, false); dnsErr != nil {
 					result.DNSError = dnsErr.Error()

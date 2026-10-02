@@ -968,3 +968,32 @@ func TestExposeRmNoApplyLeavesTheRecordAndSaysHowToRemoveIt(t *testing.T) {
 		t.Fatalf("it does not say how to remove the record later:\n%s", out)
 	}
 }
+
+func TestExposeRmWithTheMachineDownSaysWhyTheRecordIsPrinted(t *testing.T) {
+	machineDown(t)
+	dir := configPublishing(t)
+
+	out, err := execute(t, "--config", dir, "expose", "rm", "app.example.com", "--yes")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "main could not be reached") || strings.Contains(out, "No installed provider holds") {
+		t.Fatalf("the reason is the machine, not the providers:\n%s", out)
+	}
+	if !strings.Contains(out, "Remove this record by hand") || !strings.Contains(out, "app.example.com\tA\t203.0.113.10") {
+		t.Fatalf("%s", out)
+	}
+}
+
+func TestExposeAddWithTheMachineDownSaysWhyTheRecordIsPrinted(t *testing.T) {
+	machineDown(t)
+	dir := configWithCaddy(t)
+
+	out, err := execute(t, "--config", dir, "expose", "add", "alice", "8080", "--host", "app.example.com", "--publish")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if strings.Contains(out, "No installed provider holds") || !strings.Contains(out, "Create this record by hand") {
+		t.Fatalf("the reason is the machine, not the providers:\n%s", out)
+	}
+}

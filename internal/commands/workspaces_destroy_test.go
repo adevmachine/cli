@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/dns"
 	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
@@ -226,5 +227,88 @@ func TestWorkspacesDestroyRefusesWhenItCannotFindWhereItsRoutesLive(t *testing.T
 	cfg, _ := config.Load(dir)
 	if len(cfg.Workspaces) != 1 {
 		t.Fatal("config changed")
+	}
+}
+
+func configDestroying(t *testing.T) string {
+	t.Helper()
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}, {host: api.example.com, port: 8081}]\n")
+	writeCaddyPackage(t, dir)
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "main", "hostinger")
+	return dir
+}
+
+func TestWorkspacesDestroyRemovesTheRecordsThatStillPointAtTheMachine(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}, records: []dns.Record{
+		{Name: "app", Type: "A", Value: "203.0.113.10"},
+		{Name: "api", Type: "A", Value: "198.51.100.7"},
+	}}
+	dialExpose(t, client)
+	dir := configDestroying(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 1 || !strings.Contains(client.deleted[0], `{"name":"app","type":"A","value":"203.0.113.10"}`) {
+		t.Fatalf("only app's record pointing at main goes: %q", client.deleted)
+	}
+	if !strings.Contains(out, "api.example.com points at 198.51.100.7") {
+		t.Fatalf("it does not say why api's record stays:\n%s", out)
+	}
+}
+
+func TestWorkspacesDestroyIsNotStoppedByTheDNSProvider(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records:   []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}},
+		deleteErr: errors.New("exit status 1")}
+	dialExpose(t, client)
+	dir := configDestroying(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err != nil {
+		t.Fatalf("a refused record must not stop the destroy: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Remove this record by hand") || !strings.Contains(out, "app (in example.com)\tA\t203.0.113.10") {
+		t.Fatalf("%s", out)
+	}
+	cfg, _ := config.Load(dir)
+	if _, err := cfg.Workspace("alice"); err == nil {
+		t.Fatal("alice is still configured")
+	}
+}
+
+func TestWorkspacesDestroyWithNoProviderPrintsTheRecordsToRemove(t *testing.T) {
+	dialExpose(t, &exposeClient{})
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"workspaces:\n  - name: alice\n    routes: [{host: app.example.com, port: 8080}]\n")
+	writeCaddyPackage(t, dir)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "Remove this record by hand") || !strings.Contains(out, "app.example.com\tA\t203.0.113.10") {
+		t.Fatalf("%s", out)
+	}
+}
+
+func TestWorkspacesDestroyCheckShowsTheDNSRemovalAndDeletesNothing(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	dialExpose(t, client)
+	dir := configDestroying(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--check")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "would remove app A 203.0.113.10 from example.com (provider hostinger)") {
+		t.Fatalf("%s", out)
+	}
+	if len(client.deleted) != 0 {
+		t.Fatalf("--check deleted %q", client.deleted)
 	}
 }

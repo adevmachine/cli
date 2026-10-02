@@ -169,12 +169,15 @@ func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 
 	if providerFlag == ProviderManual {
 		manual.Why = "the --dns-provider flag"
+		manual.Provider = newManualBecause(out, "--dns-provider manual was given.")
 		return manual, nil
 	}
 	if client == nil {
 		// A provider runs on the machine. With no machine there is nothing
 		// to ask and nothing to write, but there is still a record to print.
 		manual.Why = "the machine could not be reached"
+		manual.Provider = newManualBecause(out,
+			fmt.Sprintf("%s could not be reached, so no DNS provider on it was asked.", machine))
 		return manual, nil
 	}
 	if providerFlag != "" {
@@ -188,6 +191,11 @@ func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 	providers, err := Installed(dir, machine, base, client)
 	if err != nil {
 		return Choice{}, err
+	}
+	if len(providers) == 0 {
+		manual.Why = "no DNS provider is installed"
+		manual.Provider = newManualBecause(out, fmt.Sprintf("No DNS provider is installed on %s.", machine))
+		return manual, nil
 	}
 	zoners := make([]Zoner, 0, len(providers))
 	for _, p := range providers {
@@ -209,9 +217,7 @@ func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 	default:
 		// Nobody holds it. That is ordinary — but saying nothing about a
 		// provider that could not be asked is not.
-		if len(providers) > 0 {
-			fmt.Fprintf(out, "No installed provider holds %s: %v\n", name, err)
-		}
+		fmt.Fprintf(out, "No installed provider holds %s: %v\n", name, err)
 		manual.Why = "no installed provider holds this zone"
 		return manual, nil
 	}

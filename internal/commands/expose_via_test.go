@@ -457,3 +457,20 @@ func TestExposeRmRemovesTheRecordOfThePublicAddressWhenAPrivateOneComesFirst(t *
 		t.Fatalf("%q", client.deleted)
 	}
 }
+
+func TestWorkspacesDestroyRemovesTheRecordThatPointsAtTheServingMachine(t *testing.T) {
+	edge := &exposeClient{zones: []string{"example.com"},
+		records: []dns.Record{{Name: "app", Type: "A", Value: "203.0.113.10"}}}
+	lab := &exposeClient{}
+	dialMachines(t, map[string]*exposeClient{"edge": edge, "lab": lab})
+	dir := configWithEdge(t, "    routes: [{host: app.example.com, port: 8080, via: edge}]\n")
+	writeDNSPackage(t, dir, "hostinger", nil, "print('ok')")
+	lockOnto(t, dir, "edge", "hostinger")
+
+	if out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice"); err != nil {
+		t.Fatal(err, out)
+	}
+	if len(edge.deleted) != 1 || !strings.Contains(edge.deleted[0], `"value":"203.0.113.10"`) {
+		t.Fatalf("the record pointing at edge is not the one deleted: %q", edge.deleted)
+	}
+}

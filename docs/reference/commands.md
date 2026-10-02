@@ -345,8 +345,13 @@ it changed. See [SSH aliases](../concepts/reaching-your-server.md#ssh-aliases).
 
 **`destroy` deletes for real**: the account, its home, its Caddy routes,
 and its `config.yml` entry. Asks you to retype the name first (or
-`--confirm <name>` from a script); DNS records are left alone. Needs the
-machine reachable; use `rm` for one that is gone.
+`--confirm <name>` from a script). Needs the machine reachable; use `rm`
+for one that is gone. After the account is gone, the DNS record of each
+of its sites goes too, with the same rules as `expose rm`: only an A
+record that still points at the machine serving the site (the `via`
+machine for one published through it), through the provider that holds
+the zone. Anything else is printed, and a DNS failure never stops the
+destroy. `--check` also prints those DNS removals.
 
 `defaults` only changes `defaults.workspace`, which new workspaces
 inherit; existing ones are unchanged.

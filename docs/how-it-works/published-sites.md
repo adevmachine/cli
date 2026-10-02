@@ -100,6 +100,16 @@ delete it cannot check first is a guess.
 The DNS step never undoes or blocks the Caddy step. When it fails, the
 site is still off Caddy, and the record to remove by hand is printed.
 
+`workspaces destroy` does the same for every site of the workspace, each
+on the machine that serves it, after the account is gone: once the
+workspace leaves the configuration, nothing would remember those names
+pointed at the machine.
+
+When a record is printed instead of written or removed, the line above
+it says why: the machine could not be reached (the provider runs on
+it), no DNS provider is installed there, or no installed provider holds
+the zone.
+
 `--no-apply` means "touch no machine", and a DNS provider runs on the
 machine, so `rm --no-apply` leaves the record and prints the `dns rm`
 to run later. `add --no-apply` still points the name: a name that

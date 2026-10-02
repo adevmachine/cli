@@ -446,6 +446,13 @@ Two more lines that are not errors, but change what a command does:
   have installed recognized this domain. This is normal for a registrar with
   no devmachine package yet: the command falls back to `manual` and prints
   the record for you to create by hand.
+- **"no DNS provider is installed"** — the machine has no DNS provider
+  package at all, so the record is printed. `devmachine packages list`
+  shows the providers you can add.
+- **"… could not be reached, so no DNS provider on it was asked"** — a
+  provider runs on the machine, so with the machine down nothing can be
+  written or removed, and the record is printed instead. Once the machine
+  answers, `devmachine dns add` or `devmachine dns rm` does it for you.
 - **"the provider failed"**, with something that looks like a crash — this is
   a bug in the provider package, not in devmachine itself. The package sent
   back something that does not match the [DNS provider
@@ -473,7 +480,7 @@ cannot find the site and Caddy cannot get its certificate.
 **What to do:** Create the record the command printed, or fix the provider
 (see the table above) and run `devmachine dns add <name> A <address>`.
 
-## `expose rm` said "the DNS record for … was not removed"
+## `expose rm` or `workspaces destroy` said "the DNS record for … was not removed"
 
 **What it means:** The site is off Caddy, but the record that pointed
 the name at the machine is still there: the DNS provider could not list
@@ -485,7 +492,7 @@ instead of nothing.
 provider (see the table above) and run
 `devmachine dns rm <name> A <address>`.
 
-## `expose rm` says a name "points at …, not at …: its DNS record is left alone"
+## `expose rm` or `workspaces destroy` says a name "points at …, not at …: its DNS record is left alone"
 
 **What it means:** The name's A record no longer holds the serving
 machine's address, so `expose rm` did not touch it. Somebody repointed
