@@ -386,6 +386,12 @@ func newWorkspacesRmCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			for _, r := range w.Routes {
+				if r.Via != "" {
+					return fmt.Errorf("%s publishes %s through %s, which would keep serving it with nothing left to "+
+						"take it off: `devmachine expose rm %s` first", w.Name, r.Host, r.Via, r.Host)
+				}
+			}
 
 			if !yes {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(),
@@ -519,6 +525,12 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			for _, c := range elsewhere {
+				if _, err := c.client.Run(cmd.Context(), c.script); err != nil {
+					return fmt.Errorf("taking %s's sites off %s: %w; nothing was destroyed, try again once %s answers",
+						w.Name, c.machine, err, c.machine)
+				}
+			}
 
 			quotedUser := quoteForShell(user)
 			script := "set -e\n" +
@@ -544,13 +556,6 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			if err != nil {
 				record(opts, target{machine: machine, workspace: w.Name}, "workspaces destroy "+w.Name, false)
 				return fmt.Errorf("destroying %s on %s: %w", w.Name, machine.Name, err)
-			}
-
-			for _, c := range elsewhere {
-				if _, err := c.client.Run(cmd.Context(), c.script); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "%s still has %s's routes file (%v): `devmachine expose list --machine %s` shows it\n",
-						c.machine, w.Name, err, c.machine)
-				}
 			}
 
 			if err := config.RemoveWorkspace(dir, w.Name); err != nil {

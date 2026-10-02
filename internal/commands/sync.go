@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -138,17 +137,24 @@ func prepareSync(ctx context.Context, opts *options) (preparedSync, error) {
 	// Generate stays pure: it never reads the lock itself, so the previous
 	// extensions come in on the plan.
 	plan.PreviousExtensions = lock.Extensions[machine.Name]
-	plan, failures := withUpstreams(ctx, cfg, plan)
+	plan, failures := withUpstreams(ctx, cfg, plan, "")
 	if err := validateLocalPackages(plan); err != nil {
 		return preparedSync{}, err
 	}
 	summary := provision.Summary(plan)
 	for _, r := range provision.UnresolvedRoutes(plan) {
 		summary = append(summary, fmt.Sprintf("warning: https://%s is left as it is on %s, since %s's address is not known: %v",
-			r.Host, machine.Name, r.From, errors.Join(failures...)))
+			r.Host, machine.Name, r.From, oneLine(failures[r.From])))
 	}
 	return preparedSync{dir: dir, cfg: cfg, machine: machine, store: store, lock: lock,
 		plan: plan, summary: summary}, nil
+}
+
+func oneLine(err error) string {
+	if err == nil {
+		return "it could not be resolved"
+	}
+	return strings.Join(strings.Fields(err.Error()), " ")
 }
 
 // apply runs the plan on the machine, streaming Ansible's output to out, and

@@ -1830,3 +1830,12 @@ workspaces:
 		}
 	}
 }
+
+func TestRemoveMachineRefusesOneThatServesARoute(t *testing.T) {
+	dir := configDirWith(t, strings.Replace(viaConfig,
+		"  - name: bob\n    machine: edge\n    routes: [{host: bob.example.com, port: 9090}]\n", "", 1))
+	err := RemoveMachine(dir, "edge")
+	if err == nil || !strings.Contains(err.Error(), "app.example.com") {
+		t.Fatalf("a machine a route is sent to must not go, got %v", err)
+	}
+}

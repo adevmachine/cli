@@ -125,7 +125,10 @@ of every workspace in the configuration: written when it serves one of
 its routes, removed otherwise. Taking the last `via: edge` off a route
 therefore also takes the file off `edge` on its next sync, and
 `workspaces destroy` removes it there before the workspace leaves the
-configuration — afterwards nothing would.
+configuration — afterwards nothing would. For the same reason
+`workspaces rm` refuses while one of the workspace's sites goes through
+another machine, and `machines rm` refuses a machine that still serves a
+site for another one: `expose rm` the host first.
 
 **`expose add` checks the path once.** After Caddy has the site, `edge`
 tries to open a connection to `lab`'s port. When it cannot, the site stays

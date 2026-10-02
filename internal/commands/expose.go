@@ -50,35 +50,29 @@ var upstreamOf = func(ctx context.Context, m config.Machine) (string, error) {
 	return remote.Upstream(remote.ResolveAll(ctx, m))
 }
 
-// withUpstreams fills in the address of every machine the plan's routes come
-// from, and says which could not be found. A route left without one is left
+// withUpstreams fills in the address of every machine the routes of one
+// workspace come from, or of every workspace when it is "", and says, per
+// machine, why one could not be found. A route left without one is left
 // alone on the machine by both sync and `expose`.
-func withUpstreams(ctx context.Context, cfg config.Config, plan packages.MachinePlan) (packages.MachinePlan, []error) {
-	type answer struct {
-		address string
-		err     error
-	}
-	answers := map[string]answer{}
-	var failures []error
+func withUpstreams(ctx context.Context, cfg config.Config, plan packages.MachinePlan, workspace string) (packages.MachinePlan, map[string]error) {
+	addresses := map[string]string{}
+	failures := map[string]error{}
 	plan.Routes = slices.Clone(plan.Routes)
 	for i, r := range plan.Routes {
-		if r.From == "" {
+		if r.From == "" || (workspace != "" && r.Workspace != workspace) {
 			continue
 		}
-		a, done := answers[r.From]
-		if !done {
+		_, found := addresses[r.From]
+		if _, failed := failures[r.From]; !found && !failed {
 			m, err := cfg.Machine(r.From)
 			if err == nil {
-				a.address, a.err = upstreamOf(ctx, m)
-			} else {
-				a.err = err
+				addresses[r.From], err = upstreamOf(ctx, m)
 			}
-			answers[r.From] = a
-			if a.err != nil {
-				failures = append(failures, a.err)
+			if err != nil {
+				failures[r.From] = err
 			}
 		}
-		plan.Routes[i].Upstream = a.address
+		plan.Routes[i].Upstream = addresses[r.From]
 	}
 	return plan, failures
 }
@@ -109,11 +103,18 @@ func caddySitesDir(ctx context.Context, dir string, cfg config.Config, machine c
 		return "", err
 	}
 	if plan.SitesDir == "" {
-		return "", fmt.Errorf(
-			"caddy is not on %s: add it with `devmachine packages add caddy --machine %s` and run `devmachine sync`",
-			machine.Name, machine.Name)
+		return "", errNoCaddy{machine.Name}
 	}
 	return plan.SitesDir, nil
+}
+
+// errNoCaddy says the machine has no caddy in its package list, as opposed
+// to its plan failing to resolve at all.
+type errNoCaddy struct{ machine string }
+
+func (e errNoCaddy) Error() string {
+	return fmt.Sprintf("caddy is not on %s: add it with `devmachine packages add caddy --machine %s` and run `devmachine sync`",
+		e.machine, e.machine)
 }
 
 // exposeResult is what `expose add` and `expose rm` print with --format json.
@@ -139,10 +140,14 @@ func routesChange(ctx context.Context, dir string, cfg config.Config, machine co
 	if err != nil {
 		return expose.FileChange{}, err
 	}
-	plan, failures := withUpstreams(ctx, cfg, plan)
+	plan, failures := withUpstreams(ctx, cfg, plan, workspace)
 	change, err := provision.WorkspaceRoutes(plan, workspace)
-	if err != nil && len(failures) > 0 {
-		return expose.FileChange{}, errors.Join(failures...)
+	if err != nil {
+		for _, r := range provision.UnresolvedRoutes(plan) {
+			if r.Workspace == workspace && failures[r.From] != nil {
+				return expose.FileChange{}, failures[r.From]
+			}
+		}
 	}
 	return change, err
 }
@@ -321,7 +326,7 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				}
 			}
 			if _, err := caddySitesDir(cmd.Context(), dir, cfg, serving); err != nil {
-				if via == "" {
+				if noCaddy := (errNoCaddy{}); via == "" && errors.As(err, &noCaddy) {
 					if others := servingMachines(cmd.Context(), dir, cfg); len(others) > 0 {
 						return fmt.Errorf("caddy is not on %s, where %s lives: publish it through a machine that has caddy, "+
 							"with `--via %s`, or add caddy to %s with `devmachine packages add caddy --machine %s`",
@@ -527,6 +532,9 @@ func reconcile(cfg config.Config, machine string, onMachine []expose.Site, reach
 			case row.From == "" && found.Upstream != "":
 				row.Status = "differs"
 				row.Note = fmt.Sprintf("the machine proxies to %s instead of itself: run `devmachine sync`", found.Upstream)
+			case row.From != "" && found.Upstream == "":
+				row.Status = "differs"
+				row.Note = fmt.Sprintf("the machine proxies to itself instead of %s: run `devmachine sync`", row.From)
 			case row.From != "" && known && found.Upstream != want:
 				row.Status = "differs"
 				row.Note = fmt.Sprintf("the machine proxies to %s, and %s is at %s: run `devmachine sync`",
@@ -629,7 +637,11 @@ func newExposeListCmd(opts *options) *cobra.Command {
 				return nil
 			}
 			for _, r := range rows {
-				cmd.Printf("%-28s %-6d %-10s %-10s %s\n", r.Host, r.Port, orDash(r.Workspace), r.Status, r.Note)
+				owner := orDash(r.Workspace)
+				if r.From != "" {
+					owner += " (from " + r.From + ")"
+				}
+				cmd.Printf("%-28s %-6d %-10s %-10s %s\n", r.Host, r.Port, owner, r.Status, r.Note)
 			}
 			return nil
 		},
@@ -687,7 +699,7 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				if !ok {
 					return nil
 				}
-				cmd.Printf("%s, workspace %s, routes:\n- {host: %s, port: %d}\n", config.FileName, owner.Name, host, route.Port)
+				cmd.Printf("%s, workspace %s, routes:\n- %s\n", config.FileName, owner.Name, routeLine(route))
 				if noApply {
 					return nil
 				}

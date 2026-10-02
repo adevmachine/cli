@@ -298,3 +298,20 @@ func TestUpstreamSaysWhyThereIsNone(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestUpstreamTakesOnlyAnAddressCaddyAndAShellCanUse(t *testing.T) {
+	for _, tc := range []struct {
+		in   []Address
+		want string
+	}{
+		{[]Address{{Address: "[2001:db8::1]", Source: "[2001:db8::1]"}}, "2001:db8::1"},
+		{[]Address{{Address: "lab.example.com", Source: "lab.example.com"}, {Address: "192.0.2.4", Source: "192.0.2.4"}}, "192.0.2.4"},
+		{[]Address{{Address: "lab.example.com", Source: "lab.example.com"}}, "lab.example.com"},
+		{[]Address{{Address: "lab'; rm -rf /", Source: "x"}, {Address: "192.0.2.4", Source: "192.0.2.4"}}, "192.0.2.4"},
+	} {
+		got, err := Upstream(Resolution{Machine: "lab", Addresses: tc.in})
+		if err != nil || got != tc.want {
+			t.Fatalf("%+v: got %q, %v", tc.in, got, err)
+		}
+	}
+}

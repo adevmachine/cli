@@ -876,6 +876,14 @@ func RemoveMachine(dir, name string) error {
 			"machine %q still holds the workspace %s: move %s to another machine, or remove it, first",
 			name, strings.Join(orphans, ", "), plural(len(orphans), "it", "them"))
 	}
+	var sent []string
+	for _, served := range current.RoutesServedBy(name) {
+		sent = append(sent, served.Route.Host)
+	}
+	if len(sent) > 0 {
+		return fmt.Errorf("machine %q still serves %s for another machine: `devmachine expose rm` %s first",
+			name, strings.Join(sent, ", "), plural(len(sent), "it", "them"))
+	}
 
 	body, err := os.ReadFile(path)
 	if err != nil {

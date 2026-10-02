@@ -282,3 +282,84 @@ func TestWorkspacesDestroyRefusesWhileTheServingMachineIsOutOfReach(t *testing.T
 		t.Fatal("nothing may be destroyed while a site would be left behind")
 	}
 }
+
+func TestWorkspacesRmRefusesWhileAnotherMachineServesItsSites(t *testing.T) {
+	dir := configWithEdge(t, "    routes: [{host: app.example.com, port: 8080, via: edge}]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "rm", "alice", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "expose rm app.example.com") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestWorkspacesDestroyStopsWhenTheServingMachineKeepsTheFile(t *testing.T) {
+	edge, lab := &destroyClient{runErr: errors.New("sudo: a password is required")}, &destroyClient{userExists: true}
+	dialDestroyMachines(t, map[string]*destroyClient{"edge": edge, "lab": lab})
+	dir := configWithEdge(t, "    routes: [{host: app.example.com, port: 8080, via: edge}]\n")
+
+	_, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err == nil || !strings.Contains(err.Error(), "edge") {
+		t.Fatalf("got %v", err)
+	}
+	if lab.lastScript != "" {
+		t.Fatal("the account must stay while edge still serves its site")
+	}
+}
+
+func TestExposeListReadsALoopbackProxyForASiteFromElsewhereAsDiffering(t *testing.T) {
+	edge := &exposeClient{files: map[string]string{
+		"alice-routes.caddy": expose.RenderWorkspace("alice", []expose.Site{{Host: "app.example.com", Port: 8080}}),
+	}}
+	dialMachines(t, map[string]*exposeClient{"edge": edge})
+	dir := configWithEdge(t, "    routes: [{host: app.example.com, port: 8080, via: edge}]\n")
+	orig := upstreamOf
+	upstreamOf = func(context.Context, config.Machine) (string, error) {
+		return "", errors.New("tailscale is not running")
+	}
+	t.Cleanup(func() { upstreamOf = orig })
+
+	out, err := execute(t, "--config", dir, "--machine", "edge", "expose", "list")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if !strings.Contains(out, "differs") || !strings.Contains(out, "from lab") {
+		t.Fatalf("a site from lab proxied to edge itself differs, and the row names lab:\n%s", out)
+	}
+}
+
+func TestExposeAddKeepsAnErrorThatIsNotAboutCaddy(t *testing.T) {
+	dialMachines(t, map[string]*exposeClient{"edge": {}, "lab": {}})
+	dir := configWith(t, "machines:\n"+
+		"  - name: edge\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"  - name: lab\n    hosts: [100.64.0.7]\n    packages: [nonexistent]\n"+
+		"workspaces:\n  - name: alice\n    machine: lab\n")
+	writeCaddyPackage(t, dir)
+
+	_, err := execute(t, "--config", dir, "expose", "add", "alice", "8080", "--host", "app.example.com", "--publish")
+	if err == nil || strings.Contains(err.Error(), "--via") {
+		t.Fatalf("an error that is not a missing caddy must not suggest --via, got %v", err)
+	}
+}
+
+func TestSyncBlamesEachSiteOnItsOwnMachine(t *testing.T) {
+	stubSync(t)
+	dir := configWith(t, "machines:\n"+
+		"  - name: edge\n    hosts: [203.0.113.10]\n    packages: [caddy]\n"+
+		"  - name: lab\n    hosts: [127.0.0.1]\n"+
+		"  - name: lab2\n    hosts: [127.0.0.2]\n"+
+		"workspaces:\n"+
+		"  - name: alice\n    machine: lab\n    routes: [{host: a.example.com, port: 1, via: edge}]\n"+
+		"  - name: bob\n    machine: lab2\n    routes: [{host: b.example.com, port: 2, via: edge}]\n")
+	writeCaddyPackage(t, dir)
+	makeCaddyARole(t, dir)
+
+	out, err := execute(t, "--config", dir, "--machine", "edge", "sync", "--yes")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "no address of lab2") && !strings.Contains(line, "b.example.com") {
+			t.Fatalf("lab2's failure is shown apart from lab2's own site:\n%s", out)
+		}
+	}
+}

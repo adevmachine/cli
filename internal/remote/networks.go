@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -189,24 +190,30 @@ func Proxy(ctx context.Context, targets []string, stdin io.Reader, stdout io.Wri
 }
 
 // Upstream is the address another machine proxies to when it serves a site
-// for this one: an address a network package resolved first, since that is a
-// private network both machines can be on, then any other. A loopback address
-// is never it — it names the machine doing the proxying.
+// for this one: an IP a network package resolved first, since that is a
+// private network both machines can be on, then a literal IP, then a DNS
+// name, which only works if the serving machine resolves it the same way. A
+// loopback address is never it — it names the machine doing the proxying.
 func Upstream(r Resolution) (string, error) {
-	var fallback string
+	var literalIP, name string
 	for _, a := range r.Addresses {
-		if isLoopback(a.Address) {
-			continue
-		}
-		if a.Package != "" {
-			return a.Address, nil
-		}
-		if fallback == "" {
-			fallback = a.Address
+		address := strings.TrimSuffix(strings.TrimPrefix(a.Address, "["), "]")
+		ip := net.ParseIP(address)
+		switch {
+		case isLoopback(address):
+		case ip != nil && a.Package != "":
+			return address, nil
+		case ip != nil && literalIP == "":
+			literalIP = address
+		case ip == nil && name == "" && hostname.MatchString(address):
+			name = address
 		}
 	}
-	if fallback != "" {
-		return fallback, nil
+	if literalIP != "" {
+		return literalIP, nil
+	}
+	if name != "" {
+		return name, nil
 	}
 	reasons := []string{"no address but a loopback one"}
 	for _, d := range r.Dropped {
@@ -214,6 +221,10 @@ func Upstream(r Resolution) (string, error) {
 	}
 	return "", fmt.Errorf("no address of %s another machine can reach: %s", r.Machine, strings.Join(reasons, "; "))
 }
+
+// hostname is a DNS name that is safe to write into a Caddy file and a shell
+// line as it is; anything else in `hosts` is not offered as an upstream.
+var hostname = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$`)
 
 func isLoopback(address string) bool {
 	if address == "localhost" {
