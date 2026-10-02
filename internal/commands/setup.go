@@ -76,6 +76,9 @@ type setupOptions struct {
 	key         string
 	fingerprint string
 	tailscale   bool
+	// passwordStdin reads the admin password from stdin, for a server that
+	// takes nothing else yet. It is used once, to install the key.
+	passwordStdin bool
 }
 
 // unattended is a `machines add` that asks nothing, because its answers came
@@ -219,7 +222,7 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		return err
 	}
 
-	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
+	if err := bootstrap(ctx, out, m, key, opts.noHarden, askingPassword(r, in, out)); err != nil {
 		return err
 	}
 	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes); err != nil {
@@ -764,8 +767,8 @@ func askForKey(r *bufio.Reader, out io.Writer, dir, machine string) (chosenKey, 
 // The order is the whole point and is not negotiable: prove the key on a
 // connection of its own before turning password login off. The other way round
 // is locking the door with the key still inside.
-func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Writer,
-	m config.Machine, key chosenKey, noHarden bool) error {
+func bootstrap(ctx context.Context, out io.Writer, m config.Machine, key chosenKey, noHarden bool,
+	password passwordSource) error {
 	client, address, err := dialWith(ctx, m, m.User, key.auth())
 	unproved := false
 	switch {
@@ -789,7 +792,7 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 		// password is worth asking for.
 		return err
 	default:
-		client, err = installWithPassword(ctx, r, source, out, m, key)
+		client, err = installWithPassword(ctx, out, m, key, password)
 		if err != nil {
 			return err
 		}
@@ -826,12 +829,12 @@ func bootstrap(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Wr
 
 // installWithPassword is the branch for a machine as it was bought: a root
 // password and nothing else. It returns the connection that proved the key.
-func installWithPassword(ctx context.Context, r *bufio.Reader, source io.Reader, out io.Writer,
-	m config.Machine, key chosenKey) (remote.Client, error) {
+func installWithPassword(ctx context.Context, out io.Writer, m config.Machine, key chosenKey,
+	source passwordSource) (remote.Client, error) {
 	address := m.Hosts[0].Address
 	fmt.Fprintf(out, "%s does not log in yet, so the password is needed once to install it.\n", key.describe())
 
-	password, err := askPassword(r, source, out, fmt.Sprintf("password for %s@%s", m.User, address))
+	password, err := source(fmt.Sprintf("password for %s@%s", m.User, address))
 	if err != nil {
 		return nil, err
 	}
@@ -864,6 +867,42 @@ func installWithPassword(ctx context.Context, r *bufio.Reader, source io.Reader,
 	}
 	fmt.Fprintf(out, "the key works.\n")
 	return proved, nil
+}
+
+// passwordSource answers the one question the bootstrap may ask: the admin's
+// password, needed only when the key does not log in yet.
+type passwordSource func(question string) (string, error)
+
+// askingPassword asks for the password on the streams the flow reads from.
+func askingPassword(r *bufio.Reader, source io.Reader, out io.Writer) passwordSource {
+	return func(question string) (string, error) { return askPassword(r, source, out, question) }
+}
+
+// givenPassword answers with a password that came on stdin, or, when none
+// did, with what to do about it: an unattended run has nobody to ask.
+func givenPassword(password string) passwordSource {
+	return func(string) (string, error) {
+		if password == "" {
+			return "", errors.New("the key does not log in yet and no password was given: pass the " +
+				"admin password on stdin with --password-stdin, or put the key's public half in the " +
+				"admin's authorized_keys first")
+		}
+		return password, nil
+	}
+}
+
+// readPasswordStdin reads the whole of stdin as the password. Only the line
+// ending is taken off, so a password that begins or ends with a space keeps it.
+func readPasswordStdin(in io.Reader) (string, error) {
+	body, err := io.ReadAll(in)
+	if err != nil {
+		return "", fmt.Errorf("reading the password from stdin: %w", err)
+	}
+	password := strings.TrimSuffix(strings.TrimSuffix(string(body), "\n"), "\r")
+	if password == "" {
+		return "", errors.New("--password-stdin read nothing from stdin: pipe the admin password in")
+	}
+	return password, nil
 }
 
 // askPassword reads a password without echoing it when there is a terminal to

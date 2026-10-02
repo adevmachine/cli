@@ -73,6 +73,24 @@ or the key is the problem.
 **What to do:** Either set `key:` on the server to a private key, or start an
 SSH agent and load one.
 
+## `machines add`: "the key does not log in yet and no password was given"
+
+**What it means:** `machines add --address …` asks nothing, so it had no
+way to get the server's password, and the key it chose is not in the
+admin's `authorized_keys` yet. A server just bought usually takes only a
+password. Nothing was changed, and nothing was written to `config.yml`.
+
+**What to do:** Give the password on stdin, so it never appears in the
+command line or the shell history:
+
+```
+printf '%s' "$PASSWORD" | devmachine machines add … --password-stdin
+```
+
+Or put the key's public half (`<key>.pub`) in the admin's
+`authorized_keys` through the provider's console, and run the same
+command again.
+
 ## It used to connect, and now it does not
 
 **What it means:** If you recently added keys to your SSH agent, that is very

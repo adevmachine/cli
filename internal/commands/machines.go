@@ -122,6 +122,8 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 	c.Flags().StringVar(&s.fingerprint, "fingerprint", "",
 		"the host key fingerprint to trust on first contact (SHA256:…), checked through another channel")
 	c.Flags().BoolVar(&s.tailscale, "tailscale", false, "also add the tailscale package")
+	c.Flags().BoolVar(&s.passwordStdin, "password-stdin", false,
+		"with --address, read the admin password from stdin, used once to install the key")
 	return c
 }
 
@@ -314,12 +316,27 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 		return err
 	}
 
+	if opts.passwordStdin && !opts.unattended() {
+		return errors.New("--password-stdin needs --address: without it the answers are asked on " +
+			"stdin, and the password is asked there too")
+	}
+	var password passwordSource
 	if opts.unattended() {
+		given := ""
+		if opts.passwordStdin {
+			if given, err = readPasswordStdin(in); err != nil {
+				return err
+			}
+		}
+		password = givenPassword(given)
 		// Nothing is read: an unattended run that reached a question would
 		// otherwise block on a terminal nobody is watching.
 		in = strings.NewReader("")
 	}
 	r := bufio.NewReader(in)
+	if password == nil {
+		password = askingPassword(r, in, out)
+	}
 	var m config.Machine
 	if opts.unattended() {
 		m = machineFromFlags(opts)
@@ -359,7 +376,7 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	// The machine is written only after the bootstrap proved the key. Written
 	// first, a failed run left an entry behind, and running again to fix it
 	// was refused as a name already configured.
-	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
+	if err := bootstrap(ctx, out, m, key, opts.noHarden, password); err != nil {
 		return err
 	}
 	if err := config.AddMachine(dir, m); err != nil {

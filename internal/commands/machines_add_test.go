@@ -3,6 +3,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -65,5 +66,77 @@ func TestMachinesAddWritesNothingWhenTheProofFails(t *testing.T) {
 	}
 	if after := readConfigFile(t, dir); after != before {
 		t.Fatalf("a failed add changed config.yml:\n%s", after)
+	}
+}
+
+func unattendedAdd(dir, fingerprint string, extra ...string) []string {
+	args := []string{"--config", dir, "machines", "add", "--name", "sandbox", "--address", "203.0.113.20",
+		"--fingerprint", fingerprint, "--no-aliases"}
+	return append(args, extra...)
+}
+
+func TestMachinesAddWithPasswordStdinInstallsTheKeyWithIt(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	out, err := executeWithInput(t, "pass word with spaces\n",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--password-stdin")...)
+	if err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	if steps.password != "pass word with spaces" {
+		t.Fatalf("it logged in with %q", steps.password)
+	}
+	if !steps.installedKey || !steps.proved || !steps.hardened {
+		t.Fatalf("it did not install and prove the key: %q", steps.events)
+	}
+	if strings.Contains(out, "pass word") || strings.Contains(readConfigFile(t, dir), "pass word") {
+		t.Fatalf("the password was written somewhere:\n%s", out)
+	}
+}
+
+func TestMachinesAddWithPasswordStdinDoesNotUseItWhenTheKeyWorks(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if out, err := executeWithInput(t, "secret\n",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--password-stdin")...); err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	if steps.askedForPassword {
+		t.Fatal("it logged in with the password although the key works")
+	}
+}
+
+func TestMachinesAddWithPasswordStdinRefusesAnEmptyOne(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	_, err := executeWithInput(t, "\n", unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--password-stdin")...)
+	if err == nil || !strings.Contains(err.Error(), "--password-stdin") {
+		t.Fatalf("got %v", err)
+	}
+	if len(steps.events) != 0 {
+		t.Fatalf("it went on with no password: %q", steps.events)
+	}
+}
+
+func TestMachinesAddPasswordStdinNeedsAddress(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	stubBootstrap(t, bootstrapStubs{})
+
+	_, err := executeWithInput(t, "secret\n", "--config", dir, "machines", "add", "--password-stdin")
+	if err == nil || !strings.Contains(err.Error(), "--address") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestMachinesAddWithFlagsAndNoPasswordSaysHowToGiveOne(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	_, err := executeWithInput(t, "", unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey))...)
+	if err == nil || !strings.Contains(err.Error(), "--password-stdin") {
+		t.Fatalf("got %v", err)
 	}
 }

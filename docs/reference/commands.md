@@ -220,7 +220,7 @@ configuration, and `--format json` prints `{"machines": [], "workspaces":
 devmachine machines list                  each machine, its addresses, port and workspaces
 devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]   set up another server and record it
 devmachine machines add --self <name>     add your computer as a machine, with no address
-devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--tailscale]   the same, asking nothing
+devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--password-stdin] [--tailscale]   the same, asking nothing
 devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]   check or update its SSH fingerprint
 devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
@@ -276,15 +276,33 @@ is left out takes its default:
 | `--key` | `new` | a key of the CLI's own for this machine (made, or reused when it exists), or a private key file |
 | `--fingerprint` | — | the host key to trust on first contact |
 | `--tailscale` | off | also add the `tailscale` package |
+| `--password-stdin` | off | read the admin password from stdin, for a server that takes nothing else yet |
 
 SSH aliases are written unless `--no-aliases`. `--fingerprint` is required
 for a machine not trusted yet: with nobody to ask, trusting whatever
 answers would be trust on first use with no one looking. Without it, or
 with a different one, `add` stops before changing anything and prints the
 fingerprint it was shown, to check through the provider console or a
-connection you already trust. A key that does not log in yet stops it
-too: there is no password to ask for, so put the key's public half in the
-admin's `authorized_keys` first, or run `add` without flags.
+connection you already trust.
+
+A key that does not log in yet needs the password once, to install it.
+With nobody to ask, it comes on stdin: `--password-stdin` reads all of
+stdin as the password (only the final line ending is dropped), so it is
+never in the command line, the shell history or a log:
+
+```
+printf '%s' "$PASSWORD" | devmachine machines add --name box --address 203.0.113.20 \
+  --fingerprint SHA256:… --password-stdin
+```
+
+It is used exactly as the interactive password is: one connection that
+installs the key, then a new connection that proves the key alone, then
+password login is turned off (unless `--no-harden`). It is written
+nowhere. When the key already logs in, the password is never used.
+Without `--password-stdin`, a key that does not log in stops `add` and
+says so; put the key's public half in the admin's `authorized_keys`
+first, or pass the password. `--password-stdin` needs `--address`:
+without it, stdin carries the answers to the questions instead.
 
 Adding or removing a machine, like adding or removing a workspace, refreshes
 the SSH aliases when `ssh_aliases: true` is set — see
