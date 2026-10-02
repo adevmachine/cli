@@ -36,7 +36,18 @@ DEVMACHINE_CONFIG=~/.config/devmachine-test devmachine doctor
 <config>/secrets.json   names of stored secrets, and values the keychain refused
 <config>/keys/          keys the CLI generated, and the public half of a chosen agent key
 <config>/history.log    one line per command that reached a machine
+<config>/cache/config.lock   held by whichever command is writing config.yml
 ```
+
+Two commands that change `config.yml` at the same moment — two
+`machines add` from a script or an app, an `expose rm` while you run
+`workspaces edit` — take turns: each holds `cache/config.lock` while it
+reads the file, changes it and writes it back, and the other waits.
+Without it, the slower one would write back what it read and silently
+drop the other's change. The lock is released when the command finishes
+writing, or dies. The file is rewritten in one step, so a command that
+only reads never sees half of it, and a `config.yml` that is a link stays
+a link.
 
 ## config.yml
 

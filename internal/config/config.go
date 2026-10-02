@@ -691,39 +691,41 @@ func (c Config) workspaceNames() []string {
 // fills in the admin user and the port, so a full rewrite would put values in
 // the file that nobody chose and that stop tracking the defaults.
 func Save(dir string, c Config) error {
-	path := filepath.Join(dir, FileName)
+	return locked(dir, func() error {
+		path := filepath.Join(dir, FileName)
 
-	body, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return writeYAML(path, &c, 0o600)
-	}
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", path, err)
-	}
-
-	mode := modeOf(path)
-
-	var document yaml.Node
-	if err := yaml.Unmarshal(body, &document); err != nil {
-		return fmt.Errorf("parsing %s: %w", path, err)
-	}
-	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
-		return writeYAML(path, &c, mode)
-	}
-
-	root := document.Content[0]
-	setField(root, "packages", stringNode(c.Packages))
-	for _, m := range c.Machines {
-		if err := setPackages(root, "machines", m.Name, m.Packages); err != nil {
-			return fmt.Errorf("writing %s: %w", path, err)
+		body, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return writeYAML(path, &c, 0o600)
 		}
-	}
-	for _, w := range c.Workspaces {
-		if err := setPackages(root, "workspaces", w.Name, w.Packages); err != nil {
-			return fmt.Errorf("writing %s: %w", path, err)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
 		}
-	}
-	return writeYAML(path, &document, mode)
+
+		mode := modeOf(path)
+
+		var document yaml.Node
+		if err := yaml.Unmarshal(body, &document); err != nil {
+			return fmt.Errorf("parsing %s: %w", path, err)
+		}
+		if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+			return writeYAML(path, &c, mode)
+		}
+
+		root := document.Content[0]
+		setField(root, "packages", stringNode(c.Packages))
+		for _, m := range c.Machines {
+			if err := setPackages(root, "machines", m.Name, m.Packages); err != nil {
+				return fmt.Errorf("writing %s: %w", path, err)
+			}
+		}
+		for _, w := range c.Workspaces {
+			if err := setPackages(root, "workspaces", w.Name, w.Packages); err != nil {
+				return fmt.Errorf("writing %s: %w", path, err)
+			}
+		}
+		return writeYAML(path, &document, mode)
+	})
 }
 
 // setPackages puts one target's package list on the entry it belongs to.
@@ -811,7 +813,34 @@ func writeYAML(path string, value any, mode os.FileMode) error {
 	if err := encoder.Close(); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
-	if err := os.WriteFile(path, buffer.Bytes(), mode); err != nil {
+	return replaceFile(path, buffer.Bytes(), mode)
+}
+
+// replaceFile writes body beside path and renames it over path, so a reader
+// that does not take the lock sees the old file or the new one, never half.
+func replaceFile(path string, body []byte, mode os.FileMode) error {
+	// A config.yml that is a link into a dotfiles repository stays a link:
+	// the file it points at is the one replaced.
+	if target, err := filepath.EvalSymlinks(path); err == nil {
+		path = target
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*")
+	if err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if _, err := tmp.Write(body); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	return nil
@@ -822,38 +851,40 @@ func writeYAML(path string, value any, mode os.FileMode) error {
 // Like Save, it edits the document rather than marshalling over the top, so
 // everything the person wrote — comments included — is still there afterwards.
 func AddMachine(dir string, m Machine) error {
-	path := filepath.Join(dir, FileName)
+	return locked(dir, func() error {
+		path := filepath.Join(dir, FileName)
 
-	body, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("there is no %s to add to: run `devmachine setup` for the first machine", path)
-	}
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", path, err)
-	}
-
-	var document yaml.Node
-	if err := yaml.Unmarshal(body, &document); err != nil {
-		return fmt.Errorf("parsing %s: %w", path, err)
-	}
-	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
-		return fmt.Errorf("%s is not a configuration: run `devmachine setup` for the first machine", path)
-	}
-
-	root := document.Content[0]
-	machines := field(root, "machines")
-	if machines == nil || machines.Kind != yaml.SequenceNode {
-		machines = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-		setField(root, "machines", machines)
-	}
-	for _, entry := range machines.Content {
-		if scalar(field(entry, "name")) == m.Name {
-			return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
+		body, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("there is no %s to add to: run `devmachine setup` for the first machine", path)
 		}
-	}
-	machines.Content = append(machines.Content, machineNode(m))
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
 
-	return writeYAML(path, &document, modeOf(path))
+		var document yaml.Node
+		if err := yaml.Unmarshal(body, &document); err != nil {
+			return fmt.Errorf("parsing %s: %w", path, err)
+		}
+		if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+			return fmt.Errorf("%s is not a configuration: run `devmachine setup` for the first machine", path)
+		}
+
+		root := document.Content[0]
+		machines := field(root, "machines")
+		if machines == nil || machines.Kind != yaml.SequenceNode {
+			machines = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+			setField(root, "machines", machines)
+		}
+		for _, entry := range machines.Content {
+			if scalar(field(entry, "name")) == m.Name {
+				return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
+			}
+		}
+		machines.Content = append(machines.Content, machineNode(m))
+
+		return writeYAML(path, &document, modeOf(path))
+	})
 }
 
 // RemoveMachine takes a machine out of config.yml.
@@ -862,53 +893,55 @@ func AddMachine(dir string, m Machine) error {
 // forgetting a machine is not destroying one, and this package could not
 // destroy anything if it tried.
 func RemoveMachine(dir, name string) error {
-	path := filepath.Join(dir, FileName)
+	return locked(dir, func() error {
+		path := filepath.Join(dir, FileName)
 
-	current, err := Load(dir)
-	if err != nil {
-		return err
-	}
-	if _, err := current.Machine(name); err != nil {
-		return err
-	}
-	if orphans := current.workspacesLosing(name); len(orphans) > 0 {
-		return fmt.Errorf(
-			"machine %q still holds the workspace %s: move %s to another machine, or remove it, first",
-			name, strings.Join(orphans, ", "), plural(len(orphans), "it", "them"))
-	}
-	var sent []string
-	for _, served := range current.RoutesServedBy(name) {
-		sent = append(sent, served.Route.Host)
-	}
-	if len(sent) > 0 {
-		return fmt.Errorf("machine %q still serves %s for another machine: `devmachine expose rm` %s first",
-			name, strings.Join(sent, ", "), plural(len(sent), "it", "them"))
-	}
-
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", path, err)
-	}
-	var document yaml.Node
-	if err := yaml.Unmarshal(body, &document); err != nil {
-		return fmt.Errorf("parsing %s: %w", path, err)
-	}
-	if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
-		return fmt.Errorf("%s is not a configuration", path)
-	}
-
-	machines := field(document.Content[0], "machines")
-	if machines == nil || machines.Kind != yaml.SequenceNode {
-		return fmt.Errorf("%s has no `machines`", path)
-	}
-	for i, entry := range machines.Content {
-		if scalar(field(entry, "name")) != name {
-			continue
+		current, err := Load(dir)
+		if err != nil {
+			return err
 		}
-		machines.Content = append(machines.Content[:i], machines.Content[i+1:]...)
-		return writeYAML(path, &document, modeOf(path))
-	}
-	return fmt.Errorf("no machine named %q in %s", name, path)
+		if _, err := current.Machine(name); err != nil {
+			return err
+		}
+		if orphans := current.workspacesLosing(name); len(orphans) > 0 {
+			return fmt.Errorf(
+				"machine %q still holds the workspace %s: move %s to another machine, or remove it, first",
+				name, strings.Join(orphans, ", "), plural(len(orphans), "it", "them"))
+		}
+		var sent []string
+		for _, served := range current.RoutesServedBy(name) {
+			sent = append(sent, served.Route.Host)
+		}
+		if len(sent) > 0 {
+			return fmt.Errorf("machine %q still serves %s for another machine: `devmachine expose rm` %s first",
+				name, strings.Join(sent, ", "), plural(len(sent), "it", "them"))
+		}
+
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
+		var document yaml.Node
+		if err := yaml.Unmarshal(body, &document); err != nil {
+			return fmt.Errorf("parsing %s: %w", path, err)
+		}
+		if len(document.Content) == 0 || document.Content[0].Kind != yaml.MappingNode {
+			return fmt.Errorf("%s is not a configuration", path)
+		}
+
+		machines := field(document.Content[0], "machines")
+		if machines == nil || machines.Kind != yaml.SequenceNode {
+			return fmt.Errorf("%s has no `machines`", path)
+		}
+		for i, entry := range machines.Content {
+			if scalar(field(entry, "name")) != name {
+				continue
+			}
+			machines.Content = append(machines.Content[:i], machines.Content[i+1:]...)
+			return writeYAML(path, &document, modeOf(path))
+		}
+		return fmt.Errorf("no machine named %q in %s", name, path)
+	})
 }
 
 // workspacesLosing names the workspaces that would be left pointing at nothing
@@ -980,18 +1013,22 @@ func modeOf(path string) os.FileMode {
 // file up to date automatically. It edits the document in place, so the
 // person's own formatting and comments survive.
 func SetSSHAliases(dir string, value bool) error {
-	return editDocument(dir, func(root *yaml.Node) error {
-		setField(root, "ssh_aliases", boolNode(value))
-		return nil
+	return locked(dir, func() error {
+		return editDocument(dir, func(root *yaml.Node) error {
+			setField(root, "ssh_aliases", boolNode(value))
+			return nil
+		})
 	})
 }
 
 // SetSSHAliasesPath records the one file the aliases live in. Empty takes the
 // field out, which means ~/.ssh/config again.
 func SetSSHAliasesPath(dir, path string) error {
-	return editDocument(dir, func(root *yaml.Node) error {
-		setField(root, "ssh_aliases_path", stringNode(path))
-		return nil
+	return locked(dir, func() error {
+		return editDocument(dir, func(root *yaml.Node) error {
+			setField(root, "ssh_aliases_path", stringNode(path))
+			return nil
+		})
 	})
 }
 
@@ -1002,43 +1039,47 @@ func SetSSHAliasesPath(dir, path string) error {
 // without disturbing anything else `machines add` or a person wrote into the
 // file.
 func SetMachineHosts(dir, name string, addresses []string) error {
-	if len(addresses) == 0 {
-		return fmt.Errorf("machine %q would be left with no address: refusing to write an empty `hosts`", name)
-	}
-	return editDocument(dir, func(root *yaml.Node) error {
-		machines := field(root, "machines")
-		if machines == nil || machines.Kind != yaml.SequenceNode {
-			return fmt.Errorf("`machines` has no entry named %q", name)
+	return locked(dir, func() error {
+		if len(addresses) == 0 {
+			return fmt.Errorf("machine %q would be left with no address: refusing to write an empty `hosts`", name)
 		}
-		for _, entry := range machines.Content {
-			if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != name {
-				continue
+		return editDocument(dir, func(root *yaml.Node) error {
+			machines := field(root, "machines")
+			if machines == nil || machines.Kind != yaml.SequenceNode {
+				return fmt.Errorf("`machines` has no entry named %q", name)
 			}
-			setField(entry, "hosts", hostsNode(field(entry, "hosts"), addresses))
-			return nil
-		}
-		return fmt.Errorf("`machines` has no entry named %q", name)
+			for _, entry := range machines.Content {
+				if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != name {
+					continue
+				}
+				setField(entry, "hosts", hostsNode(field(entry, "hosts"), addresses))
+				return nil
+			}
+			return fmt.Errorf("`machines` has no entry named %q", name)
+		})
 	})
 }
 
 // SetMachineSettings replaces one machine's `settings:` and leaves every
 // other field, and every comment, as it was. An empty map removes the key.
 func SetMachineSettings(dir, name string, settings map[string]any) error {
-	node, err := settingsNode(settings)
-	if err != nil {
-		return err
-	}
-	return editDocument(dir, func(root *yaml.Node) error {
-		machines := field(root, "machines")
-		if machines != nil && machines.Kind == yaml.SequenceNode {
-			for _, entry := range machines.Content {
-				if entry.Kind == yaml.MappingNode && scalar(field(entry, "name")) == name {
-					setField(entry, "settings", node)
-					return nil
+	return locked(dir, func() error {
+		node, err := settingsNode(settings)
+		if err != nil {
+			return err
+		}
+		return editDocument(dir, func(root *yaml.Node) error {
+			machines := field(root, "machines")
+			if machines != nil && machines.Kind == yaml.SequenceNode {
+				for _, entry := range machines.Content {
+					if entry.Kind == yaml.MappingNode && scalar(field(entry, "name")) == name {
+						setField(entry, "settings", node)
+						return nil
+					}
 				}
 			}
-		}
-		return fmt.Errorf("`machines` has no entry named %q", name)
+			return fmt.Errorf("`machines` has no entry named %q", name)
+		})
 	})
 }
 
@@ -1071,23 +1112,25 @@ func hostsNode(existing *yaml.Node, addresses []string) *yaml.Node {
 // so everything the person wrote — comments included — is still there
 // afterwards.
 func AddWorkspace(dir string, w Workspace) error {
-	return editDocument(dir, func(root *yaml.Node) error {
-		workspaces := field(root, "workspaces")
-		if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
-			workspaces = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-			setField(root, "workspaces", workspaces)
-		}
-		for _, entry := range workspaces.Content {
-			if scalar(field(entry, "name")) == w.Name {
-				return fmt.Errorf("a workspace named %q is already configured: pick another name", w.Name)
+	return locked(dir, func() error {
+		return editDocument(dir, func(root *yaml.Node) error {
+			workspaces := field(root, "workspaces")
+			if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
+				workspaces = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+				setField(root, "workspaces", workspaces)
 			}
-		}
-		node, err := workspaceNode(w)
-		if err != nil {
-			return err
-		}
-		workspaces.Content = append(workspaces.Content, node)
-		return nil
+			for _, entry := range workspaces.Content {
+				if scalar(field(entry, "name")) == w.Name {
+					return fmt.Errorf("a workspace named %q is already configured: pick another name", w.Name)
+				}
+			}
+			node, err := workspaceNode(w)
+			if err != nil {
+				return err
+			}
+			workspaces.Content = append(workspaces.Content, node)
+			return nil
+		})
 	})
 }
 
@@ -1098,43 +1141,47 @@ func AddWorkspace(dir string, w Workspace) error {
 // an empty value, so a workspace that no longer overrides its account reads
 // like one that never did.
 func UpdateWorkspace(dir string, w Workspace) error {
-	return editDocument(dir, func(root *yaml.Node) error {
-		workspaces := field(root, "workspaces")
-		if workspaces != nil && workspaces.Kind == yaml.SequenceNode {
-			for _, entry := range workspaces.Content {
-				if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != w.Name {
-					continue
+	return locked(dir, func() error {
+		return editDocument(dir, func(root *yaml.Node) error {
+			workspaces := field(root, "workspaces")
+			if workspaces != nil && workspaces.Kind == yaml.SequenceNode {
+				for _, entry := range workspaces.Content {
+					if entry.Kind != yaml.MappingNode || scalar(field(entry, "name")) != w.Name {
+						continue
+					}
+					settings, err := settingsNode(w.Settings)
+					if err != nil {
+						return err
+					}
+					setField(entry, "machine", stringNode(w.Machine))
+					setField(entry, "user", stringNode(w.User))
+					setField(entry, "packages", sequenceNode(w.Packages))
+					setField(entry, "settings", settings)
+					setField(entry, "credentials", credentialsNode(w.Credentials))
+					return nil
 				}
-				settings, err := settingsNode(w.Settings)
-				if err != nil {
-					return err
-				}
-				setField(entry, "machine", stringNode(w.Machine))
-				setField(entry, "user", stringNode(w.User))
-				setField(entry, "packages", sequenceNode(w.Packages))
-				setField(entry, "settings", settings)
-				setField(entry, "credentials", credentialsNode(w.Credentials))
-				return nil
 			}
-		}
-		return fmt.Errorf("`workspaces` has no entry named %q", w.Name)
+			return fmt.Errorf("`workspaces` has no entry named %q", w.Name)
+		})
 	})
 }
 
 // UpdateWorkspaceDefaults writes the package list inherited by workspaces
 // created in the future. Existing workspace entries are deliberately untouched.
 func UpdateWorkspaceDefaults(dir string, packages []string) error {
-	return editDocument(dir, func(root *yaml.Node) error {
-		defaults := field(root, "defaults")
-		if defaults == nil || defaults.Kind != yaml.MappingNode {
-			defaults = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-			setField(root, "defaults", defaults)
-		}
-		setField(defaults, "workspace", sequenceNode(packages))
-		if len(defaults.Content) == 0 {
-			setField(root, "defaults", nil)
-		}
-		return nil
+	return locked(dir, func() error {
+		return editDocument(dir, func(root *yaml.Node) error {
+			defaults := field(root, "defaults")
+			if defaults == nil || defaults.Kind != yaml.MappingNode {
+				defaults = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				setField(root, "defaults", defaults)
+			}
+			setField(defaults, "workspace", sequenceNode(packages))
+			if len(defaults.Content) == 0 {
+				setField(root, "defaults", nil)
+			}
+			return nil
+		})
 	})
 }
 
@@ -1144,30 +1191,32 @@ func UpdateWorkspaceDefaults(dir string, packages []string) error {
 // files stay on the machine: a configuration edit is not a licence to delete
 // somebody's work, and `sync` could not put it back.
 func RemoveWorkspace(dir, name string) error {
-	current, err := Load(dir)
-	if err != nil {
-		return err
-	}
-	if _, err := current.Workspace(name); err != nil {
-		return err
-	}
+	return locked(dir, func() error {
+		current, err := Load(dir)
+		if err != nil {
+			return err
+		}
+		if _, err := current.Workspace(name); err != nil {
+			return err
+		}
 
-	return editDocument(dir, func(root *yaml.Node) error {
-		workspaces := field(root, "workspaces")
-		if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
+		return editDocument(dir, func(root *yaml.Node) error {
+			workspaces := field(root, "workspaces")
+			if workspaces == nil || workspaces.Kind != yaml.SequenceNode {
+				return fmt.Errorf("`workspaces` has no entry named %q", name)
+			}
+			for i, entry := range workspaces.Content {
+				if scalar(field(entry, "name")) != name {
+					continue
+				}
+				workspaces.Content = append(workspaces.Content[:i], workspaces.Content[i+1:]...)
+				if len(workspaces.Content) == 0 {
+					setField(root, "workspaces", nil)
+				}
+				return nil
+			}
 			return fmt.Errorf("`workspaces` has no entry named %q", name)
-		}
-		for i, entry := range workspaces.Content {
-			if scalar(field(entry, "name")) != name {
-				continue
-			}
-			workspaces.Content = append(workspaces.Content[:i], workspaces.Content[i+1:]...)
-			if len(workspaces.Content) == 0 {
-				setField(root, "workspaces", nil)
-			}
-			return nil
-		}
-		return fmt.Errorf("`workspaces` has no entry named %q", name)
+		})
 	})
 }
 
@@ -1233,34 +1282,46 @@ func routesNode(routes []Route) *yaml.Node {
 // AddRoute records that a workspace's port answers to a host. The host must
 // be free across the whole configuration, because one name reaches one port.
 func AddRoute(dir, workspace string, r Route) error {
-	cfg, err := Load(dir)
-	if err != nil {
-		return err
-	}
-	if _, err := cfg.Workspace(workspace); err != nil {
-		return err
-	}
-	if owner, _, ok := cfg.RouteOwner(r.Host); ok {
-		return fmt.Errorf("%s is already published by workspace %q: `devmachine expose rm %s` first", r.Host, owner.Name, r.Host)
-	}
-	return editDocument(dir, func(root *yaml.Node) error {
-		entry := workspaceEntry(root, workspace)
-		if entry == nil {
-			return fmt.Errorf("`workspaces` has no entry named %q", workspace)
+	return locked(dir, func() error {
+		cfg, err := Load(dir)
+		if err != nil {
+			return err
 		}
-		var routes []Route
-		if node := field(entry, "routes"); node != nil {
-			if err := node.Decode(&routes); err != nil {
-				return fmt.Errorf("reading the routes of %q: %w", workspace, err)
+		if _, err := cfg.Workspace(workspace); err != nil {
+			return err
+		}
+		if owner, _, ok := cfg.RouteOwner(r.Host); ok {
+			return fmt.Errorf("%s is already published by workspace %q: `devmachine expose rm %s` first", r.Host, owner.Name, r.Host)
+		}
+		return editDocument(dir, func(root *yaml.Node) error {
+			entry := workspaceEntry(root, workspace)
+			if entry == nil {
+				return fmt.Errorf("`workspaces` has no entry named %q", workspace)
 			}
-		}
-		setField(entry, "routes", routesNode(append(routes, r)))
-		return nil
+			var routes []Route
+			if node := field(entry, "routes"); node != nil {
+				if err := node.Decode(&routes); err != nil {
+					return fmt.Errorf("reading the routes of %q: %w", workspace, err)
+				}
+			}
+			setField(entry, "routes", routesNode(append(routes, r)))
+			return nil
+		})
 	})
 }
 
 // RemoveRoute forgets a host and says which workspace had it.
 func RemoveRoute(dir, host string) (string, error) {
+	var owner string
+	err := locked(dir, func() error {
+		var err error
+		owner, err = removeRoute(dir, host)
+		return err
+	})
+	return owner, err
+}
+
+func removeRoute(dir, host string) (string, error) {
 	cfg, err := Load(dir)
 	if err != nil {
 		return "", err

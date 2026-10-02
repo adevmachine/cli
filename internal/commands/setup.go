@@ -988,6 +988,11 @@ func writeConfig(dir, path string, file configFile, exclusive bool) error {
 	if err != nil {
 		return fmt.Errorf("rendering the configuration: %w", err)
 	}
+	unlock, err := config.Lock(dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	if exclusive {
 		flags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
