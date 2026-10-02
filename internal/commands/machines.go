@@ -356,15 +356,17 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	}
 	m.Packages = startingPackages(ctx, dir, current.Packages, opts.noEssentials, out)
 
+	// The machine is written only after the bootstrap proved the key. Written
+	// first, a failed run left an entry behind, and running again to fix it
+	// was refused as a name already configured.
+	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
+		return err
+	}
 	if err := config.AddMachine(dir, m); err != nil {
 		return err
 	}
 	repo.AutoCommit(ctx, dir, "chore(config): add machine "+m.Name)
 	fmt.Fprintf(out, "\nadded %s to %s\n\n", m.Name, filepath.Join(dir, config.FileName))
-
-	if err := bootstrap(ctx, r, in, out, m, key, opts.noHarden); err != nil {
-		return err
-	}
 	if err := offerSSHAliases(r, out, dir, opts.noAliases, opts.yes || opts.unattended()); err != nil {
 		return err
 	}

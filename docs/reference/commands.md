@@ -258,6 +258,11 @@ is asked. Refuses if a self machine already exists, or the name is taken.
 See [your computer as a machine](../how-it-works/your-computer-as-a-machine.md)
 for how this differs from `machines create-local`.
 
+`add` writes the machine to `config.yml` only once the key is proved and
+the bootstrap finished. A run that fails leaves `config.yml` untouched,
+so the same command can simply run again — see [`machines add` writes the
+machine last](../how-it-works/trust-bootstrap.md#machines-add-writes-the-machine-last).
+
 **Unattended.** `--address` makes `add` ask nothing, so a script or an
 agent adds a machine in one command; every question has a flag, and what
 is left out takes its default:

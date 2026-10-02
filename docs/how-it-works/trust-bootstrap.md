@@ -35,6 +35,20 @@ password login is still on: you can still get in with the password
 `--no-harden` skips locking the server down; the key is still installed
 and proved.
 
+## `machines add` writes the machine last
+
+`machines add` records the new machine in `config.yml` only after the
+whole bootstrap worked: key proved, password login off, Ansible
+installed. If any step fails, `config.yml` is as it was, so you fix the
+cause and run the same command again — it is not refused as a name
+already configured. What a failed run did leave is harmless to a second
+one: the trusted host key in `known_hosts` matches, the key it made is
+reused, and a key it already installed now logs in, so no password is
+asked for.
+
+`setup` is different on purpose: it writes `config.yml` first, and
+running it again resumes from that file instead of starting over.
+
 Locking down means writing one file that turns password login off,
 checking it is valid, and only reloading SSH if it passes — **an invalid
 file is deleted**, since a bad file left behind would break the next SSH
