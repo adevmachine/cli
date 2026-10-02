@@ -125,7 +125,7 @@ func TestResolveRunsThePackagesScriptWithTheName(t *testing.T) {
 	localPackage(t, configDir, "acme-net", "acme", `[ "$1" = main ] || exit 1
 echo 100.64.0.7
 echo
-echo fd7a:115c:a1e0::7
+echo 2001:db8::7
 `)
 	p := onlyProvider(t, configDir)
 
@@ -133,7 +133,7 @@ echo fd7a:115c:a1e0::7
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(got, ",") != "100.64.0.7,fd7a:115c:a1e0::7" {
+	if strings.Join(got, ",") != "100.64.0.7,2001:db8::7" {
 		t.Fatalf("got %v", got)
 	}
 }
