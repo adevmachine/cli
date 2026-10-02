@@ -866,7 +866,9 @@ through one):
   hand is printed, and the JSON carries `dns_error`.
 - `--check` also prints the DNS removal it would make.
 - `--no-apply` touches no machine, so no DNS either: it prints the
-  `devmachine dns rm <host> A <address>` to run later. (`add --no-apply`
+  `devmachine dns rm <host> A <address> --machine <serving machine>` to
+  run later — `--machine` names the machine whose DNS provider holds the
+  zone, which is the serving one, not necessarily the only one. (`add --no-apply`
   still points the name, since a name that does not resolve yet stops
   the certificate on the next `sync`.) See
 [Publishing](../concepts/publishing.md) for the cases this question

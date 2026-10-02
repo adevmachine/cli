@@ -663,8 +663,8 @@ func dnsLeftNote(machine config.Machine, host string) string {
 	if err != nil {
 		address = "<address>"
 	}
-	return fmt.Sprintf("The DNS record for %s is left alone (--no-apply): remove it with `devmachine dns rm %s A %s`.",
-		host, host, address)
+	return fmt.Sprintf("The DNS record for %s is left alone (--no-apply): remove it with "+
+		"`devmachine dns rm %s A %s --machine %s`.", host, host, address, machine.Name)
 }
 
 // publicAddress is the address a public name should point at: the first one

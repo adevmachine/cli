@@ -964,7 +964,7 @@ func TestExposeRmNoApplyLeavesTheRecordAndSaysHowToRemoveIt(t *testing.T) {
 	if len(client.deleted) != 0 || client.lists != 0 {
 		t.Fatalf("--no-apply asked the DNS provider: %d lists, %q", client.lists, client.deleted)
 	}
-	if !strings.Contains(out, "devmachine dns rm app.example.com A 203.0.113.10") {
+	if !strings.Contains(out, "devmachine dns rm app.example.com A 203.0.113.10 --machine main") {
 		t.Fatalf("it does not say how to remove the record later:\n%s", out)
 	}
 }
