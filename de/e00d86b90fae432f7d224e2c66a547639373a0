@@ -1,0 +1,39 @@
+internal/dns/manual.go
+  s_b040951662cf49::t_3d43ad4dfd5716 38-40
+internal/commands/expose.go
+  s_b040951662cf49::t_3d43ad4dfd5716 135-137,394-395,400-402,463,465,469,477-484,488,492,497,499,501
+docs/reference/commands.md
+  s_b040951662cf49::t_5d8d576b38cf52 696-698,889-894
+internal/commands/credentials.go
+  s_b040951662cf49::t_4e4d20bee0bc9a 284-288,352,474-480,482-483,487,489
+internal/commands/expose_via_test.go
+  s_b040951662cf49::t_3d43ad4dfd5716 410-413
+docs/guides/logins-and-secrets.md
+  s_b040951662cf49::t_5d8d576b38cf52 123-124
+internal/credentials/deliver.go
+  s_b040951662cf49::t_4e4d20bee0bc9a 48-53
+internal/commands/credentials_test.go
+  s_b040951662cf49::t_af5a9406ee412a 552-567
+docs/guides/expose-home-server-without-port-forwarding.md
+  s_b040951662cf49::t_5d8d576b38cf52 81-82,89-91
+internal/credentials/present.go
+  s_b040951662cf49::t_4e4d20bee0bc9a 30-35,57,59,61,77,85-88,106-110
+internal/credentials/present_test.go
+  s_b040951662cf49::t_4e4d20bee0bc9a 181,204-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dee00d86b90fae432f7d224e2c66a547639373a0",
+  "prompts": {},
+  "sessions": {
+    "s_b040951662cf49": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4e3d292-63fb-49a6-b181-1db1a3a0bccb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
