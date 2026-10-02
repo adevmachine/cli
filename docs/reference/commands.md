@@ -88,6 +88,11 @@ release pinned, `defaults.workspace`, the machine with `essentials`, and
 | reach it over Tailscale? | `--tailscale` |
 | install the agent skills? | run `devmachine skills add` afterwards |
 
+It creates that file only if it is still missing when the bootstrap
+ends. If another `add` (or `create-local --add`) wrote one in the
+meantime, this machine is added to it instead of overwriting it; a
+`--domain` given then is not written, and the output says so.
+
 Only `--address` does this. `machines add` with questions and no
 `config.yml` stops and sends you to `setup`, which asks the same
 questions plus the domain.

@@ -205,7 +205,7 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 
 	release := pinForNewConfig(ctx, out)
 	m.Packages = startingPackages(ctx, dir, release, opts.noEssentials, out)
-	if err := writeNewConfig(dir, m, release, domain); err != nil {
+	if err := writeNewConfig(dir, m, release, domain, false); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "\nwrote %s\n\n", path)
@@ -967,7 +967,9 @@ func expandHome(path string) (string, error) {
 }
 
 // writeConfig puts the file on disk, readable by its owner and nobody else.
-func writeConfig(dir, path string, file configFile) error {
+// With exclusive, it only creates the file: one that appeared since the
+// caller looked is not overwritten, and the error wraps os.ErrExist.
+func writeConfig(dir, path string, file configFile, exclusive bool) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
@@ -975,7 +977,19 @@ func writeConfig(dir, path string, file configFile) error {
 	if err != nil {
 		return fmt.Errorf("rendering the configuration: %w", err)
 	}
-	if err := os.WriteFile(path, body, 0o600); err != nil {
+	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	if exclusive {
+		flags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
+	}
+	f, err := os.OpenFile(path, flags, 0o600)
+	if err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if _, err := f.Write(body); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	if err := f.Close(); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	return nil

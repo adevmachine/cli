@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
+	"github.com/mydevmachine/devmachine/internal/remote"
 )
 
 const oneMachine = "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"
@@ -295,5 +297,32 @@ func TestMachinesAddWithQuestionsAndNoConfigurationSendsToSetup(t *testing.T) {
 	}
 	if len(steps.events) != 0 {
 		t.Fatalf("it reached a server first: %q", steps.events)
+	}
+}
+
+// Two adds into an empty folder at once: the one that finishes second must
+// add its machine to the configuration the first wrote, not overwrite it.
+func TestMachinesAddIntoAConfigurationWrittenMeanwhileAddsToIt(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+	t.Cleanup(swap(&installAnsible, func(context.Context, remote.Client, io.Writer) error {
+		return os.WriteFile(filepath.Join(dir, config.FileName),
+			[]byte("domain: example.org\nmachines:\n  - name: other\n    hosts: [203.0.113.30]\n"), 0o600)
+	}))
+
+	out, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--domain", "example.com")...)
+	if err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Machines) != 2 || cfg.Machines[0].Name != "other" || cfg.Machines[1].Name != "sandbox" {
+		t.Fatalf("machines = %#v", cfg.Machines)
+	}
+	if cfg.Domain != "example.org" || !strings.Contains(out, "--domain") {
+		t.Fatalf("domain %q, and the output does not say --domain was not written: %s", cfg.Domain, out)
 	}
 }

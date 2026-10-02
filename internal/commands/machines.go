@@ -424,8 +424,19 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	}
 	m.KnownHostsFile = trusted
 	if fresh {
-		err = writeNewConfig(dir, m, release, opts.domain)
-	} else {
+		err = writeNewConfig(dir, m, release, opts.domain, true)
+		if errors.Is(err, os.ErrExist) {
+			fresh = false
+			fmt.Fprintf(out, "\n%s appeared while %s was being set up, so %s is added to it",
+				config.FileName, m.Name, m.Name)
+			if opts.domain != "" {
+				fmt.Fprintf(out, "; --domain %s was not written, since that file already says which domain it has",
+					opts.domain)
+			}
+			fmt.Fprintln(out, ".")
+		}
+	}
+	if !fresh {
 		err = config.AddMachine(dir, m)
 	}
 	if err != nil {
@@ -491,8 +502,9 @@ func pinForNewConfig(ctx context.Context, out io.Writer) string {
 }
 
 // writeNewConfig writes the configuration setup would have written for this
-// machine, and AGENTS.md beside it.
-func writeNewConfig(dir string, m config.Machine, release, domain string) error {
+// machine, and AGENTS.md beside it. With exclusive it never overwrites a
+// config.yml, and says so with an error that wraps os.ErrExist.
+func writeNewConfig(dir string, m config.Machine, release, domain string, exclusive bool) error {
 	entry := machineEntry(m)
 	entry.Packages = m.Packages
 	if err := writeConfig(dir, filepath.Join(dir, config.FileName), configFile{
@@ -500,7 +512,7 @@ func writeNewConfig(dir string, m config.Machine, release, domain string) error 
 		Machines: []machineFile{entry},
 		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
 		Domain:   domain,
-	}); err != nil {
+	}, exclusive); err != nil {
 		return err
 	}
 	return writeAgentsFile(dir)
