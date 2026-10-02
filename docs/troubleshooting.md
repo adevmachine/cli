@@ -533,8 +533,10 @@ cannot find the site and Caddy cannot get its certificate.
 
 **What it means:** The site is off Caddy, but the record that pointed
 the name at the machine is still there: the DNS provider could not list
-the zone, refused the delete, or its setup is broken. The reason is on
-the same line. The name still resolves, and visitors get a TLS error
+the zone, refused the delete, or its setup is broken; no DNS provider
+is installed, or the machine could not be reached to ask one; or the
+name also points at another address, and taking one value out of
+several is left to you. The reason is on the same line. The name still resolves, and visitors get a TLS error
 instead of nothing.
 
 **What to do:** Remove the record the command printed, or fix the

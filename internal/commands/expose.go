@@ -556,7 +556,15 @@ func unpointDNS(ctx context.Context, dir string, machine config.Machine, host st
 			fmt.Fprintf(out, "would print %s A %s to remove by hand (%s)\n", host, address, choice.Why)
 			return nil
 		}
-		return choice.Provider.Delete(ctx, choice.Zone, rec)
+		reason := choice.Why
+		if manual, ok := choice.Provider.(*dns.Manual); ok {
+			reason = strings.TrimSuffix(manual.Reason(choice.Zone), ".")
+		}
+		fmt.Fprintf(out, "warning: the DNS record for %s was not removed: %s\n", host, reason)
+		if err := choice.Provider.Delete(ctx, choice.Zone, rec); err != nil {
+			return err
+		}
+		return fmt.Errorf("the DNS record was not removed: %s", reason)
 	}
 
 	records, err := choice.Provider.List(ctx, choice.Zone)
@@ -584,6 +592,12 @@ func unpointDNS(ctx context.Context, dir string, machine config.Machine, host st
 	case !found:
 		fmt.Fprintf(out, "%s has no A record in %s (provider %s): nothing to remove from DNS\n", host, choice.Zone, choice.Name)
 		return nil
+	case len(elsewhere) > 0:
+		// Some providers take one value out of a set by deleting the whole
+		// set and writing the rest back. Failing between the two would take
+		// down the values somebody else added, so this one is left to a person.
+		return byHand(choice.Zone, fmt.Errorf("%s also points at %s, and only its %s value is this machine's",
+			host, strings.Join(elsewhere, ", "), address))
 	case dryRun:
 		fmt.Fprintf(out, "would %s\n", line)
 		return nil

@@ -854,7 +854,13 @@ through one):
   says where it points. Somebody repointed the name; deleting it would
   take down whatever answers there.
 - With no provider installed, or the machine out of reach, it prints the
-  record to remove by hand.
+  record to remove by hand, and the JSON carries `dns_error` saying so —
+  the record is still there.
+- A name that holds the machine's address **and** another value is not
+  deleted through the provider: some providers take one value out by
+  rewriting the whole set, and a failure halfway would take the other
+  value down too. The record to remove by hand is printed, and the JSON
+  carries `dns_error`.
 - When the provider cannot list the zone or refuses the delete, nothing
   is deleted, the site still comes off Caddy, the record to remove by
   hand is printed, and the JSON carries `dns_error`.

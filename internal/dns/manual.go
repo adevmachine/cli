@@ -30,6 +30,9 @@ func newManualBecause(out io.Writer, because string) *Manual {
 	return &Manual{out: out, because: because}
 }
 
+// Reason is the sentence that says why a record for zone is done by hand.
+func (m *Manual) Reason(zone string) string { return m.reason(zone) }
+
 func (m *Manual) reason(zone string) string {
 	if m.because != "" {
 		return m.because
