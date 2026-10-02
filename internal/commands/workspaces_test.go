@@ -672,3 +672,16 @@ func TestWorkspacesEditRefusesToRemoveTheAccount(t *testing.T) {
 		t.Fatalf("got %v, want a refusal that says why", err)
 	}
 }
+
+func TestWorkspacesEditUnsetTakesASettingOut(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n    packages: [zsh]\n    settings:\n      zsh.theme: plain\n")
+
+	if _, err := execute(t, "--config", dir, "workspaces", "edit", "alice", "--unset", "zsh.theme", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := config.Load(dir)
+	w, _ := cfg.Workspace("alice")
+	if len(w.Settings) != 0 {
+		t.Fatalf("the setting survived: %#v", w.Settings)
+	}
+}

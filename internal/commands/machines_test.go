@@ -372,3 +372,122 @@ func TestMachinesAddWithFlagsAddsTailscaleOnlyWhenAsked(t *testing.T) {
 		}
 	}
 }
+
+func TestMachinesEditWritesASettingIntoTheMachine(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "main",
+		"--set", "hostinger.zones=[example.com, example.org]", "--yes")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	m, _ := cfg.Machine("main")
+	zones, ok := m.Settings["hostinger.zones"].([]any)
+	if !ok || len(zones) != 2 || zones[0] != "example.com" {
+		t.Fatalf("got %#v", m.Settings)
+	}
+}
+
+func TestMachinesEditRefusesASettingForAPackageItDoesNotHave(t *testing.T) {
+	dir := configWithKey(t, "    packages: [caddy]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "main", "--set", "hostinger.zones=[example.com]", "--yes")
+	if err == nil {
+		t.Fatal("it wrote a setting nothing would read")
+	}
+	if !strings.Contains(err.Error(), "hostinger") {
+		t.Fatalf("the error does not name it: %v", err)
+	}
+	cfg, _ := config.Load(dir)
+	m, _ := cfg.Machine("main")
+	if len(m.Settings) != 0 {
+		t.Fatalf("it wrote anyway: %#v", m.Settings)
+	}
+}
+
+func TestMachinesEditUnsetTakesASettingOut(t *testing.T) {
+	dir := configWithKey(t, "    packages: [caddy, hostinger]\n    settings:\n      caddy.email: alice@example.com\n      hostinger.zones: [example.com]\n")
+
+	if _, err := execute(t, "--config", dir, "machines", "edit", "main", "--unset", "hostinger.zones", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := execute(t, "--config", dir, "machines", "edit", "main", "--set", "caddy.email=", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ := config.Load(dir)
+	m, _ := cfg.Machine("main")
+	if len(m.Settings) != 0 {
+		t.Fatalf("a setting survived: %#v", m.Settings)
+	}
+}
+
+func TestMachinesEditRefusesToSetAndUnsetTheSameSetting(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "main",
+		"--set", "hostinger.zones=[example.com]", "--unset", "hostinger.zones", "--yes")
+	if err == nil {
+		t.Fatal("it accepted two orders that contradict each other")
+	}
+}
+
+func TestMachinesEditRefusesASetWithNoValue(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "main", "--set", "hostinger.zones", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "=") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestMachinesEditWithNothingToChangeSaysSo(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "main", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "--set") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestMachinesEditRefusesAMachineThatIsNotConfigured(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	_, err := execute(t, "--config", dir, "machines", "edit", "sandbox", "--set", "hostinger.zones=[example.com]", "--yes")
+	if err == nil {
+		t.Fatal("it edited a machine that is not configured")
+	}
+}
+
+func TestMachinesEditCheckWritesNothing(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	out, err := execute(t, "--config", dir, "machines", "edit", "main", "--set", "hostinger.zones=[example.com]", "--check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "would") {
+		t.Fatalf("a dry run should say what it would do: %q", out)
+	}
+	cfg, _ := config.Load(dir)
+	m, _ := cfg.Machine("main")
+	if len(m.Settings) != 0 {
+		t.Fatalf("a dry run wrote: %#v", m.Settings)
+	}
+}
+
+func TestMachinesEditAsksFirst(t *testing.T) {
+	dir := configWithKey(t, "    packages: [hostinger]\n")
+
+	if _, err := executeWithInput(t, "n\n", "--config", dir, "machines", "edit", "main",
+		"--set", "hostinger.zones=[example.com]"); !errors.Is(err, errDeclined) {
+		t.Fatalf("got %v", err)
+	}
+	cfg, _ := config.Load(dir)
+	m, _ := cfg.Machine("main")
+	if len(m.Settings) != 0 {
+		t.Fatalf("a no still wrote: %#v", m.Settings)
+	}
+}

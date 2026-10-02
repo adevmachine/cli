@@ -601,7 +601,7 @@ func newWorkspacesEditCmd(opts *options) *cobra.Command {
 			"sync` is what applies the change.\n\n" +
 			"`--set <package>.<name>=<value>` writes into the workspace's " +
 			"`settings:`, which is how a package's variables are set. An empty " +
-			"value takes the setting out again.\n\n" +
+			"value, or `--unset <package>.<name>`, takes the setting out again.\n\n" +
 			"`--share <credential>=own` keeps this workspace's own login instead " +
 			"of the one shared across the machine, which is how one workspace " +
 			"signs in to a different account. `=machine` puts it back, and an " +
@@ -619,6 +619,7 @@ func newWorkspacesEditCmd(opts *options) *cobra.Command {
 	c.Flags().StringSliceVar(&e.add, "add", nil, "a package to add")
 	c.Flags().StringSliceVar(&e.remove, "rm", nil, "a package to take off")
 	c.Flags().StringArrayVar(&e.set, "set", nil, "a setting, as <package>.<name>=<value>")
+	c.Flags().StringArrayVar(&e.unset, "unset", nil, "a setting to take out, as <package>.<name>")
 	c.Flags().StringArrayVar(&e.share, "share", nil,
 		"whether a login is shared, as <credential>=machine|own")
 	c.Flags().BoolVar(&e.check, "check", false, "say what would change, and change nothing")
@@ -634,6 +635,7 @@ type workspaceEditOptions struct {
 	add     []string
 	remove  []string
 	set     []string
+	unset   []string
 	share   []string
 	check   bool
 	yes     bool
@@ -665,7 +667,7 @@ func runWorkspaceEdit(cmd *cobra.Command, opts *options, name string, e workspac
 	}
 	if len(changes) == 0 {
 		return fmt.Errorf(
-			"nothing to change on %q: pass --machine, --user, --add, --rm, --set or --share", name)
+			"nothing to change on %q: pass --machine, --user, --add, --rm, --set, --unset or --share", name)
 	}
 
 	// Validating the whole configuration is what catches a setting for a
@@ -794,28 +796,55 @@ func applyWorkspaceEdit(cfg config.Config, w *config.Workspace, e workspaceEditO
 	}
 	w.Credentials = shared
 
-	settings := maps.Clone(w.Settings)
+	settings, edits, err := editSettings(w.Settings, e.set, e.unset)
+	if err != nil {
+		return nil, err
+	}
+	w.Settings = settings
+
+	return append(changes, edits...), nil
+}
+
+// editSettings applies --set and --unset to a copy of settings and returns
+// it with what each one changed. A machine and a workspace hold settings the
+// same way, so both edit commands read the flags here.
+func editSettings(current map[string]any, set, unset []string) (map[string]any, []string, error) {
+	var changes []string
+	settings := maps.Clone(current)
 	if settings == nil {
 		settings = map[string]any{}
 	}
-	for _, raw := range e.set {
+	remove := func(key string) {
+		if _, held := settings[key]; held {
+			delete(settings, key)
+			changes = append(changes, "take out the setting "+key)
+		}
+	}
+	for _, raw := range set {
 		key, text, ok := strings.Cut(raw, "=")
 		if !ok || key == "" {
-			return nil, fmt.Errorf("--set %q is not a setting: write it as <package>.<name>=<value>", raw)
+			return nil, nil, fmt.Errorf("--set %q is not a setting: write it as <package>.<name>=<value>", raw)
+		}
+		if slices.Contains(unset, key) {
+			return nil, nil, fmt.Errorf("--set %s and --unset %s say two different things: pass one of them", key, key)
 		}
 		if text == "" {
-			if _, held := settings[key]; held {
-				delete(settings, key)
-				changes = append(changes, "take out the setting "+key)
-			}
+			remove(key)
 			continue
 		}
 		settings[key] = settingValue(text)
 		changes = append(changes, "set "+key+" to "+text)
 	}
-	w.Settings = settings
-
-	return changes, nil
+	for _, key := range unset {
+		if key == "" || strings.Contains(key, "=") {
+			return nil, nil, fmt.Errorf("--unset %q is not a setting name: write it as <package>.<name>", key)
+		}
+		remove(key)
+	}
+	if len(settings) == 0 {
+		settings = nil
+	}
+	return settings, changes, nil
 }
 
 // settingValue reads a value the way the file that holds it would.

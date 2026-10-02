@@ -63,7 +63,11 @@ Hostinger's DNS API answers about one zone at a time and has no
 list-zones endpoint. Provider selection normally reads the account's
 domains from the Domains portfolio endpoint, but a least-privilege DNS
 token gets a 403 there even though it can read its own zone. Set
-`hostinger.zones` on the machine for that case.
+`hostinger.zones` on the machine for that case:
+
+```
+devmachine machines edit main --set hostinger.zones=[example.com]
+```
 
 ### A delete filter takes the whole RRset
 

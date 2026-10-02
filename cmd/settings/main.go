@@ -39,6 +39,7 @@ Or without opening the file:
 
 ` + "```" + `
 devmachine workspaces edit alice --set zsh.tmux_config=false
+devmachine machines edit main --set caddy.email=someone@example.com
 ` + "```" + `
 
 A setting for a package the target does not install is refused. A typo in a

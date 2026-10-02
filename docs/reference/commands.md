@@ -218,6 +218,7 @@ devmachine machines add [--no-harden] [--no-essentials] [--no-aliases] [--yes]  
 devmachine machines add --self <name>     add your computer as a machine, with no address
 devmachine machines add --name <n> --address <a> --fingerprint <SHA256:…> [--user u] [--port p] [--key new|file] [--tailscale]   the same, asking nothing
 devmachine machines trust [name] [--check] [--replace] [--expect <fp>] [--yes]   check or update its SSH fingerprint
+devmachine machines edit <name> [--set k=v] [--unset k] [--check] [--yes]   change a machine's package settings
 devmachine machines rm <name> [--yes]     forget a machine; the server keeps running
 devmachine machines create-local <name>   a machine on your computer
 devmachine machines start <name>          start a local machine
@@ -232,6 +233,14 @@ Manages the list of machines devmachine knows about.
 on your own computer. **Your computer is never picked by default** — a
 command with no `--machine` still acts on the server, even with a self
 machine also configured.
+
+`edit` changes a machine's `settings:` and nothing else, the way
+`workspaces edit` does for a workspace. `--set <package>.<name>=<value>`
+writes a package option, read as YAML (`--set
+hostinger.zones=[example.com]` writes a list); an empty value or `--unset
+<package>.<name>` removes it. Both repeat. A setting for a package the
+machine does not install is refused. Comments in `config.yml` survive, and
+`sync` applies the change.
 
 `add` sets up another server, same as [setup](#setup) — including the SSH
 aliases and Tailscale questions. `add --self <name>` instead names the
@@ -305,7 +314,7 @@ subdomains do not work on it.
 ```
 devmachine workspaces list
 devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
-devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--check] [--yes]
+devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--unset k] [--share c=machine|own] [--check] [--yes]
 devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]
 devmachine workspaces rm <name> [--yes]
 devmachine workspaces destroy <name> [--confirm <name>] [--check]
@@ -329,7 +338,7 @@ machines, pass `--machine`.
 `edit` changes one workspace. `--add`/`--rm` take a package name each,
 repeatable. `--set <package>.<name>=<value>` writes a package option
 (read as YAML — see [packages](../concepts/packages.md)); an empty value
-removes it. `--share <credential>=own` keeps this workspace's own login
+or `--unset <package>.<name>` removes it. `--share <credential>=own` keeps this workspace's own login
 instead of the shared one; `=machine` shares it again. A package option
 for a package the workspace does not install is refused.
 

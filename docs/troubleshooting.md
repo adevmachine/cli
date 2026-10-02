@@ -325,6 +325,18 @@ If your variable is there under a different name than the package's own
 `defaults/main.yml` uses, the package needs fixing — the name in its defaults
 is the name a setting has to match.
 
+## `machines edit` or `workspaces edit` says it "does not install the package"
+
+**What it means:** The setting's first part, before the dot, names a
+package that machine or workspace does not have. Nothing would read the
+value: the recipe would keep its default, so the CLI refuses it instead.
+It is usually a typo in the package name, or a package added to the
+workspace when the setting is on the machine (or the other way round).
+
+**What to do:** Check the name with `devmachine packages list`. If the
+package really is missing, add it first (`devmachine packages add <name>
+--machine main`), then set the value.
+
 ## `devmachine ssh` opens a session as the wrong user
 
 **What it means:** `devmachine ssh` with no argument logs you in as the
@@ -468,8 +480,8 @@ record by hand.
 
 **What to do:** `devmachine packages pin v26` (or later) and
 `devmachine sync --tags hostinger`. A token without "Domains portfolio"
-permission also needs the zones listed: `hostinger.zones: [example.com]` in
-the machine's settings.
+permission also needs the zones listed: `devmachine machines edit main
+--set hostinger.zones=[example.com]`.
 
 ## `expose add` said "the DNS record for … was not written"
 

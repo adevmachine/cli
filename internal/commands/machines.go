@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
@@ -24,6 +25,7 @@ func newMachinesCmd(opts *options) *cobra.Command {
 		newMachinesListCmd(opts),
 		newMachinesAddCmd(opts),
 		newMachinesTrustCmd(opts),
+		newMachinesEditCmd(opts),
 		newMachinesRmCmd(opts),
 		newMachinesCreateLocalCmd(opts),
 		newMachinesStartCmd(),
@@ -151,6 +153,102 @@ func runMachinesAddSelf(ctx context.Context, dir string, out io.Writer, name str
 	}
 
 	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n", name, name)
+	return nil
+}
+
+type machineEditOptions struct {
+	set   []string
+	unset []string
+	check bool
+	yes   bool
+}
+
+func newMachinesEditCmd(opts *options) *cobra.Command {
+	var e machineEditOptions
+
+	c := &cobra.Command{
+		Use:   "edit <name>",
+		Short: "Change a machine's package settings",
+		Long: "It edits the configuration and touches no machine. `devmachine " +
+			"sync` is what applies the change.\n\n" +
+			"`--set <package>.<name>=<value>` writes into the machine's " +
+			"`settings:`, which is how a machine package's variables are set. " +
+			"The value is read as YAML, so `[a, b]` is a list. An empty value, " +
+			"or `--unset <package>.<name>`, takes the setting out again.\n\n" +
+			"A setting for a package the machine does not install is refused.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runMachineEdit(cmd, opts, args[0], e)
+		},
+	}
+	c.Flags().StringArrayVar(&e.set, "set", nil, "a setting, as <package>.<name>=<value>")
+	c.Flags().StringArrayVar(&e.unset, "unset", nil, "a setting to take out, as <package>.<name>")
+	c.Flags().BoolVar(&e.check, "check", false, "say what would change, and change nothing")
+	c.Flags().BoolVar(&e.yes, "yes", false, "do not ask")
+	return c
+}
+
+func runMachineEdit(cmd *cobra.Command, opts *options, name string, e machineEditOptions) error {
+	dir, _, err := config.Dir(opts.configDir)
+	if err != nil {
+		return err
+	}
+	cfg, err := loadConfig(opts)
+	if err != nil {
+		return err
+	}
+	m, err := cfg.Machine(name)
+	if err != nil {
+		return err
+	}
+
+	settings, changes, err := editSettings(m.Settings, e.set, e.unset)
+	if err != nil {
+		return err
+	}
+	if len(changes) == 0 {
+		return fmt.Errorf("nothing to change on %q: pass --set or --unset", name)
+	}
+
+	// Validating the whole configuration is what refuses a setting for a
+	// package the machine does not install.
+	edited := cfg
+	edited.Machines = slices.Clone(cfg.Machines)
+	for i := range edited.Machines {
+		if edited.Machines[i].Name == name {
+			edited.Machines[i].Settings = settings
+		}
+	}
+	if err := edited.Validate(); err != nil {
+		return err
+	}
+
+	if e.check {
+		for _, line := range changes {
+			cmd.Printf("would %s\n", line)
+		}
+		cmd.Println("Nothing was written.")
+		return nil
+	}
+	if !e.yes {
+		ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(),
+			fmt.Sprintf("On %s: %s?", name, strings.Join(changes, "; ")))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errDeclined
+		}
+	}
+
+	if err := config.SetMachineSettings(dir, name, settings); err != nil {
+		return err
+	}
+	repo.AutoCommit(cmd.Context(), dir, "chore(config): update machine "+name)
+	for _, line := range changes {
+		cmd.Printf("%s: %s\n", name, line)
+	}
+	cmd.Println("The machine is untouched until the next `devmachine sync`.")
 	return nil
 }
 

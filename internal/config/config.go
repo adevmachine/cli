@@ -1021,6 +1021,27 @@ func SetMachineHosts(dir, name string, addresses []string) error {
 	})
 }
 
+// SetMachineSettings replaces one machine's `settings:` and leaves every
+// other field, and every comment, as it was. An empty map removes the key.
+func SetMachineSettings(dir, name string, settings map[string]any) error {
+	node, err := settingsNode(settings)
+	if err != nil {
+		return err
+	}
+	return editDocument(dir, func(root *yaml.Node) error {
+		machines := field(root, "machines")
+		if machines != nil && machines.Kind == yaml.SequenceNode {
+			for _, entry := range machines.Content {
+				if entry.Kind == yaml.MappingNode && scalar(field(entry, "name")) == name {
+					setField(entry, "settings", node)
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("`machines` has no entry named %q", name)
+	})
+}
+
 // hostsNode is addresses as a block list, one per line, the way the manual
 // writes `hosts`. An address that was already there keeps its own node, and
 // with it any comment written next to it.

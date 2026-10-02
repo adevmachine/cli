@@ -1839,3 +1839,79 @@ func TestRemoveMachineRefusesOneThatServesARoute(t *testing.T) {
 		t.Fatalf("a machine a route is sent to must not go, got %v", err)
 	}
 }
+
+func TestSetMachineSettingsWritesThemAndKeepsComments(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main  # the server
+    hosts: [203.0.113.10]
+    packages: [hostinger, caddy]
+    settings:
+      caddy.email: alice@example.com  # for the certificates
+  - name: sandbox
+    hosts: [203.0.113.20]
+`)
+
+	err := SetMachineSettings(dir, "main", map[string]any{
+		"caddy.email":     "alice@example.com",
+		"hostinger.zones": []any{"example.com"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "the server") {
+		t.Fatalf("the comment is gone:\n%s", body)
+	}
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := cfg.Machine("main")
+	zones, ok := m.Settings["hostinger.zones"].([]any)
+	if !ok || len(zones) != 1 || zones[0] != "example.com" {
+		t.Fatalf("got %#v", m.Settings)
+	}
+	if m.Settings["caddy.email"] != "alice@example.com" {
+		t.Fatalf("the other setting did not survive: %#v", m.Settings)
+	}
+	other, _ := cfg.Machine("sandbox")
+	if len(other.Settings) != 0 {
+		t.Fatalf("it wrote onto another machine: %#v", other.Settings)
+	}
+}
+
+func TestSetMachineSettingsRemovesAnEmptiedMap(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: main
+    hosts: [203.0.113.10]
+    packages: [caddy]
+    settings:
+      caddy.email: alice@example.com
+`)
+
+	if err := SetMachineSettings(dir, "main", nil); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "settings") {
+		t.Fatalf("an empty settings key was left behind:\n%s", body)
+	}
+}
+
+func TestSetMachineSettingsRefusesOneTheFileDoesNotHave(t *testing.T) {
+	dir := configDirWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	if err := SetMachineSettings(dir, "sandbox", map[string]any{"caddy.email": "x"}); err == nil {
+		t.Fatal("it edited a machine that is not there")
+	}
+}
