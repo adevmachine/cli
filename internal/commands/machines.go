@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -88,7 +89,8 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 		Long: "Asks the same questions as `setup`, minus the domain, and runs the " +
 			"same bootstrap: it installs a key, proves the key on a connection of " +
 			"its own, turns password login off, and installs Ansible.\n\n" +
-			"`setup` writes the first machine. This writes every one after it.\n\n" +
+			"`setup` writes the first machine. This writes every one after it, and, " +
+			"with --address and no config.yml yet, the first one too, without a terminal.\n\n" +
 			"--self <name> adds your computer as a machine instead: no address, no key, no " +
 			"password. It only makes sure Homebrew and Ansible are on PATH.",
 		Args: cobra.NoArgs,
@@ -124,6 +126,8 @@ func newMachinesAddCmd(opts *options) *cobra.Command {
 	c.Flags().StringVar(&s.fingerprint, "fingerprint", "",
 		"the host key fingerprint to trust on first contact (SHA256:…), checked through another channel")
 	c.Flags().BoolVar(&s.tailscale, "tailscale", false, "also add the tailscale package")
+	c.Flags().StringVar(&s.domain, "domain", "",
+		"the domain, written only when there is no config.yml yet and add writes a new one")
 	c.Flags().BoolVar(&s.passwordStdin, "password-stdin", false,
 		"with --address, read the admin password from stdin, used once to install the key")
 	return c
@@ -314,8 +318,16 @@ func newMachinesRmCmd(opts *options) *cobra.Command {
 // setup does: every branch of the bootstrap is reachable without a terminal.
 func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupOptions) error {
 	current, err := config.Load(dir)
+	fresh := errors.Is(err, os.ErrNotExist)
+	if fresh {
+		current, err = config.Config{}, nil
+	}
 	if err != nil {
 		return err
+	}
+	if opts.domain != "" && !fresh {
+		return fmt.Errorf("--domain only goes into a new configuration, and %s already exists: "+
+			"set `domain:` in it instead", filepath.Join(dir, config.FileName))
 	}
 
 	if opts.passwordStdin && !opts.unattended() {
@@ -351,6 +363,11 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if _, err := current.Machine(m.Name); err == nil {
 		return fmt.Errorf("a machine named %q is already configured: pick another name", m.Name)
 	}
+	if fresh {
+		if err := (config.Config{Machines: []config.Machine{m}, Domain: opts.domain}).Validate(); err != nil {
+			return err
+		}
+	}
 	m.KnownHostsFile = filepath.Join(dir, config.KnownHostsFileName)
 	if opts.unattended() {
 		err = trustExpected(ctx, out, m, opts.fingerprint)
@@ -373,7 +390,11 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err := recordKey(dir, &m, key); err != nil {
 		return err
 	}
-	m.Packages = startingPackages(ctx, dir, current.Packages, opts.noEssentials, out)
+	release := current.Packages
+	if fresh {
+		release = pinForNewConfig(ctx, out)
+	}
+	m.Packages = startingPackages(ctx, dir, release, opts.noEssentials, out)
 
 	// The machine is written only after the bootstrap proved the key. Written
 	// first, a failed run left an entry behind, and running again to fix it
@@ -381,7 +402,12 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err := bootstrap(ctx, out, m, key, opts.noHarden, password); err != nil {
 		return err
 	}
-	if err := config.AddMachine(dir, m); err != nil {
+	if fresh {
+		err = writeNewConfig(dir, m, release, opts.domain)
+	} else {
+		err = config.AddMachine(dir, m)
+	}
+	if err != nil {
 		return err
 	}
 	repo.AutoCommit(ctx, dir, "chore(config): add machine "+m.Name)
@@ -408,6 +434,33 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n",
 		m.Name, m.Name)
 	return nil
+}
+
+// pinForNewConfig is the packages release a new configuration is pinned to:
+// the latest, as setup pins it, or none when it cannot be found.
+func pinForNewConfig(ctx context.Context, out io.Writer) string {
+	release, err := latestPackagesRelease(ctx)
+	if err != nil {
+		fmt.Fprintf(out, "\nno packages release is pinned (%v): run `devmachine packages pin` before the first sync.\n", err)
+		return ""
+	}
+	return release
+}
+
+// writeNewConfig writes the configuration setup would have written for this
+// machine, and AGENTS.md beside it.
+func writeNewConfig(dir string, m config.Machine, release, domain string) error {
+	entry := machineEntry(m)
+	entry.Packages = m.Packages
+	if err := writeConfig(dir, filepath.Join(dir, config.FileName), configFile{
+		Packages: release,
+		Machines: []machineFile{entry},
+		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
+		Domain:   domain,
+	}); err != nil {
+		return err
+	}
+	return writeAgentsFile(dir)
 }
 
 // machineFromFlags is askForMachine's answer for an unattended run.

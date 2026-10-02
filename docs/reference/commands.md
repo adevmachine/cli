@@ -68,6 +68,31 @@ there.
 Run again with a configuration in place, and it just makes sure Ansible
 is installed — it never rewrites `config.yml`, a key, or SSH settings.
 
+**Without a terminal.** `setup` only asks. A script, an agent or an app
+runs `machines add --address …` instead: with no `config.yml` yet it
+writes the same configuration `setup` would — the latest packages
+release pinned, `defaults.workspace`, the machine with `essentials`, and
+`AGENTS.md` — and runs the same bootstrap. Each question has a flag:
+
+| `setup` asks | `machines add` flag |
+| --- | --- |
+| machine name | `--name` |
+| address | `--address` |
+| admin login | `--user` |
+| SSH port | `--port` |
+| domain | `--domain` (only when it writes a new `config.yml`) |
+| trust this fingerprint? | `--fingerprint` (read it first with `machines scan`) |
+| how to log in | `--key new`, `--key <file>` or `--key agent:<SHA256:…>` |
+| the password | `--password-stdin` |
+| write SSH host entries? | yes, unless `--no-aliases` |
+| reach it over Tailscale? | `--tailscale` |
+| install the agent skills? | run `devmachine skills add` afterwards |
+
+Unlike `setup`, it writes `config.yml` only once the bootstrap worked, so
+a run that fails leaves no configuration behind. Workspaces then come
+from `devmachine workspaces new`, and packages from `devmachine packages
+add`, both without questions when given `--yes`.
+
 **On a self machine** (`self: true`, your own computer — see
 [`machines`](#machines)), setup only checks Homebrew and installs Ansible;
 no fingerprint, key or password involved.
@@ -266,7 +291,8 @@ machine last](../how-it-works/trust-bootstrap.md#machines-add-writes-the-machine
 
 **Unattended.** `--address` makes `add` ask nothing, so a script or an
 agent adds a machine in one command; every question has a flag, and what
-is left out takes its default:
+is left out takes its default. With no `config.yml` yet, it writes a new
+one the way `setup` does — see [setup without a terminal](#setup):
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
@@ -277,6 +303,7 @@ is left out takes its default:
 | `--key` | `new` | a key of the CLI's own for this machine (made, or reused when it exists), a private key file, or `agent:<SHA256:…>` for a key your SSH agent holds |
 | `--fingerprint` | — | the host key to trust on first contact |
 | `--tailscale` | off | also add the `tailscale` package |
+| `--domain` | — | the domain; only when there is no `config.yml` yet, and refused otherwise |
 | `--password-stdin` | off | read the admin password from stdin, for a server that takes nothing else yet |
 
 `--key agent:SHA256:…` picks one key from the SSH agent by its

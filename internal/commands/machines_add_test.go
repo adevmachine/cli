@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -197,5 +199,66 @@ func TestMachinesAddWithFlagsSaysWhenTheAgentHoldsNothing(t *testing.T) {
 		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--key", "agent:SHA256:zzzz")...)
 	if err == nil || !strings.Contains(err.Error(), "SSH_AUTH_SOCK") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// With no config.yml yet, `machines add --address` is setup without a
+// terminal: it writes the configuration setup would.
+func TestMachinesAddWithFlagsAndNoConfigurationWritesOne(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	t.Cleanup(swap(&latestPackagesRelease, func(context.Context) (string, error) { return "v9", nil }))
+	stubReleaseHas(t, true)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	out, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--domain", "example.com")...)
+	if err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("it wrote no configuration that loads: %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Packages != "v9" || cfg.Domain != "example.com" ||
+		!slices.Equal(cfg.Defaults.Workspace, config.DefaultWorkspacePackages) {
+		t.Fatalf("configuration = %#v", cfg)
+	}
+	if len(cfg.Machines) != 1 || cfg.Machines[0].Name != "sandbox" ||
+		!slices.Equal(cfg.Machines[0].Packages, []string{essentials}) {
+		t.Fatalf("machines = %#v", cfg.Machines)
+	}
+	if _, err := os.Stat(filepath.Join(dir, agentsFileName)); err != nil {
+		t.Fatalf("no AGENTS.md: %v", err)
+	}
+}
+
+func TestMachinesAddWithNoConfigurationWritesNoneWhenItFails(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false})
+
+	if _, err := executeWithInput(t, "", unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey))...); err == nil {
+		t.Fatal("a key that does not log in was accepted")
+	}
+	for _, name := range []string{config.FileName, agentsFileName} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("a failed add left %s behind", name)
+		}
+	}
+}
+
+func TestMachinesAddRefusesDomainOnAnExistingConfiguration(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	_, err := executeWithInput(t, "",
+		unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey), "--domain", "example.com")...)
+	if err == nil || !strings.Contains(err.Error(), "--domain") {
+		t.Fatalf("got %v", err)
+	}
+	if len(steps.events) != 0 {
+		t.Fatalf("it reached the server first: %q", steps.events)
 	}
 }

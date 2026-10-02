@@ -79,6 +79,9 @@ type setupOptions struct {
 	// passwordStdin reads the admin password from stdin, for a server that
 	// takes nothing else yet. It is used once, to install the key.
 	passwordStdin bool
+	// domain is written only into a new configuration, the one `machines
+	// add` writes when there is no config.yml yet.
+	domain string
 }
 
 // unattended is a `machines add` that asks nothing, because its answers came
@@ -200,27 +203,12 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 		return err
 	}
 
-	release, err := latestPackagesRelease(ctx)
-	if err != nil {
-		fmt.Fprintf(out, "\nno packages release is pinned (%v): run `devmachine packages pin` before the first sync.\n", err)
-		release = ""
-	}
-
-	entry := machineEntry(m)
-	entry.Packages = startingPackages(ctx, dir, release, opts.noEssentials, out)
-	if err := writeConfig(dir, path, configFile{
-		Packages: release,
-		Machines: []machineFile{entry},
-		Defaults: defaultsFile{Workspace: config.DefaultWorkspacePackages},
-		Domain:   domain,
-	}); err != nil {
+	release := pinForNewConfig(ctx, out)
+	m.Packages = startingPackages(ctx, dir, release, opts.noEssentials, out)
+	if err := writeNewConfig(dir, m, release, domain); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "\nwrote %s\n\n", path)
-
-	if err := writeAgentsFile(dir); err != nil {
-		return err
-	}
 
 	if err := bootstrap(ctx, out, m, key, opts.noHarden, askingPassword(r, in, out)); err != nil {
 		return err
@@ -239,7 +227,7 @@ func runSetup(ctx context.Context, dir string, in io.Reader, out io.Writer, opts
 	if err != nil {
 		return err
 	}
-	fmt.Fprint(out, nextAfterSetup(entry.Packages, sshAliases))
+	fmt.Fprint(out, nextAfterSetup(m.Packages, sshAliases))
 	return nil
 }
 
