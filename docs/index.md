@@ -34,6 +34,7 @@ list](guides/index.md).
 - [Try it on your own computer first](guides/a-local-vm-with-lima.md)
 - [Express site with TLS](guides/express-site-with-tls.md)
 - [Docker site on 8080](guides/docker-site-on-8080.md)
+- [Expose a home server without port forwarding](guides/expose-home-server-without-port-forwarding.md)
 - [Claude Code, controlled from your phone](guides/claude-code-remote-control.md)
 - [Start Claude from your phone](guides/start-claude-from-your-phone.md)
 - [OpenClaw, in its own sandbox](guides/openclaw-in-its-own-sandbox.md)

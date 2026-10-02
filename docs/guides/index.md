@@ -55,6 +55,9 @@ session. Only a reboot stops it.
   your own domain with HTTPS.
 - [Docker site on 8080](docker-site-on-8080.md) — a container, live at your
   own domain with HTTPS.
+- [Expose a home server without port forwarding](expose-home-server-without-port-forwarding.md)
+  — an old laptop or homelab box at your own domain with HTTPS, through
+  your VPS, even behind CGNAT.
 - [wuzapi as your own package](wuzapi-as-your-own-package.md) — a WhatsApp API
   written once as a package, running on two machines.
 
