@@ -560,7 +560,7 @@ func trustFirstContactWith(ctx context.Context, out io.Writer, machine config.Ma
 	if err := store.Put(machine.Name, machine.Port, presented); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "trusted %s in %s\n", fingerprint, machine.KnownHostsFile)
+	fmt.Fprintf(out, "trusted %s for %s\n", fingerprint, machine.Name)
 	return nil
 }
 

@@ -37,12 +37,22 @@ and proved.
 
 ## `machines add` writes the machine last
 
-`machines add` records the new machine in `config.yml` only after the
-whole bootstrap worked: key proved, password login off, Ansible
-installed. If any step fails, `config.yml` is as it was, so you fix the
-cause and run the same command again — it is not refused as a name
-already configured. What a failed run did leave is harmless to a second
-one: the trusted host key in `known_hosts` matches, the key it made is
+`machines add` records the new machine only after the whole bootstrap
+worked: key proved, password login off, Ansible installed. Both files
+wait for that moment — `config.yml` and `known_hosts`. Until then the
+host key you approved is trusted in a file of the run's own, which is
+thrown away when the run ends. If any step fails, both files are as they
+were, so you fix the cause and run the same command again: it is not
+refused as a name already configured, and a corrected address or a
+rebuilt server that presents another host key is not refused as a
+changed key either. The new key still has to pass `--fingerprint` or
+your yes, like any first contact.
+
+A host key already in `known_hosts` under a name that is not configured
+— left by an older CLI, or by a machine you removed — is replaced, not
+compared: a name that is not a machine has nothing to protect.
+
+What a failed run leaves is harmless to the next one: the key it made is
 reused, and a key it already installed now logs in, so no password is
 asked for.
 

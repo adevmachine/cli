@@ -40,11 +40,14 @@ func TestMachinesAddWithFlagsWritesNothingUntilTheKeyIsProved(t *testing.T) {
 		t.Fatalf("a failed add changed config.yml:\n%s", after)
 	}
 
+	if _, err := os.Stat(filepath.Join(dir, config.KnownHostsFileName)); !os.IsNotExist(err) {
+		t.Fatal("a failed add left a trusted host key behind")
+	}
+
+	// The server answered with another key the second time: a corrected
+	// address, or a rebuild. The first run's key must not stand in the way.
 	steps = stubBootstrap(t, bootstrapStubs{keyWorks: true})
 	args[len(args)-2] = hostkeys.Fingerprint(steps.hostKey)
-	if err := os.Remove(filepath.Join(dir, config.KnownHostsFileName)); err != nil {
-		t.Fatal(err)
-	}
 	if out, err := executeWithInput(t, "", args...); err != nil {
 		t.Fatalf("the second run failed: %v (%s)", err, out)
 	}
@@ -260,5 +263,24 @@ func TestMachinesAddRefusesDomainOnAnExistingConfiguration(t *testing.T) {
 	}
 	if len(steps.events) != 0 {
 		t.Fatalf("it reached the server first: %q", steps.events)
+	}
+}
+
+func TestMachinesAddReplacesAStaleHostKeyForANameNotConfigured(t *testing.T) {
+	dir := writeConfigDir(t, oneMachine)
+	store, err := hostkeys.Open(filepath.Join(dir, config.KnownHostsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put("sandbox", 22, commandHostKey(t)); err != nil {
+		t.Fatal(err)
+	}
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if out, err := executeWithInput(t, "", unattendedAdd(dir, hostkeys.Fingerprint(steps.hostKey))...); err != nil {
+		t.Fatalf("machines add returned %v (%s)", err, out)
+	}
+	if err := store.Check("sandbox", 22, steps.hostKey); err != nil {
+		t.Fatalf("the new host key is not the trusted one: %v", err)
 	}
 }

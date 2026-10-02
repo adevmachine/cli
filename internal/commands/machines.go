@@ -369,7 +369,18 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 			return err
 		}
 	}
-	m.KnownHostsFile = filepath.Join(dir, config.KnownHostsFileName)
+	trusted := filepath.Join(dir, config.KnownHostsFileName)
+	staging, err := os.MkdirTemp("", "devmachine-add-")
+	if err != nil {
+		return fmt.Errorf("making a place to hold the host key until the machine is added: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(staging) }()
+	// Until the bootstrap works, the host key is trusted in a file of this
+	// run's own. Written to known_hosts at once, a failed run left a key
+	// keyed by the name, and the next try at a corrected address or a
+	// rebuilt server was refused as a changed key for a machine that is not
+	// configured, which `machines trust` cannot replace.
+	m.KnownHostsFile = filepath.Join(staging, config.KnownHostsFileName)
 	if opts.unattended() {
 		err = trustExpected(ctx, out, m, opts.fingerprint)
 	} else {
@@ -403,6 +414,10 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	if err := bootstrap(ctx, out, m, key, opts.noHarden, password); err != nil {
 		return err
 	}
+	if err := keepHostKey(m, trusted); err != nil {
+		return err
+	}
+	m.KnownHostsFile = trusted
 	if fresh {
 		err = writeNewConfig(dir, m, release, opts.domain)
 	} else {
@@ -435,6 +450,28 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	fmt.Fprintf(out, "\nNext: `devmachine doctor --machine %s`, then `devmachine sync --machine %s`.\n",
 		m.Name, m.Name)
 	return nil
+}
+
+// keepHostKey copies the machine's host key from the run's own file into the
+// configuration's known_hosts, replacing whatever an earlier run left there
+// under the same name.
+func keepHostKey(m config.Machine, trusted string) error {
+	staged, err := hostkeys.Open(m.KnownHostsFile)
+	if err != nil {
+		return err
+	}
+	key, err := staged.Key(m.Name, m.Port)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(trusted), 0o700); err != nil {
+		return fmt.Errorf("creating the configuration directory for host trust: %w", err)
+	}
+	store, err := hostkeys.Open(trusted)
+	if err != nil {
+		return err
+	}
+	return store.Put(m.Name, m.Port, key)
 }
 
 // pinForNewConfig is the packages release a new configuration is pinned to:
