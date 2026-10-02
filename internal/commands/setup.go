@@ -22,6 +22,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/remote"
 	agentskills "github.com/mydevmachine/devmachine/internal/skills"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -82,6 +83,9 @@ type setupOptions struct {
 	// domain is written only into a new configuration, the one `machines
 	// add` writes when there is no config.yml yet.
 	domain string
+	// hostKey is a host key already read from the machine and trusted as it
+	// is, for a VM `create-local --add` made a moment ago. It has no flag.
+	hostKey ssh.PublicKey
 }
 
 // unattended is a `machines add` that asks nothing, because its answers came
@@ -526,6 +530,13 @@ func trustFirstContactWith(ctx context.Context, out io.Writer, machine config.Ma
 	if err != nil {
 		return err
 	}
+	return trustPresented(out, machine, presented, address, approve)
+}
+
+// trustPresented records a host key already read from the machine, once
+// approve says yes, or checks it against the one already trusted.
+func trustPresented(out io.Writer, machine config.Machine, presented ssh.PublicKey, address string,
+	approve func(fingerprint string) (bool, error)) error {
 	fingerprint := hostkeys.Fingerprint(presented)
 	fmt.Fprintf(out, "\n%s at %s presented %s host key %s.\n", machine.Name, address, presented.Type(), fingerprint)
 

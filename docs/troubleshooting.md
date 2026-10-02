@@ -97,13 +97,18 @@ command again.
 failed — the error after the colon says which step. Nothing was written
 to `config.yml`, so nothing points at a half-added machine.
 
-**What to do:** Fix the cause, then add the running VM with the address
-and port the error printed: `devmachine machines add --name <name>
---address 127.0.0.1 --port <port> --fingerprint <SHA256:…>
---password-stdin`, with `devmachine` on stdin (`machines scan --address
-127.0.0.1 --port <port>` prints the fingerprint). Or throw it away with
-`devmachine machines delete-local <name>` and run `create-local --add`
-again.
+**What to do:** Fix the cause, then run the command the error ends with.
+It is the whole `machines add` for the running VM — name, address, port,
+the host key's fingerprint, the public password on stdin, and the flags
+you gave — ready to copy:
+
+```
+printf '%s' devmachine | devmachine machines add --name sandbox --address 127.0.0.1 \
+  --port 60022 --fingerprint SHA256:… --password-stdin
+```
+
+Or throw the VM away with `devmachine machines delete-local <name>` and
+run `create-local --add` again.
 
 ## It used to connect, and now it does not
 

@@ -386,9 +386,13 @@ func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer
 	// rebuilt server was refused as a changed key for a machine that is not
 	// configured, which `machines trust` cannot replace.
 	m.KnownHostsFile = filepath.Join(staging, config.KnownHostsFileName)
-	if opts.unattended() {
+	switch {
+	case opts.hostKey != nil:
+		err = trustPresented(out, m, opts.hostKey, m.Hosts[0].Address,
+			func(string) (bool, error) { return true, nil })
+	case opts.unattended():
 		err = trustExpected(ctx, out, m, opts.fingerprint)
-	} else {
+	default:
 		err = trustFirstContact(ctx, r, out, m)
 	}
 	if err != nil {
@@ -563,7 +567,7 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			m, err := createAndAddLocal(cmd.Context(), dir, cmd.ErrOrStderr(), args[0], s)
+			m, err := createAndAddLocal(cmd.Context(), dir, opts.configDir, cmd.ErrOrStderr(), args[0], s)
 			if err != nil {
 				return err
 			}
@@ -583,7 +587,8 @@ func newMachinesCreateLocalCmd(opts *options) *cobra.Command {
 //
 // Progress goes to out, which is stderr, so `--format json` leaves a document
 // on stdout and nothing else.
-func createAndAddLocal(ctx context.Context, dir string, out io.Writer, name string, s setupOptions) (config.Machine, error) {
+func createAndAddLocal(ctx context.Context, dir, configFlag string, out io.Writer, name string,
+	s setupOptions) (config.Machine, error) {
 	current, err := config.Load(dir)
 	if err == nil {
 		if _, err := current.Machine(name); err == nil {
@@ -604,18 +609,39 @@ func createAndAddLocal(ctx context.Context, dir string, out io.Writer, name stri
 		return config.Machine{}, fmt.Errorf("the local machine %q is running, and was not added: %w", name, err)
 	}
 	s.name, s.address, s.user, s.port = m.Name, m.Hosts[0].Address, m.User, m.Port
-	s.fingerprint = hostkeys.Fingerprint(presented)
+	s.fingerprint, s.hostKey = hostkeys.Fingerprint(presented), presented
 	s.passwordStdin = true
 	if err := runMachinesAdd(ctx, dir, strings.NewReader(local.Password), out, s); err != nil {
 		return config.Machine{}, fmt.Errorf("the local machine %q is running, and was not added: %w; "+
-			"add it with `devmachine machines add --address %s --port %d` once the cause is fixed",
-			name, err, m.Hosts[0].Address, m.Port)
+			"once the cause is fixed, add it with: %s", name, err, addLocalCommand(configFlag, s))
 	}
 	added, err := config.Load(dir)
 	if err != nil {
 		return config.Machine{}, err
 	}
 	return added.Machine(name)
+}
+
+// addLocalCommand is the `machines add` that adds a running local machine
+// by hand, ready to copy: every answer create-local --add gave, and the
+// public password on stdin.
+func addLocalCommand(configFlag string, s setupOptions) string {
+	command := "printf '%s' " + local.Password + " | devmachine"
+	if configFlag != "" {
+		command += " --config " + configFlag
+	}
+	command += fmt.Sprintf(" machines add --name %s --address %s --port %d --fingerprint %s --password-stdin",
+		s.name, s.address, s.port, s.fingerprint)
+	if s.key != "" && s.key != "new" {
+		command += " --key " + s.key
+	}
+	if s.noEssentials {
+		command += " --no-essentials"
+	}
+	if s.noAliases {
+		command += " --no-aliases"
+	}
+	return command
 }
 
 func newMachinesStartCmd() *cobra.Command {

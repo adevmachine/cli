@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/hostkeys"
 	"github.com/mydevmachine/devmachine/internal/keys"
 	"github.com/mydevmachine/devmachine/internal/local"
 )
@@ -105,5 +106,43 @@ func TestCreateLocalRefusesAddFlagsWithoutAdd(t *testing.T) {
 	_, err := execute(t, "--config", t.TempDir(), "machines", "create-local", "sandbox", "--no-aliases")
 	if err == nil || !strings.Contains(err.Error(), "--add") || len(*created) != 0 {
 		t.Fatalf("got %v, created %v", err, *created)
+	}
+}
+
+func TestCreateLocalWithAddScansTheHostKeyOnce(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	stubCreateLocal(t)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	if out, err := executeWithInput(t, "", "--config", dir, "machines", "create-local", "sandbox", "--add",
+		"--no-aliases"); err != nil {
+		t.Fatalf("create-local --add returned %v (%s)", err, out)
+	}
+	scans := 0
+	for _, e := range steps.events {
+		if e == "scan host key" {
+			scans++
+		}
+	}
+	if scans != 1 {
+		t.Fatalf("it scanned the host key %d times: %q", scans, steps.events)
+	}
+}
+
+func TestCreateLocalWithAddFailingPrintsACommandThatWorks(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	stubCreateLocal(t)
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: false, proofFails: true})
+
+	_, err := executeWithInput(t, "", "--config", dir, "machines", "create-local", "sandbox", "--add",
+		"--no-aliases")
+	if err == nil {
+		t.Fatal("an unproved key was accepted")
+	}
+	want := "printf '%s' devmachine | devmachine --config " + dir + " machines add --name sandbox " +
+		"--address 127.0.0.1 --port 60022 --fingerprint " + hostkeys.Fingerprint(steps.hostKey) +
+		" --password-stdin --no-aliases"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("got %v\nwant it to contain %s", err, want)
 	}
 }

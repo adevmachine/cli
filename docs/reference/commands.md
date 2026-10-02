@@ -403,7 +403,9 @@ VM a moment ago and it answers only on this computer's loopback. `--key`,
 `--no-essentials` and `--no-aliases` mean what they mean for `machines
 add`, and are refused without `--add`. The name is checked against the
 configuration before any VM is made. If adding fails, the VM keeps
-running and nothing is written; the error says how to add it by hand.
+running and nothing is written; the error ends with the exact `machines
+add` command that adds it by hand, ready to copy. The host key is read
+once, and that same key is the one trusted.
 `--format json` prints the machine as `machines list` does, with its
 `key` once added; the progress goes to stderr. `start`, `stop` and `delete-local` only act on a local machine.
 
