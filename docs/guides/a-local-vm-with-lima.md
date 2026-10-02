@@ -17,7 +17,9 @@ up, make workspaces, add packages, open them. Nothing to buy, and you can
 throw it away when you are done.
 
 **You need:** a Mac or Linux computer and [Lima](https://lima-vm.io), which
-runs the virtual machine: `brew install lima`.
+runs the virtual machine: `brew install lima`. The VM runs Ubuntu 24.04 with
+2 CPUs, 4 GiB of memory and a 20 GiB disk; the first one downloads the image,
+which takes a few minutes.
 
 ## Before you start: machine, skills, workspace
 
@@ -99,11 +101,11 @@ Create a local devmachine VM called sandbox and set it up as a machine,
 then create a workspace acme on it with claude-code.
 ```
 
-The agent runs `machines create-local`, then `setup` or `machines add`. You
-still answer the fingerprint check yourself, even on a local VM — the agent
-tells you the address, port and password to use, but does not skip that
-step. After that, it creates the workspace, adds the package, and asks
-before running `sync`.
+The agent runs `machines create-local sandbox --add`, which asks nothing:
+the VM was made a moment ago and answers only on your computer, so there is
+no fingerprint for you to check. After that, it creates the workspace, adds
+the package, and asks before running `sync`. The steps it follows are in
+[set up devmachine with a coding agent](../agent-setup.md).
 
 **Check it:** `devmachine doctor --machine sandbox` passes every line after
 setup.

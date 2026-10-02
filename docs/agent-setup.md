@@ -5,24 +5,31 @@ that a person asked to set devmachine up for them. If you are that agent,
 follow it in order. Talk to the person in their language, ask one question at
 a time, and never guess an answer only they know.
 
-devmachine sets up a VPS for the person to code on. Each project gets its own
-account on the server, called a workspace, with its own tools, logins and
-coding agent. devmachine runs on the person's own computer and reaches the
-server over SSH.
+devmachine sets up a machine for the person to code on: a VPS they rent, or
+a virtual machine on their own computer. Each project gets its own account on
+that machine, called a workspace, with its own tools, logins and coding
+agent. devmachine runs on the person's own computer and reaches the machine
+over SSH.
 
 ## Rules
 
-- **Only the person confirms the server's identity.** `devmachine setup` shows
-  a code called the fingerprint and asks if it is trusted. The person checks
-  it against their provider's dashboard. Never answer that prompt yourself,
-  never pipe an answer into `setup`, never pass a flag that skips it.
+- **Your shell has no terminal.** A command that asks a question waits
+  forever for an answer you cannot type. Use the flags this page gives, which
+  ask nothing, and hand a question-asking command such as `devmachine setup`
+  to the person.
+- **Only the person confirms a server's identity.** A server shows a code
+  called the fingerprint. The person checks it against their provider's
+  dashboard. Pass `--fingerprint` only after they say it matches; never take
+  it from `machines scan` alone, and never answer a fingerprint prompt
+  yourself.
 - **Only the person types a password or signs in to a service.** When a step
   needs one, hand them the command.
-- **Show before you change a server.** Run `devmachine sync --check`, show
+- **Show before you change a machine.** Run `devmachine sync --check`, show
   the person what it will do, and run `devmachine sync --yes` only after they
   agree.
 - **Use commands, not files.** Change the configuration with `devmachine`
-  commands. Never edit `config.yml` by hand.
+  commands. Never edit `config.yml` by hand. To know where the configuration
+  is, run `devmachine config path` — do not guess a folder.
 - When something fails, read the error, then check
   [troubleshooting](troubleshooting.md), before trying anything else.
 
@@ -38,74 +45,154 @@ On macOS with Homebrew, that installs through the tap
 (`brew install mydevmachine/tap/devmachine`); otherwise it downloads and
 verifies the release binary for you.
 
-Then run `devmachine skills add`. It teaches you, and any other agent the
-person uses, the whole CLI. This only takes effect in a new session, so keep
-following this page either way.
+Then install the skills that teach you the whole CLI, naming your own
+harness — `claude`, `codex`, `pi` or `opencode`:
+
+```
+devmachine skills add --agent claude --yes
+```
+
+Without `--agent` and `--yes` it asks a question for each agent it finds, and
+you cannot answer it. If your harness is none of those four, skip this step.
+The skills take effect only in a new session, so keep following this page
+either way.
 
 ## 2. Ask what you need
 
-Ask one question at a time:
+First ask: **do they have a server, or do they want a machine on this
+computer?** A machine on this computer is free and nothing to buy, a good
+way to try devmachine; but the internet cannot reach it, so it cannot show an
+app at a public URL.
+
+Then ask one question at a time.
+
+For a server:
 
 1. The server's address — an IP or a hostname. It must run Debian or Ubuntu.
-2. Can they reach it as root over SSH — with a key already on the server, or
-   with the root password their provider gave them?
-3. A name for the first workspace, for example the project they will work on.
-4. Do they want a coding agent inside that workspace? Claude Code is a
-   package called `claude-code`.
-5. Only if they want an app visible at a URL: a domain, and whether it is at
+2. How they reach it as root over SSH: with a key already on the server, or
+   with the root password their provider gave them.
+3. A name for the server, for example `vps`.
+4. Only if they want an app visible at a URL: a domain, and whether it is at
    Hostinger or Cloudflare. Otherwise skip this.
 
-## 3. Hand over `setup`
+For a machine on this computer:
 
-Tell the person to run `devmachine setup` themselves — in Claude Code they can
-type `! devmachine setup` in this session. Tell them what it will ask: a name
-for the server, the address, the login (`root`) and port (`22`), and a domain
-(empty is fine). It also asks how the CLI should log in — the first option, a
-key of its own, is right when unsure — and shows the fingerprint to check
-against the provider's dashboard.
+1. A name for it, for example `sandbox`: lower-case letters, digits and
+   dashes.
 
-Once the machine answers, it asks two more questions: whether to write SSH
-host entries so `ssh <workspace>-devmachine` and `mosh` work from any
-terminal — **say yes**, that is what makes the workspace reachable outside
-this CLI too, including from an editor like VS Code Remote-SSH — and whether
-to reach the machine over Tailscale as well, which is the person's call.
+For both:
 
-Once they answer, `setup` sets up a key, checks it works, turns off password
-logins, and locks in the latest set of packages.
+1. A name for the first workspace, for example the project they will work on.
+2. Do they want a coding agent inside that workspace? Claude Code is a
+   package called `claude-code`.
 
-When they say it finished, run `devmachine doctor`. Every line should pass or
-warn; fix a warning about SSH aliases with `devmachine aliases --write`, and a
-missing credential with the `devmachine login` command it names.
+## 3a. A machine on this computer
 
-## 4. Create the workspace
+It needs [Lima](https://lima-vm.io), which runs the virtual machine. Check
+with `limactl --version`. If it is missing, install it with
+`brew install lima`; without Homebrew, follow
+[Lima's install guide](https://lima-vm.io/docs/installation/).
+
+Tell the person what the machine takes: Ubuntu 24.04 with 2 CPUs, 4 GiB of
+memory and a 20 GiB disk. The first run downloads the image and boots it,
+which takes a few minutes. Then run:
 
 ```
-devmachine workspaces new <name>
-devmachine packages add claude-code --workspace <name>
+devmachine machines create-local <name> --add
+```
+
+This creates the VM and adds it in one step, with no questions: it logs in
+with the VM's root password (public on purpose — the VM holds nothing real),
+installs a key, proves it, turns password login off, and writes the machine
+to the configuration. There is no fingerprint to check here: the VM answers
+only on this computer, a moment after this command made it.
+
+Go on to [step 4](#4-check-the-machine).
+
+## 3b. A server
+
+Read the server's fingerprint, without logging in and without trusting it:
+
+```
+devmachine machines scan --address <address>
+```
+
+Show the person the `SHA256:…` it prints and ask them to compare it with
+the one in their provider's dashboard or console. Go on only when they say
+it matches.
+
+**If their own key already logs in as root**, add the server yourself. Find
+the key's fingerprint with `ssh-add -l` and pass it as `agent:<fingerprint>`,
+or pass the path of its private key file instead:
+
+```
+devmachine machines add --address <address> --name <name> \
+  --fingerprint SHA256:… --key agent:SHA256:… [--domain <domain>]
+```
+
+**If only a password logs in**, the password must not pass through you.
+Hand the person the command, to run themselves after copying the password —
+in Claude Code they can type it after `!` in this session:
+
+```
+pbpaste | devmachine machines add --address <address> --name <name> \
+  --fingerprint SHA256:… --password-stdin [--domain <domain>]
+```
+
+`pbpaste` is macOS; on Linux, `xclip -o -selection clipboard` does the same.
+
+Either way, `machines add` asks nothing: it installs the key (a new one of
+the CLI's own when `--key` is left out), proves it works, turns off password logins, gives the machine the
+`essentials` package, and writes SSH host entries so
+`ssh <workspace>-devmachine` and `mosh` work from any terminal and from an
+editor like VS Code Remote-SSH. Add `--tailscale` only if the person wants to
+reach the machine over Tailscale too. `--domain` is accepted only for the
+first machine.
+
+**A person at a terminal of their own** can run `devmachine setup` instead:
+it asks the same questions one by one, and shows the fingerprint to check.
+That is the right command for a person, not for you.
+
+## 4. Check the machine
+
+Run `devmachine doctor`. Every line should pass or warn; fix a warning about
+SSH aliases with `devmachine aliases --write`, and a missing credential with
+the `devmachine login` command it names.
+
+The machine starts with the `essentials` package: base tools, git, a
+firewall, Caddy, and `devmachine-app`, what the macOS app reads from a
+machine. If they asked for a bare machine, add `--no-essentials` to
+`create-local --add` or `machines add`; if they then use the macOS app, add
+it alone with `devmachine packages add devmachine-app --machine <name>`.
+
+## 5. Create the workspace
+
+```
+devmachine workspaces new <workspace>
+devmachine packages add claude-code --workspace <workspace>
 devmachine sync --check
 ```
 
-The machine already has the `essentials` package from `setup` (base tools,
-git, a firewall, Caddy and what the macOS app reads). If they asked for a bare server, tell them to run
-`devmachine setup --no-essentials` instead. Skip the `claude-code` line if
-they wanted no coding agent. Show them the plan, and
-once they agree run `devmachine sync --yes`. The first sync takes a few
-minutes.
+Skip the `claude-code` line if they wanted no coding agent. With more than
+one machine configured, add `--machine <name>` to each of these. Show them
+the plan, and once they agree run `devmachine sync --yes`. The first sync
+takes a few minutes.
 
-## 5. Sign in to GitHub
+## 6. Sign in to GitHub
 
 If they use GitHub, hand them `devmachine login gh`. It opens a terminal on
-the server with GitHub's own sign-in page, which only they can finish. Then
+the machine with GitHub's own sign-in page, which only they can finish. Then
 run `devmachine sync --yes`, which copies that login into every workspace
 that uses GitHub.
 
-## 6. Hand it back
+## 7. Hand it back
 
-Tell them to enter the workspace with `devmachine ssh <name>` — or, if they
-said yes to SSH aliases, `ssh <name>-devmachine` works the same way from any
-terminal or editor. If they asked for a coding agent, they run `claude`
-there once to sign in.
+Tell them to enter the workspace with `devmachine ssh <workspace>`, or with
+`ssh <workspace>-devmachine` from any terminal or editor. If they asked for a
+coding agent, they run `claude` there once to sign in.
 
 Offer what they may want next, each in one short line:
 [guides](guides/index.md) — a site with its own domain and HTTPS, a
 Docker app, Claude Code opened from the phone, an agent in its own workspace.
+On a machine on this computer, an app is seen through
+`devmachine tunnel <workspace> <port>` instead of a URL.

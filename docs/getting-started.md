@@ -18,6 +18,17 @@ On macOS, that line installs through Homebrew if you have it. Prefer
 Homebrew directly? `brew install mydevmachine/tap/devmachine` works the same
 way.
 
+No server yet? Make a machine on your computer instead, with
+[Lima](https://lima-vm.io) (`brew install lima`), and use it in place of
+`setup`:
+
+```
+devmachine machines create-local sandbox --add
+```
+
+It creates a virtual machine and adds it in one step. See
+[try it on your own computer first](guides/a-local-vm-with-lima.md).
+
 `devmachine skills add` teaches your coding agent how to use devmachine. You
 can run it before `setup`, too.
 
