@@ -35,7 +35,9 @@ func (m *Manual) List(context.Context, string) ([]Record, error) {
 // and how to stop being manual for this registrar.
 func (m *Manual) Upsert(_ context.Context, zone string, r Record) error {
 	fmt.Fprintf(m.out, "No installed provider holds %s. Create this record by hand:\n\n", zone)
-	fmt.Fprintf(m.out, "  %s\t%s\t%s", r.Name, r.Type, r.Value)
+	// The full name, never "@": with no provider the zone is only a guess,
+	// and "@" read as the apex of the real zone points the wrong name.
+	fmt.Fprintf(m.out, "  %s\t%s\t%s", fullName(r.Name, zone), r.Type, r.Value)
 	if r.TTL > 0 {
 		fmt.Fprintf(m.out, "\t%d", r.TTL)
 	}

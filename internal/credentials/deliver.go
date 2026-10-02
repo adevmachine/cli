@@ -45,6 +45,12 @@ func EnvBody(d Declared, value string) string {
 		d.Env + "=" + shellQuote(value) + "\n"
 }
 
+// OwnsFile says the file is the CLI's own: the sourced env file it writes
+// and no tool edits, so a difference from the stored value is a rotation.
+func OwnsFile(d Declared) bool {
+	return isEnvDelivery(d)
+}
+
 // Body is exactly what lands in the file for a value.
 func Body(d Declared, value string) string {
 	if isEnvDelivery(d) {

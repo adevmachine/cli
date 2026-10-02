@@ -178,7 +178,7 @@ func TestThePresentScriptReportsTheDigestOfWhatIsThere(t *testing.T) {
 	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("sh", "-c", presentScript)
+	cmd := exec.Command("sh", "-c", "digest=1\n"+presentScript)
 	cmd.Stdin = strings.NewReader("probe\x1f\x1f" + file + "\nmissing\x1f\x1f" + dir + "/nope\n")
 	out, err := cmd.Output()
 	if err != nil {
@@ -199,5 +199,34 @@ func TestLookReadsTheDigestBack(t *testing.T) {
 	}
 	if !present["gh"] || present["alice/claude"] || digests["gh"] != "abc123" || digests["alice/claude"] != "" {
 		t.Fatalf("%v %v", present, digests)
+	}
+}
+
+func TestThePresentScriptNeverHashesThroughALink(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/target", []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(dir+"/target", dir+"/env"); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", "digest=1\n"+presentScript)
+	cmd.Stdin = strings.NewReader("probe\x1f\x1f" + dir + "/env\n")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "probe\tyes\t\n" {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestPresentAsksForNoDigest(t *testing.T) {
+	c := &recordingClient{}
+	if _, err := Present(context.Background(), c, []Declared{machineLogin("gh")}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(c.commands[0], "digest=\n") {
+		t.Fatalf("doctor and list must not hash anything: %q", c.commands[0][:20])
 	}
 }

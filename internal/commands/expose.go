@@ -132,6 +132,9 @@ type exposeResult struct {
 	// only the configuration has the change.
 	Status string `json:"status"`
 	Note   string `json:"note,omitempty"`
+	// DNSError says the name was not pointed at the machine, and why: the
+	// site is on Caddy, but nobody finds it until the printed record exists.
+	DNSError string `json:"dns_error,omitempty"`
 }
 
 // routesChange is the routes file the workspace's share of cfg makes, the
@@ -388,11 +391,15 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			} else {
 				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v); the DNS record is printed to create by hand\n", serving.Name, err)
 			}
-			if err := pointDNSAtMachine(cmd.Context(), dir, target{machine: serving}, host, client, cmd.ErrOrStderr()); err != nil {
+			dnsErr, err := pointDNSAtMachine(cmd.Context(), dir, target{machine: serving}, host, client, cmd.ErrOrStderr())
+			if err != nil {
 				return err
 			}
 
 			result := exposeResult{Host: host, Port: port, Workspace: workspace, Via: via, Status: "pending"}
+			if dnsErr != nil {
+				result.DNSError = dnsErr.Error()
+			}
 			var applyErr error
 			if noApply {
 				result.Note = "recorded only (--no-apply)"
@@ -453,13 +460,13 @@ func routeLine(r config.Route) string {
 // that refuses the write does not stop the publish: it says why, prints the
 // record to create by hand, and Caddy still gets the route. Stopping here left
 // a route recorded and on no machine, with an error about DNS only.
-func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out io.Writer) error {
+func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string, client remote.Client, out io.Writer) (dnsErr, err error) {
 	if err := requiresAddress(tgt.machine, "expose"); err != nil {
-		return err
+		return nil, err
 	}
 	addresses, err := remote.Resolve(tgt.machine)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	address, private := publicAddress(addresses)
 	if private {
@@ -467,27 +474,31 @@ func pointDNSAtMachine(ctx context.Context, dir string, tgt target, host string,
 			tgt.machine.Name, host, address)
 	}
 
-	manual := func(zone string, why error) error {
-		fmt.Fprintf(out, "the DNS record for %s was not written (%v)\n", host, why)
-		rec := dns.Record{Name: labelFor(host, zone), Type: "A", Value: address}
-		return dns.NewManual(out).Upsert(ctx, zone, rec)
+	byHand := func(zone string, why error) (error, error) {
+		name := host
+		if zone != host {
+			name = labelFor(host, zone) + " (in " + zone + ")"
+		}
+		fmt.Fprintf(out, "warning: the DNS record for %s was not written: %v\n", host, why)
+		fmt.Fprintf(out, "Create this record by hand:\n\n  %s\tA\t%s\n\n", name, address)
+		return why, nil
 	}
 	base, err := provision.Base(tgt.machine)
 	if err != nil {
-		return manual(host, err)
+		return byHand(host, err)
 	}
 	choice, err := dns.Choose(ctx, dir, tgt.machine.Name, base, host, "", client, out)
 	if err != nil {
-		return manual(host, err)
+		return byHand(host, fmt.Errorf("the DNS provider setup is broken: %w", err))
 	}
 	rec := dns.Record{Name: labelFor(host, choice.Zone), Type: "A", Value: address}
 	if err := choice.Provider.Upsert(ctx, choice.Zone, rec); err != nil {
 		if choice.Name == dns.ProviderManual {
-			return err
+			return nil, err
 		}
-		return manual(choice.Zone, fmt.Errorf("%s refused it: %w", choice.Name, err))
+		return byHand(choice.Zone, fmt.Errorf("%s refused it: %w", choice.Name, err))
 	}
-	return nil
+	return nil, nil
 }
 
 // publicAddress is the address a public name should point at: the first one

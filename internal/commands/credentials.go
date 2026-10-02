@@ -281,10 +281,11 @@ func newCredentialsPushCmd(opts *options) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "push",
 		Short: "Deliver the values a machine is missing or holds an old copy of",
-		Long: "Only what is missing, or differs from the value stored here, is " +
-			"written: a rotated token reaches the machine on the next push. " +
-			"The machine is asked only for a SHA-256 of each file, never the " +
-			"value. A login is skipped — nobody " +
+		Long: "Only what is missing is written, and a token the CLI delivered " +
+			"as an env file that differs from the value stored here: a rotated " +
+			"token reaches the machine on the next push. The machine is asked " +
+			"only for a SHA-256 of that file, never the value. A file a tool " +
+			"keeps for itself is never rewritten once it is there. A login is skipped — nobody " +
 			"can push a browser session — and a credential nobody stored a " +
 			"value for is named, because a push that quietly does nothing is " +
 			"the failure this command exists to prevent.\n\n" +
@@ -348,11 +349,7 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 				"a login cannot be pushed: run `" + credentials.LoginCommand(d) + "`",
 			})
 		case present[credentials.Key(d)]:
-			changed, err := rotated(found.dir, d, stored, digests[credentials.Key(d)])
-			if err != nil {
-				return err
-			}
-			if !changed {
+			if !rotated(found.dir, d, stored, digests[credentials.Key(d)]) {
 				report.Skipped = append(report.Skipped, skippedJSON{credentials.Key(d), "already there"})
 				continue
 			}
@@ -474,18 +471,22 @@ func runPush(cmd *cobra.Command, opts *options, check, yes bool) error {
 }
 
 // rotated says whether the value stored here differs from the file on the
-// machine. A machine that could not hash the file, or a value nobody stored
-// here, is never taken for a difference: an unknown is not a change.
-func rotated(dir string, d credentials.Declared, stored map[string]bool, digest string) (bool, error) {
+// machine. Only a file this CLI owns can be rotated — the sourced env file it
+// writes and nothing else touches. A file a tool keeps (a session it renews,
+// a config it adds to) differs from the stored value for good reasons, and
+// writing the stored one back would undo them. A machine that could not hash
+// the file, or a value that cannot be read here, is never taken for a
+// difference: an unknown is not a change.
+func rotated(dir string, d credentials.Declared, stored map[string]bool, digest string) bool {
 	name := secretName(d, stored)
-	if digest == "" || d.Kind == packages.KindManual || !stored[name] {
-		return false, nil
+	if digest == "" || !credentials.OwnsFile(d) || !stored[name] {
+		return false
 	}
 	value, err := secrets.Get(dir, name)
 	if err != nil {
-		return false, err
+		return false
 	}
-	return credentials.Digest(d, value) != digest, nil
+	return credentials.Digest(d, value) != digest
 }
 
 func pushCommandLine(check bool) string {

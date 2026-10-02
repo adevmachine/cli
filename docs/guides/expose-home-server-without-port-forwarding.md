@@ -78,16 +78,17 @@ devmachine machines add
 ```
 
 When it asks for the address, give its private one — the name Tailscale
-gave it, as `tailscale:homelab`, or an address such as `100.64.0.7`. Then
-let devmachine manage the network package there too, so it knows how to
-resolve that name:
+gave it, as `tailscale:homelab`, or an address such as `100.64.0.7`. Add
+the network package to it too, so it stays on the network after a rebuild:
 
 ```
 devmachine packages add tailscale --machine homelab
 devmachine sync --machine homelab
 ```
 
-`devmachine resolve --machine homelab` shows the address the VPS will use.
+A `tailscale:` name is resolved on your own computer, so your computer has
+to be on the private network as well. `devmachine resolve --machine homelab`
+shows the address the VPS will proxy to.
 
 ### 2. Make a workspace and start the service
 

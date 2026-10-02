@@ -120,7 +120,8 @@ shows only the name `cloudflare`, never the value.
 devmachine credentials push
 ```
 
-`push` writes only what is missing. It skips `gh` and `claude` — nobody can
+`push` writes what is missing, and a token it delivered before whose value
+you have since changed with `secrets set`. It skips `gh` and `claude` — nobody can
 push a browser login — and delivers the `cloudflare` token to
 `/etc/devmachine/cloudflare/env` on the machine, where the package reads it.
 Nothing is printed: not the plan, not the result.

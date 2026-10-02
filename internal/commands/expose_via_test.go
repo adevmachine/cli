@@ -407,7 +407,10 @@ func TestExposeAddStillPublishesWhenTheProviderRefusesTheRecord(t *testing.T) {
 	if !strings.Contains(out, "Create this record by hand") || !strings.Contains(out, "203.0.113.10") {
 		t.Fatalf("the output must say what to create by hand:\n%s", out)
 	}
-	if !strings.Contains(out, "app\tA\t203.0.113.10") {
+	if !strings.Contains(got.DNSError, "hostinger refused it") {
+		t.Fatalf("the JSON must say the record was not written: %+v", got)
+	}
+	if !strings.Contains(out, "app (in example.com)\tA\t203.0.113.10") {
 		t.Fatalf("the record is named inside the provider's zone:\n%s", out)
 	}
 	if !strings.Contains(out, "hostinger") {

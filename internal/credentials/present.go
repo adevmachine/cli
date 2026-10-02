@@ -27,9 +27,12 @@ func Place(d Declared) string {
 }
 
 // presentScript answers, for each line it reads, whether the place exists
-// and, when it is a file root can read, the SHA-256 of what it holds: enough
-// to tell a rotated value from the one delivered, without the value ever
-// leaving the machine.
+// and, when $digest is set and it is a regular file root can read, the
+// SHA-256 of what it holds: enough to tell a rotated value from the one
+// delivered, without the value ever leaving the machine. A symbolic link is
+// never hashed: root following one out of a workspace's home could be made to
+// read anything. The file is hashed through stdin so its name, which
+// sha256sum escapes, never reaches the output.
 //
 // One command for every credential: three of them must not be three
 // connections, because `doctor` and `credentials list` both ask about the lot.
@@ -51,11 +54,11 @@ while IFS="$sep" read -r key user place; do
 	esac
 	if [ -n "$home" ] && [ -e "$path" ]; then
 		sum=
-		if [ -f "$path" ] && [ -r "$path" ]; then
+		if [ -n "$digest" ] && [ -f "$path" ] && [ ! -L "$path" ] && [ -r "$path" ]; then
 			if command -v sha256sum >/dev/null 2>&1; then
-				sum=$(sha256sum "$path" | cut -d' ' -f1)
+				sum=$(sha256sum < "$path" | cut -d' ' -f1)
 			elif command -v shasum >/dev/null 2>&1; then
-				sum=$(shasum -a 256 "$path" | cut -d' ' -f1)
+				sum=$(shasum -a 256 < "$path" | cut -d' ' -f1)
 			fi
 		fi
 		printf '%s%syes%s%s\n' "$key" "$tab" "$tab" "$sum"
@@ -71,7 +74,7 @@ done
 // its tool keeps the session — is left out of the answer rather than reported
 // missing. "I cannot tell" and "it is not there" are different things.
 func Present(ctx context.Context, c remote.Client, wanted []Declared) (map[string]bool, error) {
-	present, _, err := Look(ctx, c, wanted)
+	present, _, err := look(ctx, c, wanted, false)
 	return present, err
 }
 
@@ -79,6 +82,10 @@ func Present(ctx context.Context, c remote.Client, wanted []Declared) (map[strin
 // digest is empty when the machine could not say: a directory, a file root
 // cannot read, or no tool to hash with.
 func Look(ctx context.Context, c remote.Client, wanted []Declared) (map[string]bool, map[string]string, error) {
+	return look(ctx, c, wanted, true)
+}
+
+func look(ctx context.Context, c remote.Client, wanted []Declared, digest bool) (map[string]bool, map[string]string, error) {
 	present := map[string]bool{}
 	digests := map[string]string{}
 
@@ -96,7 +103,11 @@ func Look(ctx context.Context, c remote.Client, wanted []Declared) (map[string]b
 		return present, digests, nil
 	}
 
-	out, err := c.RunInput(ctx, presentScript, strings.NewReader(list.String()))
+	script := "digest=\n" + presentScript
+	if digest {
+		script = "digest=1\n" + presentScript
+	}
+	out, err := c.RunInput(ctx, script, strings.NewReader(list.String()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("looking for the credentials on the machine: %w", err)
 	}

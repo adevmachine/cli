@@ -549,3 +549,19 @@ func TestPushLeavesAValueAloneWhenTheMachineCannotSayWhatItHolds(t *testing.T) {
 		t.Fatalf("nothing is known to differ, so nothing is written: %#v", client.delivered)
 	}
 }
+
+func TestPushNeverRewritesAFileAToolKeeps(t *testing.T) {
+	dir := configWith(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n    packages: [npm-auth]\n")
+	writeCredentialPackage(t, dir, "npm-auth", packages.ScopeMachine,
+		"  - name: probe-npmrc\n    kind: file\n    scope: machine\n    path: /root/.npmrc\n")
+	storeSecret(t, dir, "probe-npmrc", "//registry/:_authToken=stored")
+	client := answering(t, "probe-npmrc\tyes\t0000000000000000000000000000000000000000000000000000000000000000")
+
+	out, err := execute(t, "--config", dir, "credentials", "push", "--yes")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.delivered) != 0 {
+		t.Fatalf("a file the tool renews must stay as it is: %#v", client.delivered)
+	}
+}
