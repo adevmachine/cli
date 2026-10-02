@@ -284,3 +284,16 @@ func TestMachinesAddReplacesAStaleHostKeyForANameNotConfigured(t *testing.T) {
 		t.Fatalf("the new host key is not the trusted one: %v", err)
 	}
 }
+
+func TestMachinesAddWithQuestionsAndNoConfigurationSendsToSetup(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "devmachine")
+	steps := stubBootstrap(t, bootstrapStubs{keyWorks: true})
+
+	_, err := executeWithInput(t, "sandbox\n198.51.100.7\nroot\n22\n1\n", "--config", dir, "machines", "add")
+	if err == nil || !strings.Contains(err.Error(), "devmachine setup") || !strings.Contains(err.Error(), "--address") {
+		t.Fatalf("got %v", err)
+	}
+	if len(steps.events) != 0 {
+		t.Fatalf("it reached a server first: %q", steps.events)
+	}
+}

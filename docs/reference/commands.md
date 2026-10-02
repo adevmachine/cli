@@ -88,6 +88,10 @@ release pinned, `defaults.workspace`, the machine with `essentials`, and
 | reach it over Tailscale? | `--tailscale` |
 | install the agent skills? | run `devmachine skills add` afterwards |
 
+Only `--address` does this. `machines add` with questions and no
+`config.yml` stops and sends you to `setup`, which asks the same
+questions plus the domain.
+
 Unlike `setup`, it writes `config.yml` only once the bootstrap worked, so
 a run that fails leaves no configuration behind. Workspaces then come
 from `devmachine workspaces new`, and packages from `devmachine packages

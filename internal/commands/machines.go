@@ -320,6 +320,11 @@ func newMachinesRmCmd(opts *options) *cobra.Command {
 func runMachinesAdd(ctx context.Context, dir string, in io.Reader, out io.Writer, opts setupOptions) error {
 	current, err := config.Load(dir)
 	fresh := errors.Is(err, os.ErrNotExist)
+	if fresh && !opts.unattended() {
+		return fmt.Errorf("there is no %s yet: `devmachine setup` asks for the first machine, domain "+
+			"included, and `machines add --address …` adds it without questions",
+			filepath.Join(dir, config.FileName))
+	}
 	if fresh {
 		current, err = config.Config{}, nil
 	}
