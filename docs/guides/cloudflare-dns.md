@@ -42,7 +42,7 @@ Go to [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profi
 and select **Create Token**. Use the **Edit zone DNS** template, and scope
 it to the one zone you want devmachine to manage (`example.com`). This
 gives the token `Zone / DNS / Edit` on that zone only — not your whole
-account, and not the Domains portfolio.
+account.
 
 ### 2. Add the package
 
@@ -77,10 +77,13 @@ devmachine dns providers
 ```
 
 This is the first thing to run when DNS does not do what you expect: it
-lists every installed provider and the zones it can see. If your token has
-DNS permission but not Domains portfolio permission, Cloudflare can still
-return a 403 on the zone list — set `cloudflare.zones` (a machine setting)
-to the zone names by hand in that case.
+lists every installed provider and the zones it can see. A token from the
+**Edit zone DNS** template sees exactly the zones it is scoped to, so there
+is nothing to list by hand. If your zone is not there, the token does not
+cover it: every `cloudflare` command finds a zone by its name through that
+same lookup, so `dns` and `expose` cannot reach it either. Edit the token
+to include the zone, then `secrets set cloudflare` and `credentials push`
+again if you made a new one.
 
 ```
 devmachine dns list example.com
