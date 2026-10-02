@@ -263,3 +263,38 @@ func TestProxyReturnsWhenTheMachineClosesTheConnection(t *testing.T) {
 		t.Fatalf("got %q", out.String())
 	}
 }
+
+func TestUpstreamPrefersAPrivateNetworkAndNeverLoopback(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   []Address
+		want string
+	}{
+		{"private network first", []Address{
+			{Address: "203.0.113.7", Source: "203.0.113.7"},
+			{Address: "100.64.0.7", Source: "tailscale:lab", Package: "tailscale"},
+		}, "100.64.0.7"},
+		{"loopback skipped", []Address{
+			{Address: "127.0.0.1", Source: "127.0.0.1"},
+			{Address: "localhost", Source: "localhost"},
+			{Address: "::1", Source: "::1"},
+			{Address: "192.0.2.4", Source: "192.0.2.4"},
+		}, "192.0.2.4"},
+	} {
+		got, err := Upstream(Resolution{Machine: "lab", Addresses: tc.in})
+		if err != nil || got != tc.want {
+			t.Fatalf("%s: got %q, %v", tc.name, got, err)
+		}
+	}
+}
+
+func TestUpstreamSaysWhyThereIsNone(t *testing.T) {
+	_, err := Upstream(Resolution{
+		Machine:   "lab",
+		Addresses: []Address{{Address: "127.0.0.1", Source: "127.0.0.1"}},
+		Dropped:   []Dropped{{Source: "tailscale:lab", Reason: "tailscale is not running"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "lab") || !strings.Contains(err.Error(), "tailscale is not running") {
+		t.Fatalf("got %v", err)
+	}
+}

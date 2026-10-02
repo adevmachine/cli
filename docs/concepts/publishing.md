@@ -35,6 +35,15 @@ site back after a rebuild, or publishes it when the machine was out of
 reach. See
 [why a published site lives in the configuration](../how-it-works/published-sites.md).
 
+## A machine the internet cannot reach
+
+A port on a machine with no public address — a VM on your desk, a box
+behind NAT — is published by another machine that has Caddy:
+`expose add acme 8080 --host app.example.com --via edge`. Visitors need
+nothing; only the two machines have to reach each other, over the address
+the workspace's machine has in `hosts`. See
+[publishing through another machine](../how-it-works/published-sites.md#publishing-through-another-machine).
+
 ## Why `expose` asks first
 
 `expose add` tells you, before it does anything, that the port becomes

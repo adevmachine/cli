@@ -86,3 +86,42 @@ func TestParseReadsTheOldPerHostFile(t *testing.T) {
 		t.Fatalf("%+v", sites)
 	}
 }
+
+func TestRenderWorkspaceProxiesToAnotherMachineWhenTheSiteSaysSo(t *testing.T) {
+	got := RenderWorkspace("alice", []Site{
+		{Host: "app.example.com", Port: 8080, Upstream: "100.64.0.7"},
+		{Host: "v6.example.com", Port: 8081, Upstream: "fd7a:115c:a1e0::7"},
+		{Host: "local.example.com", Port: 8082},
+	})
+	for _, want := range []string{
+		"reverse_proxy 100.64.0.7:8080",
+		"reverse_proxy [fd7a:115c:a1e0::7]:8081",
+		"reverse_proxy 127.0.0.1:8082",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("want %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestParseReadsTheUpstreamBack(t *testing.T) {
+	content := RenderWorkspace("alice", []Site{
+		{Host: "app.example.com", Port: 8080, Upstream: "100.64.0.7"},
+		{Host: "v6.example.com", Port: 8081, Upstream: "fd7a:115c:a1e0::7"},
+		{Host: "local.example.com", Port: 8082},
+	})
+	got := Parse(content)
+	want := []Site{
+		{Host: "app.example.com", Port: 8080, Upstream: "100.64.0.7", Workspace: "alice"},
+		{Host: "v6.example.com", Port: 8081, Upstream: "fd7a:115c:a1e0::7", Workspace: "alice"},
+		{Host: "local.example.com", Port: 8082, Workspace: "alice"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("site %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

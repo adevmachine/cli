@@ -75,6 +75,10 @@ type MachinePlan struct {
 	// ResolveMachine refuses a route with nowhere to go.
 	Routes   []Route
 	SitesDir string
+	// OtherWorkspaces names every workspace that lives on another machine,
+	// when caddy is here. This machine owns their routes file too: it is
+	// written for the routes sent here with `via` and removed otherwise.
+	OtherWorkspaces []string
 	// PreviousExtensions is the absolute path of every extension file the
 	// last successful sync of this machine wrote, from the lock. It is empty
 	// on the first run after upgrading, and then Generate removes nothing —
@@ -88,6 +92,12 @@ type Route struct {
 	Workspace string `json:"workspace"`
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
+	// From is the machine the port is on, when it is not this one.
+	From string `json:"from,omitempty"`
+	// Upstream is From's address as this machine reaches it. ResolveMachine
+	// never sets it, which keeps it pure; the caller resolves it before
+	// Generate, the way it carries PreviousExtensions over.
+	Upstream string `json:"upstream,omitempty"`
 }
 
 // ResolveMachine works out the machine's own packages, each of its
@@ -123,15 +133,25 @@ func ResolveMachine(store *Store, cfg config.Config, machine config.Machine, cli
 	plan.Extensions = extensions
 
 	plan.SitesDir = sitesDirOf(plan)
-	for _, w := range cfg.WorkspacesOn(machine.Name) {
-		for _, r := range w.Routes {
-			if plan.SitesDir == "" {
-				return MachinePlan{}, fmt.Errorf(
-					"workspace %q publishes %s, but caddy is not on machine %q: "+
-						"add it with `devmachine packages add caddy --machine %s`",
-					w.Name, r.Host, machine.Name, machine.Name)
+	for _, served := range cfg.RoutesServedBy(machine.Name) {
+		w, r := served.Workspace, served.Route
+		if plan.SitesDir == "" {
+			return MachinePlan{}, fmt.Errorf(
+				"workspace %q publishes %s, but caddy is not on machine %q: "+
+					"add it with `devmachine packages add caddy --machine %s`",
+				w.Name, r.Host, machine.Name, machine.Name)
+		}
+		route := Route{Workspace: w.Name, Host: r.Host, Port: r.Port}
+		if r.Via != "" {
+			route.From = w.Machine
+		}
+		plan.Routes = append(plan.Routes, route)
+	}
+	if plan.SitesDir != "" {
+		for _, w := range cfg.Workspaces {
+			if !slices.ContainsFunc(cfg.WorkspacesOn(machine.Name), func(here config.Workspace) bool { return here.Name == w.Name }) {
+				plan.OtherWorkspaces = append(plan.OtherWorkspaces, w.Name)
 			}
-			plan.Routes = append(plan.Routes, Route{Workspace: w.Name, Host: r.Host, Port: r.Port})
 		}
 	}
 	return plan, nil

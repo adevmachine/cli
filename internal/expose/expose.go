@@ -3,6 +3,7 @@ package expose
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +15,19 @@ type Site struct {
 	Port int    // 8080
 	// Workspace is whose port it is; empty for the machine's own.
 	Workspace string
+	// Upstream is the address of the machine the port is on, when that is
+	// not the machine serving the site; empty means this machine.
+	Upstream string
+}
+
+const loopback = "127.0.0.1"
+
+func (s Site) target() string {
+	address := s.Upstream
+	if address == "" {
+		address = loopback
+	}
+	return net.JoinHostPort(address, strconv.Itoa(s.Port))
 }
 
 // Render returns the Caddy block for a site.
@@ -51,7 +65,7 @@ func RenderWorkspace(workspace string, sites []Site) string {
 	fmt.Fprintf(&b, "# run `devmachine sync`; a change made here is undone by the next run.\n")
 	fmt.Fprintf(&b, "# workspace: %s\n", workspace)
 	for _, s := range sites {
-		fmt.Fprintf(&b, "\n%s {\n\treverse_proxy 127.0.0.1:%d\n}\n", s.Host, s.Port)
+		fmt.Fprintf(&b, "\n%s {\n\treverse_proxy %s\n}\n", s.Host, s.target())
 	}
 	return b.String()
 }
@@ -63,7 +77,7 @@ func WorkspaceFileName(workspace string) string {
 
 var (
 	reBlock     = regexp.MustCompile(`^([^\s{#]+)\s*\{`)
-	rePort      = regexp.MustCompile(`reverse_proxy 127\.0\.0\.1:(\d+)`)
+	reProxy     = regexp.MustCompile(`reverse_proxy\s+(\S+)`)
 	reWorkspace = regexp.MustCompile(`^#\s*workspace:\s*(\S+)`)
 )
 
@@ -87,11 +101,25 @@ func Parse(content string) []Site {
 			current = &out[len(out)-1]
 			continue
 		}
-		if m := rePort.FindStringSubmatch(line); m != nil && current != nil {
-			current.Port, _ = strconv.Atoi(m[1])
+		if m := reProxy.FindStringSubmatch(line); m != nil && current != nil {
+			current.Upstream, current.Port = splitTarget(m[1])
 		}
 	}
 	return out
+}
+
+// splitTarget reads `address:port` back. A target that is not one, such as a
+// URL written by hand, reads as port 0, which `list` reports as differing.
+func splitTarget(target string) (string, int) {
+	address, port, err := net.SplitHostPort(target)
+	if err != nil {
+		return "", 0
+	}
+	n, _ := strconv.Atoi(port)
+	if address == loopback {
+		address = ""
+	}
+	return address, n
 }
 
 // FileChange is what one routes file in caddy's sites directory must become.

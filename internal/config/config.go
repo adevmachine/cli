@@ -145,6 +145,15 @@ type Machine struct {
 type Route struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
+	// Via names the machine whose Caddy serves this route, for a workspace
+	// on a machine the internet cannot reach. Empty means the workspace's own.
+	Via string `yaml:"via,omitempty"`
+}
+
+// ServedRoute is a route together with the workspace that owns it.
+type ServedRoute struct {
+	Workspace Workspace
+	Route     Route
 }
 
 // Workspace is an environment: one Linux user on one machine.
@@ -391,6 +400,28 @@ func (c Config) WorkspacesOn(machine string) []Workspace {
 	return out
 }
 
+// ServingMachine names the machine whose Caddy serves a route.
+func (c Config) ServingMachine(w Workspace, r Route) string {
+	if r.Via != "" {
+		return r.Via
+	}
+	return w.resolvedMachine(c)
+}
+
+// RoutesServedBy returns every route a machine's Caddy serves, in workspace
+// order: its own workspaces' routes and those sent to it with `via`.
+func (c Config) RoutesServedBy(machine string) []ServedRoute {
+	var out []ServedRoute
+	for _, w := range c.Workspaces {
+		for _, r := range w.Routes {
+			if c.ServingMachine(w, r) == machine {
+				out = append(out, ServedRoute{Workspace: w, Route: r})
+			}
+		}
+	}
+	return out
+}
+
 // RouteOwner finds the workspace and route that publish a host.
 func (c Config) RouteOwner(host string) (Workspace, Route, bool) {
 	for _, w := range c.Workspaces {
@@ -502,6 +533,13 @@ func (c Config) Validate() error {
 				return fmt.Errorf("workspace %q publishes %s on port %d: use a port between 1 and 65535", w.Name, r.Host, r.Port)
 			case hosts[r.Host] != "":
 				return fmt.Errorf("%s is published twice, by %q and %q: one hostname reaches one port", r.Host, hosts[r.Host], w.Name)
+			case r.Via == "":
+			case !seen[r.Via]:
+				return fmt.Errorf("workspace %q publishes %s via %q, but there is no machine with that name", w.Name, r.Host, r.Via)
+			case r.Via == w.resolvedMachine(c):
+				return fmt.Errorf("workspace %q publishes %s via %q, which is its own machine: remove `via`", w.Name, r.Host, r.Via)
+			case selfByName[r.Via]:
+				return fmt.Errorf("workspace %q publishes %s via %q, which is this computer: a site is served by a machine the internet reaches", w.Name, r.Host, r.Via)
 			}
 			hosts[r.Host] = w.Name
 		}
@@ -1157,6 +1195,7 @@ func routesNode(routes []Route) *yaml.Node {
 		item := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle}
 		setField(item, "host", stringNode(r.Host))
 		setField(item, "port", intNode(r.Port))
+		setField(item, "via", stringNode(r.Via))
 		node.Content = append(node.Content, item)
 	}
 	return node

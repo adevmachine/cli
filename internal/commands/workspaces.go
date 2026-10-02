@@ -3,6 +3,7 @@ package commands
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -14,6 +15,7 @@ import (
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/expose"
 	"github.com/mydevmachine/devmachine/internal/keys"
+	"github.com/mydevmachine/devmachine/internal/remote"
 	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
@@ -498,15 +500,24 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			}
 			defer client.Close()
 
-			sitesDir, sitesErr := caddySitesDir(cmd.Context(), dir, cfg, machine)
-			if sitesErr != nil && len(w.Routes) > 0 {
-				hosts := make([]string, 0, len(w.Routes))
-				for _, r := range w.Routes {
-					hosts = append(hosts, r.Host)
+			var local []string
+			for _, r := range w.Routes {
+				if r.Via == "" {
+					local = append(local, r.Host)
 				}
+			}
+			sitesDir, sitesErr := caddySitesDir(cmd.Context(), dir, cfg, machine)
+			if sitesErr != nil && len(local) > 0 {
 				return fmt.Errorf("%s publishes %s, and the file that serves it cannot be found (%v): "+
 					"destroying the account would leave Caddy serving it. `devmachine expose rm` each host "+
-					"and `devmachine sync` first", w.Name, strings.Join(hosts, ", "), sitesErr)
+					"and `devmachine sync` first", w.Name, strings.Join(local, ", "), sitesErr)
+			}
+			elsewhere, err := servingClients(cmd.Context(), dir, cfg, w)
+			for _, c := range elsewhere {
+				defer c.client.Close()
+			}
+			if err != nil {
+				return err
 			}
 
 			quotedUser := quoteForShell(user)
@@ -533,6 +544,13 @@ func newWorkspacesDestroyCmd(opts *options) *cobra.Command {
 			if err != nil {
 				record(opts, target{machine: machine, workspace: w.Name}, "workspaces destroy "+w.Name, false)
 				return fmt.Errorf("destroying %s on %s: %w", w.Name, machine.Name, err)
+			}
+
+			for _, c := range elsewhere {
+				if _, err := c.client.Run(cmd.Context(), c.script); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "%s still has %s's routes file (%v): `devmachine expose list --machine %s` shows it\n",
+						c.machine, w.Name, err, c.machine)
+				}
 			}
 
 			if err := config.RemoveWorkspace(dir, w.Name); err != nil {
@@ -797,4 +815,45 @@ func settingValue(text string) any {
 		return text
 	}
 	return value
+}
+
+// servingClient is a machine that serves a workspace's sites through `via`,
+// and the script that takes them off it.
+type servingClient struct {
+	machine string
+	client  remote.Client
+	script  string
+}
+
+// servingClients reaches every machine that serves the workspace's sites with
+// `via`, before anything is destroyed: once the workspace is out of the
+// configuration, nothing would remove its file there again.
+func servingClients(ctx context.Context, dir string, cfg config.Config, w config.Workspace) ([]servingClient, error) {
+	var out []servingClient
+	seen := map[string]bool{}
+	for _, r := range w.Routes {
+		if r.Via == "" || seen[r.Via] {
+			continue
+		}
+		seen[r.Via] = true
+		m, err := cfg.Machine(r.Via)
+		if err != nil {
+			return out, err
+		}
+		sitesDir, err := caddySitesDir(ctx, dir, cfg, m)
+		if err != nil {
+			return out, fmt.Errorf("%s publishes %s through %s, whose Caddy cannot be found (%v): "+
+				"`devmachine expose rm %s` first", w.Name, r.Host, m.Name, err, r.Host)
+		}
+		client, _, err := dialAdmin(ctx, m)
+		if err != nil {
+			return out, fmt.Errorf("%s publishes %s through %s, which could not be reached (%v): destroying the "+
+				"account would leave Caddy there serving it. `devmachine expose rm %s` once %s answers, or try again",
+				w.Name, r.Host, m.Name, err, r.Host, m.Name)
+		}
+		routesFile := path.Join(sitesDir, expose.WorkspaceFileName(w.Name))
+		out = append(out, servingClient{machine: m.Name, client: client,
+			script: "rm -f " + quoteForShell(routesFile) + " && (systemctl reload caddy || true)"})
+	}
+	return out, nil
 }

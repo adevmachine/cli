@@ -664,7 +664,7 @@ first. A name is always the full name (or the zone itself for the apex).
 only you should reach, uses [`devmachine tunnel`](#tunnel) instead.
 
 ```
-devmachine expose add <workspace> <port> --host <host> [--check] [--publish] [--no-apply]
+devmachine expose add <workspace> <port> --host <host> [--via <machine>] [--check] [--publish] [--no-apply]
 devmachine expose list
 devmachine expose rm <host> [--check] [--yes] [--no-apply]
 ```
@@ -693,17 +693,29 @@ get a yes. `--publish` is the non-interactive way past that.
   become (`+` added, `-` removed).
 - With `--format json` it prints `host`, `port`, `workspace`, `applied`
   (`true` once Caddy serves it) and `status` (`published` or `pending`),
-  with a `note` saying why when it is pending.
+  with a `note` saying why when it is pending. A site published with
+  `--via` also carries `via`, and a `note` when that machine cannot reach
+  the port.
+- `--via <machine>` publishes through another machine's Caddy, for a
+  workspace on a machine the internet cannot reach (a VM on your desk, a
+  box behind NAT). The route is recorded with `via:`, the name points at
+  that machine, and its Caddy proxies to the workspace's machine at the
+  address its `hosts` give — one from a private network first, never a
+  loopback one. Without `--via`, a workspace whose machine has no caddy is
+  refused with the machines that have it. See
+  [publishing through another machine](../how-it-works/published-sites.md#publishing-through-another-machine).
 
 See [why a published site lives in the configuration](../how-it-works/published-sites.md).
 
-`list` prints every host with its port, workspace, and one of four
-words: `published` (both agree), `pending`/`differs` (needs `sync`),
+`list` prints every host the machine's Caddy serves — those sent to it
+with `--via` too, naming the machine they come from — with its port,
+workspace, and one of four words: `published` (both agree), `pending`/`differs` (needs `sync`),
 `unmanaged` (only the machine has it — adopt with the `add` shown).
 Unreachable machine or missing `caddy`: rows print `unknown`.
 
-`rm` takes a host out of the configuration and off Caddy at once, the
-same way `add` puts it on: the workspace's routes file is written without
+`rm` takes a host out of the configuration and off Caddy at once, on the
+machine that serves it whatever `--machine` says, the same way `add` puts
+it on: the workspace's routes file is written without
 it (or removed, with no route left) and Caddy reloads. With the machine
 out of reach it keeps serving the site until the next `sync`.
 `--no-apply` and `--check` work as for `add`; in JSON, `status` is

@@ -81,3 +81,54 @@ A name that does not resolve fails minutes later, in Caddy's certificate
 log, where nobody is looking — so `add` points the name in the same
 breath, printing the record to create by hand if the machine is
 unreachable.
+
+## Publishing through another machine
+
+A machine the internet cannot reach — a VM on your desk, a box behind NAT —
+can still have its port published, by a machine that the internet does
+reach and that runs Caddy:
+
+    workspaces:
+      - name: acme
+        machine: lab
+        routes:
+          - {host: app.example.com, port: 8080, via: edge}
+
+`expose add acme 8080 --host app.example.com --via edge` writes that line.
+The name points at `edge`, and `edge`'s Caddy proxies to `lab`. Nothing is
+installed on `lab`.
+
+**There is no "main" machine.** Which machine serves a site is written on
+the route, so a configuration with three machines and two Caddys means
+the same thing to everybody. Without `via`, a route is served by its
+workspace's machine, as before. When that machine has no caddy, `expose`
+refuses and names the machines that have it, instead of picking one.
+
+**The address comes from `lab`'s `hosts`, not from a VPN.** The CLI
+resolves them the way it does to connect (see
+[addresses and fallback](addresses-and-fallback.md)) and takes the first
+address a network package gave, since that is a private network both
+machines can be on; then any other; never a loopback one, which would
+name `edge` itself. Tailscale, Headscale, plain WireGuard or a LAN address
+all work the same way, because the CLI only ever sees an address.
+
+**It is resolved every time, never stored.** `expose` and `sync` resolve it
+when they write `edge`'s file, so a machine that moves is followed by the
+next sync. When the address cannot be found from your computer — the
+private network is off here — `sync` leaves that workspace's file on `edge`
+exactly as it is and says so: the site keeps answering the way it did,
+instead of disappearing because of where you ran the command.
+
+**`edge` owns the file.** It is `acme-routes.caddy` in `edge`'s `sites.d`, the
+same name sync uses everywhere. A machine with caddy owns the routes file
+of every workspace in the configuration: written when it serves one of
+its routes, removed otherwise. Taking the last `via: edge` off a route
+therefore also takes the file off `edge` on its next sync, and
+`workspaces destroy` removes it there before the workspace leaves the
+configuration — afterwards nothing would.
+
+**`expose add` checks the path once.** After Caddy has the site, `edge`
+tries to open a connection to `lab`'s port. When it cannot, the site stays
+published and the command says what to look at, because otherwise every
+visitor gets a bare 502: the service listening only on `127.0.0.1`, a
+firewall on `lab`, or the two machines not on the same private network.

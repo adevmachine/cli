@@ -1738,3 +1738,95 @@ func TestMachinePackagesLocationIsRuntimeOnly(t *testing.T) {
 		t.Fatalf("runtime package location leaked into YAML:\n%s", body)
 	}
 }
+
+const viaConfig = `
+machines:
+  - name: edge
+    hosts: [203.0.113.10]
+  - name: lab
+    hosts: [100.64.0.7]
+  - name: mac
+    self: true
+workspaces:
+  - name: alice
+    machine: lab
+    routes: [{host: app.example.com, port: 8080, via: edge}]
+  - name: bob
+    machine: edge
+    routes: [{host: bob.example.com, port: 9090}]
+`
+
+func TestARouteViaAnotherMachineIsServedThere(t *testing.T) {
+	cfg, err := Load(configDirWith(t, viaConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	w, r, _ := cfg.RouteOwner("app.example.com")
+	if r.Via != "edge" || cfg.ServingMachine(w, r) != "edge" {
+		t.Fatalf("via not read: %+v, served by %q", r, cfg.ServingMachine(w, r))
+	}
+	w, r, _ = cfg.RouteOwner("bob.example.com")
+	if cfg.ServingMachine(w, r) != "edge" {
+		t.Fatalf("a route without via is served by its workspace's machine, got %q", cfg.ServingMachine(w, r))
+	}
+
+	var onEdge []string
+	for _, s := range cfg.RoutesServedBy("edge") {
+		onEdge = append(onEdge, s.Workspace.Name+" "+s.Route.Host)
+	}
+	if strings.Join(onEdge, ",") != "alice app.example.com,bob bob.example.com" {
+		t.Fatalf("edge serves %v", onEdge)
+	}
+	if got := cfg.RoutesServedBy("lab"); len(got) != 0 {
+		t.Fatalf("lab serves nothing, got %+v", got)
+	}
+}
+
+func TestValidateRefusesAViaThatCannotServe(t *testing.T) {
+	for via, want := range map[string]string{
+		"nowhere": "no machine",
+		"lab":     "its own machine",
+		"mac":     "this computer",
+	} {
+		body := strings.Replace(viaConfig, "via: edge", "via: "+via, 1)
+		cfg, err := Load(configDirWith(t, body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("via %s: want an error saying %q, got %v", via, want, err)
+		}
+	}
+}
+
+func TestAddRouteWritesViaOnlyWhenSet(t *testing.T) {
+	dir := configDirWith(t, `
+machines:
+  - name: edge
+    hosts: [203.0.113.10]
+  - name: lab
+    hosts: [100.64.0.7]
+workspaces:
+  - name: alice
+    machine: lab
+`)
+	if err := AddRoute(dir, "alice", Route{Host: "app.example.com", Port: 8080, Via: "edge"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddRoute(dir, "alice", Route{Host: "api.example.com", Port: 8081}); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(filepath.Join(dir, FileName))
+	for _, want := range []string{
+		"{host: app.example.com, port: 8080, via: edge}",
+		"{host: api.example.com, port: 8081}",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("want %q in:\n%s", want, body)
+		}
+	}
+}

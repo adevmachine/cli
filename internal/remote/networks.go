@@ -187,3 +187,38 @@ func Proxy(ctx context.Context, targets []string, stdin io.Reader, stdout io.Wri
 	}
 	return used, nil
 }
+
+// Upstream is the address another machine proxies to when it serves a site
+// for this one: an address a network package resolved first, since that is a
+// private network both machines can be on, then any other. A loopback address
+// is never it — it names the machine doing the proxying.
+func Upstream(r Resolution) (string, error) {
+	var fallback string
+	for _, a := range r.Addresses {
+		if isLoopback(a.Address) {
+			continue
+		}
+		if a.Package != "" {
+			return a.Address, nil
+		}
+		if fallback == "" {
+			fallback = a.Address
+		}
+	}
+	if fallback != "" {
+		return fallback, nil
+	}
+	reasons := []string{"no address but a loopback one"}
+	for _, d := range r.Dropped {
+		reasons = append(reasons, fmt.Sprintf("%s (%s)", d.Source, d.Reason))
+	}
+	return "", fmt.Errorf("no address of %s another machine can reach: %s", r.Machine, strings.Join(reasons, "; "))
+}
+
+func isLoopback(address string) bool {
+	if address == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(address)
+	return ip != nil && ip.IsLoopback()
+}

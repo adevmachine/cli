@@ -3,6 +3,7 @@ package packages
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -329,5 +330,48 @@ func TestResolveGivesEveryWorkspaceItsAccountFirst(t *testing.T) {
 	got := names(plan.Workspaces[0].Ordered)
 	if len(got) != 2 || got[0] != "workspace" {
 		t.Fatalf("got %v, want the workspace package first", got)
+	}
+}
+
+func TestResolveMachineGathersRoutesSentToItWithVia(t *testing.T) {
+	store := storeWith(t, map[string]string{
+		"caddy":     "format: 1\nname: caddy\nscope: machine\nsummary: x\nprovides:\n  sites.d: /etc/caddy/sites.d\n",
+		"workspace": "format: 1\nname: workspace\nscope: workspace\nsummary: x\n",
+	})
+	cfg := config.Config{
+		Machines: []config.Machine{
+			{Name: "edge", Hosts: []config.Host{{Address: "203.0.113.10"}}, Packages: []string{"caddy"}},
+			{Name: "lab", Hosts: []config.Host{{Address: "100.64.0.7"}}},
+		},
+		Workspaces: []config.Workspace{
+			{Name: "alice", Machine: "lab", Packages: []string{"workspace"},
+				Routes: []config.Route{{Host: "app.example.com", Port: 8080, Via: "edge"}}},
+			{Name: "bob", Machine: "edge", Packages: []string{"workspace"},
+				Routes: []config.Route{{Host: "bob.example.com", Port: 9090}}},
+			{Name: "carol", Machine: "lab", Packages: []string{"workspace"}},
+		},
+	}
+
+	edge, err := ResolveMachine(store, cfg, cfg.Machines[0], "9.9.9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Route{
+		{Workspace: "alice", Host: "app.example.com", Port: 8080, From: "lab"},
+		{Workspace: "bob", Host: "bob.example.com", Port: 9090},
+	}
+	if !reflect.DeepEqual(edge.Routes, want) {
+		t.Fatalf("edge routes %+v", edge.Routes)
+	}
+	if !reflect.DeepEqual(edge.OtherWorkspaces, []string{"alice", "carol"}) {
+		t.Fatalf("edge must own the routes file of every workspace elsewhere: %v", edge.OtherWorkspaces)
+	}
+
+	lab, err := ResolveMachine(store, cfg, cfg.Machines[1], "9.9.9")
+	if err != nil {
+		t.Fatalf("a route sent elsewhere needs no caddy here: %v", err)
+	}
+	if len(lab.Routes) != 0 {
+		t.Fatalf("lab serves nothing: %+v", lab.Routes)
 	}
 }

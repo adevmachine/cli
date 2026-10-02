@@ -68,6 +68,9 @@ type exposeClient struct {
 	// verdict what the machine answers them; empty means it applied.
 	scripts []string
 	verdict string
+	// probe is what the machine answers when asked whether it reaches
+	// another machine's port; empty means it does.
+	probe string
 }
 
 var (
@@ -147,6 +150,11 @@ func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
 			}
 		}
 		return "", nil
+	case strings.Contains(command, "/dev/tcp/"):
+		if c.probe == "" {
+			return "reachable\n", nil
+		}
+		return c.probe + "\n", nil
 	case strings.HasSuffix(strings.TrimSpace(command), " zones"):
 		body, _ := json.Marshal(struct {
 			Zones []string `json:"zones"`

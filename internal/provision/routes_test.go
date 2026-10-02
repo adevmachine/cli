@@ -147,3 +147,65 @@ func TestWorkspaceRoutesRefusesWithoutCaddyOrOnAnotherMachine(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func viaPlan(t *testing.T, upstream string) packages.MachinePlan {
+	t.Helper()
+	plan := routesPlan(t)
+	plan.OtherWorkspaces = []string{"carol", "dave"}
+	plan.Routes = append(plan.Routes,
+		packages.Route{Workspace: "carol", Host: "carol.example.com", Port: 3000, From: "lab", Upstream: upstream})
+	return plan
+}
+
+func TestARouteFromAnotherMachineProxiesToItsAddress(t *testing.T) {
+	files, err := Generate(viaPlan(t, "100.64.0.7"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(files["routes/carol.caddy"]); !strings.Contains(got, "reverse_proxy 100.64.0.7:3000") {
+		t.Fatalf("carol's file:\n%s", got)
+	}
+	copies, removals := routeTasksOf(t, files["site.yml"])
+	var dests []string
+	for _, e := range copies.Loop {
+		dests = append(dests, e.Dest)
+	}
+	if !slices.Contains(dests, "/etc/caddy/sites.d/carol-routes.caddy") {
+		t.Fatalf("carol's file is not written: %v", dests)
+	}
+	var gone []string
+	for _, e := range removals.Loop {
+		gone = append(gone, e.Path)
+	}
+	if !slices.Contains(gone, "/etc/caddy/sites.d/dave-routes.caddy") {
+		t.Fatalf("a workspace elsewhere with no route here must have its file removed: %v", gone)
+	}
+}
+
+func TestARouteWhoseAddressIsUnknownLeavesItsFileAlone(t *testing.T) {
+	plan := viaPlan(t, "")
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := files["routes/carol.caddy"]; ok {
+		t.Fatal("no address, no file to render")
+	}
+	copies, removals := routeTasksOf(t, files["site.yml"])
+	for _, e := range copies.Loop {
+		if strings.Contains(e.Dest, "carol") {
+			t.Fatal("carol's file must not be written")
+		}
+	}
+	for _, e := range removals.Loop {
+		if strings.Contains(e.Path, "carol") {
+			t.Fatal("carol's file must not be removed either: its site keeps working as it was")
+		}
+	}
+	if _, err := WorkspaceRoutes(plan, "carol"); err == nil || !strings.Contains(err.Error(), "lab") {
+		t.Fatalf("the fast path must say whose address is missing, got %v", err)
+	}
+	if got := UnresolvedRoutes(plan); len(got) != 1 || got[0].Host != "carol.example.com" {
+		t.Fatalf("unresolved: %+v", got)
+	}
+}

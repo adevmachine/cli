@@ -826,6 +826,46 @@ devmachine packages add caddy --machine Z
 devmachine sync
 ```
 
+## "caddy is not on X, where Y lives: publish it through a machine that has caddy"
+
+**What it means:** The workspace's machine has no Caddy, and another
+machine in your configuration does. `expose` does not pick one for you.
+
+**What to do:** Publish through the machine it names:
+
+```
+devmachine expose add Y <port> --host <host> --via <machine>
+```
+
+Adding caddy to X instead only helps when the internet can reach X.
+
+## `expose add --via` warns "edge cannot reach lab at …"
+
+**What it means:** The site is on Caddy, but the machine serving it could
+not open a connection to the port on the workspace's machine. Visitors get
+a 502 until that changes.
+
+**What to do:** On the workspace's machine:
+
+- The service must listen on the address the warning names, or on every
+  address — not only on `127.0.0.1`. A container published as
+  `127.0.0.1:8080:80` cannot be reached from another machine.
+- A firewall must let the serving machine in on that port.
+- Both machines must be on the private network the address belongs to:
+  `devmachine resolve --machine <machine>` shows which address is used.
+
+Nothing needs publishing again: Caddy retries on every request.
+
+## `sync` says "… is left as it is on edge, since lab's address is not known"
+
+**What it means:** The private network that gives the workspace's machine
+its address is off or signed out on your computer, so the file on the
+serving machine could not be written. It was left exactly as it was, and
+the site keeps answering the way it did.
+
+**What to do:** Turn the network on here and run `devmachine sync` again.
+`devmachine resolve --machine lab` shows why the address is missing.
+
 ## `sync` failed at "reload caddy for the routes"
 
 **What it means:** Caddy refused the new set of site files. The most common

@@ -16,13 +16,33 @@ const (
 	routeFileMode  = "0644"
 )
 
-// routeFiles is what routeTasks makes true for each workspace on the plan, in
-// plan order: its routes file written, or removed when it has no route left.
-func routeFiles(plan packages.MachinePlan) []expose.FileChange {
+// routeFile is one workspace's routes file on this machine.
+type routeFile struct {
+	workspace string
+	change    expose.FileChange
+	// unresolved is set when a route here comes from a machine whose address
+	// is not known: the file is then left as it is, neither written nor
+	// removed, so the site keeps answering the way it did.
+	unresolved bool
+}
+
+// routeFiles is what routeTasks makes true for each workspace, in plan order
+// and then the workspaces elsewhere: its routes file written, or removed when
+// it has no route here.
+func routeFiles(plan packages.MachinePlan) []routeFile {
 	byWorkspace := routesByWorkspace(plan)
-	out := make([]expose.FileChange, 0, len(plan.Workspaces))
+	unresolved := map[string]bool{}
+	for _, r := range UnresolvedRoutes(plan) {
+		unresolved[r.Workspace] = true
+	}
+	names := make([]string, 0, len(plan.Workspaces)+len(plan.OtherWorkspaces))
 	for _, w := range plan.Workspaces {
-		name := w.Target.Name
+		names = append(names, w.Target.Name)
+	}
+	names = append(names, plan.OtherWorkspaces...)
+
+	out := make([]routeFile, 0, len(names))
+	for _, name := range names {
 		change := expose.FileChange{
 			Path:  path.Join(plan.SitesDir, expose.WorkspaceFileName(name)),
 			Owner: routeFileOwner,
@@ -35,7 +55,19 @@ func routeFiles(plan packages.MachinePlan) []expose.FileChange {
 				change.Stale = append(change.Stale, path.Join(plan.SitesDir, expose.FileName(s)))
 			}
 		}
-		out = append(out, change)
+		out = append(out, routeFile{workspace: name, change: change, unresolved: unresolved[name]})
+	}
+	return out
+}
+
+// UnresolvedRoutes are the routes from another machine whose address the
+// caller could not find.
+func UnresolvedRoutes(plan packages.MachinePlan) []packages.Route {
+	var out []packages.Route
+	for _, r := range plan.Routes {
+		if r.From != "" && r.Upstream == "" {
+			out = append(out, r)
+		}
 	}
 	return out
 }
@@ -47,10 +79,23 @@ func WorkspaceRoutes(plan packages.MachinePlan, workspace string) (expose.FileCh
 	if plan.SitesDir == "" {
 		return expose.FileChange{}, fmt.Errorf("caddy is not on %s", plan.Machine.Name)
 	}
-	for i, w := range plan.Workspaces {
-		if w.Target.Name == workspace {
-			return routeFiles(plan)[i], nil
+	for _, f := range routeFiles(plan) {
+		if f.workspace != workspace {
+			continue
 		}
+		if f.unresolved {
+			return expose.FileChange{}, fmt.Errorf("the address of %s is not known from here", fromOf(plan, workspace))
+		}
+		return f.change, nil
 	}
 	return expose.FileChange{}, fmt.Errorf("workspace %q is not on %s", workspace, plan.Machine.Name)
+}
+
+func fromOf(plan packages.MachinePlan, workspace string) string {
+	for _, r := range UnresolvedRoutes(plan) {
+		if r.Workspace == workspace {
+			return r.From
+		}
+	}
+	return ""
 }

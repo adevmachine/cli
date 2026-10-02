@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"path"
 	"slices"
 	"strconv"
@@ -44,6 +45,59 @@ func machinePlan(ctx context.Context, dir string, cfg config.Config, machine con
 	return packages.ResolveMachine(store, cfg, machine, version)
 }
 
+// upstreamOf is the address a machine serving a site for m proxies to.
+var upstreamOf = func(ctx context.Context, m config.Machine) (string, error) {
+	return remote.Upstream(remote.ResolveAll(ctx, m))
+}
+
+// withUpstreams fills in the address of every machine the plan's routes come
+// from, and says which could not be found. A route left without one is left
+// alone on the machine by both sync and `expose`.
+func withUpstreams(ctx context.Context, cfg config.Config, plan packages.MachinePlan) (packages.MachinePlan, []error) {
+	type answer struct {
+		address string
+		err     error
+	}
+	answers := map[string]answer{}
+	var failures []error
+	plan.Routes = slices.Clone(plan.Routes)
+	for i, r := range plan.Routes {
+		if r.From == "" {
+			continue
+		}
+		a, done := answers[r.From]
+		if !done {
+			m, err := cfg.Machine(r.From)
+			if err == nil {
+				a.address, a.err = upstreamOf(ctx, m)
+			} else {
+				a.err = err
+			}
+			answers[r.From] = a
+			if a.err != nil {
+				failures = append(failures, a.err)
+			}
+		}
+		plan.Routes[i].Upstream = a.address
+	}
+	return plan, failures
+}
+
+// servingMachines names the machines with caddy, other than this computer,
+// in configuration order: where a site can be published.
+func servingMachines(ctx context.Context, dir string, cfg config.Config) []string {
+	var out []string
+	for _, m := range cfg.Machines {
+		if m.Self {
+			continue
+		}
+		if plan, err := machinePlan(ctx, dir, cfg, m); err == nil && plan.SitesDir != "" {
+			out = append(out, m.Name)
+		}
+	}
+	return out
+}
+
 // caddySitesDir asks the machine's plan for the caddy package's `sites.d`
 // extension point.
 //
@@ -67,6 +121,9 @@ type exposeResult struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port,omitempty"`
 	Workspace string `json:"workspace"`
+	// Via is the machine whose Caddy serves the site, when it is not the
+	// workspace's own.
+	Via string `json:"via,omitempty"`
 	// Applied says Caddy on the machine already serves the change.
 	Applied bool `json:"applied"`
 	// Status is `published` or `removed` once applied, and `pending` while
@@ -82,7 +139,37 @@ func routesChange(ctx context.Context, dir string, cfg config.Config, machine co
 	if err != nil {
 		return expose.FileChange{}, err
 	}
-	return provision.WorkspaceRoutes(plan, workspace)
+	plan, failures := withUpstreams(ctx, cfg, plan)
+	change, err := provision.WorkspaceRoutes(plan, workspace)
+	if err != nil && len(failures) > 0 {
+		return expose.FileChange{}, errors.Join(failures...)
+	}
+	return change, err
+}
+
+// probeCommand asks a machine whether it reaches address:port at all. It
+// answers `unknown` where it cannot tell, rather than claiming it does not.
+func probeCommand(address string, port int) string {
+	return fmt.Sprintf("if command -v bash >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then "+
+		"if timeout 3 bash -c '</dev/tcp/%s/%d' 2>/dev/null; then echo reachable; else echo unreachable; fi; "+
+		"else echo unknown; fi", address, port)
+}
+
+// unreachableNote says what to check when the serving machine cannot reach
+// the port it proxies to, or "" when it can or cannot tell. Caddy would
+// otherwise answer every visitor with a bare 502.
+func unreachableNote(ctx context.Context, client remote.Client, serving, from config.Machine, port int) string {
+	address, err := upstreamOf(ctx, from)
+	if err != nil {
+		return ""
+	}
+	out, err := client.Run(ctx, probeCommand(address, port))
+	if err != nil || strings.TrimSpace(out) != "unreachable" {
+		return ""
+	}
+	return fmt.Sprintf("%s cannot reach %s at %s: check that the service listens on that address and not only on "+
+		"127.0.0.1, that %s's firewall lets %s in, and that both are on the same private network",
+		serving.Name, from.Name, net.JoinHostPort(address, strconv.Itoa(port)), from.Name, serving.Name)
 }
 
 // errNotApplied says the configuration has the change and the machine does
@@ -179,7 +266,7 @@ func withoutRoute(cfg config.Config, host string) config.Config {
 }
 
 func newExposeAddCmd(opts *options) *cobra.Command {
-	var host string
+	var host, via string
 	var check, yes, publish, noApply bool
 
 	c := &cobra.Command{
@@ -191,7 +278,11 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			"whole machine's play. A machine that cannot be reached keeps the " +
 			"route pending until the next `devmachine sync`. Before recording " +
 			"anything it asks — because whatever is behind the port becomes " +
-			"reachable by anybody who learns the hostname.",
+			"reachable by anybody who learns the hostname.\n\n" +
+			"--via publishes it through another machine's Caddy, for a workspace " +
+			"on a machine the internet cannot reach: that machine proxies to the " +
+			"workspace's machine over the address its `hosts` give, a private " +
+			"network first.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workspace := args[0]
@@ -219,23 +310,45 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine); err != nil {
+			route := config.Route{Host: host, Port: port, Via: via}
+			serving := tgt.machine
+			if via != "" {
+				if err := withRoute(cfg, workspace, route).Validate(); err != nil {
+					return err
+				}
+				if serving, err = cfg.Machine(via); err != nil {
+					return err
+				}
+			}
+			if _, err := caddySitesDir(cmd.Context(), dir, cfg, serving); err != nil {
+				if via == "" {
+					if others := servingMachines(cmd.Context(), dir, cfg); len(others) > 0 {
+						return fmt.Errorf("caddy is not on %s, where %s lives: publish it through a machine that has caddy, "+
+							"with `--via %s`, or add caddy to %s with `devmachine packages add caddy --machine %s`",
+							serving.Name, workspace, strings.Join(others, "` or `--via "), serving.Name, serving.Name)
+					}
+				}
 				return err
 			}
 
 			question := fmt.Sprintf(
 				"Publish %s:%d as https://%s, reachable by anybody who learns that hostname?",
 				workspace, port, host)
+			if via != "" {
+				question = fmt.Sprintf(
+					"Publish %s:%d as https://%s through %s, reachable by anybody who learns that hostname?",
+					workspace, port, host, via)
+			}
 			if check {
 				if owner, _, ok := cfg.RouteOwner(host); ok {
 					return fmt.Errorf("%s is already published by workspace %q: `devmachine expose rm %s` first", host, owner.Name, host)
 				}
 				cmd.Println("would " + question)
-				cmd.Printf("%s, workspace %s, routes:\n+ {host: %s, port: %d}\n", config.FileName, workspace, host, port)
+				cmd.Printf("%s, workspace %s, routes:\n+ %s\n", config.FileName, workspace, routeLine(route))
 				if noApply {
 					return nil
 				}
-				return previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withRoute(cfg, workspace, config.Route{Host: host, Port: port}), tgt.machine, workspace)
+				return previewRoutes(cmd.Context(), cmd.OutOrStdout(), dir, withRoute(cfg, workspace, route), serving, workspace)
 			}
 			if !publish {
 				ok, err := confirm(cmd.InOrStdin(), cmd.OutOrStdout(), question)
@@ -247,10 +360,14 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 				}
 			}
 
-			if err := config.AddRoute(dir, workspace, config.Route{Host: host, Port: port}); err != nil {
+			if err := config.AddRoute(dir, workspace, route); err != nil {
 				return err
 			}
-			record(opts, tgt, fmt.Sprintf("expose add %s %d --host %s", workspace, port, host), true)
+			command := fmt.Sprintf("expose add %s %d --host %s", workspace, port, host)
+			if via != "" {
+				command += " --via " + via
+			}
+			record(opts, tgt, command, true)
 			repo.AutoCommit(cmd.Context(), dir, fmt.Sprintf("chore(config): expose %s", host))
 
 			notes := cmd.OutOrStdout()
@@ -259,31 +376,37 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 			}
 
 			var client remote.Client
-			if c, _, err := dialMux(cmd.Context(), tgt.machine, ""); err == nil {
+			if c, _, err := dialMux(cmd.Context(), serving, ""); err == nil {
 				client = c
 				defer client.Close()
 			} else {
-				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v); the DNS record is printed to create by hand\n", tgt.machine.Name, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v); the DNS record is printed to create by hand\n", serving.Name, err)
 			}
-			if err := pointDNSAtMachine(cmd.Context(), dir, tgt, host, client, cmd.ErrOrStderr()); err != nil {
+			if err := pointDNSAtMachine(cmd.Context(), dir, target{machine: serving}, host, client, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 
-			result := exposeResult{Host: host, Port: port, Workspace: workspace, Status: "pending"}
+			result := exposeResult{Host: host, Port: port, Workspace: workspace, Via: via, Status: "pending"}
 			var applyErr error
 			if noApply {
 				result.Note = "recorded only (--no-apply)"
 				fmt.Fprintf(notes, "recorded https://%s -> %s:%d in the configuration. Run `devmachine sync` to publish it on %s.\n",
-					host, workspace, port, tgt.machine.Name)
-			} else if applyErr = applyRoutes(cmd.Context(), client, dir, tgt.machine, workspace); applyErr == nil {
+					host, workspace, port, serving.Name)
+			} else if applyErr = applyRoutes(cmd.Context(), client, dir, serving, workspace); applyErr == nil {
 				result.Applied, result.Status = true, "published"
 				fmt.Fprintf(notes, "published: https://%s -> %s:%d on %s. Caddy gets the certificate on the first "+
-					"request, which can take a few seconds.\n", host, workspace, port, tgt.machine.Name)
+					"request, which can take a few seconds.\n", host, workspace, port, serving.Name)
+				if via != "" {
+					if note := unreachableNote(cmd.Context(), client, serving, tgt.machine, port); note != "" {
+						result.Note = note
+						fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", note)
+					}
+				}
 			} else if pending := (errNotApplied{}); errors.As(applyErr, &pending) {
 				applyErr = nil
 				result.Note = pending.reason
 				fmt.Fprintf(notes, "recorded https://%s -> %s:%d, pending: %s. Run `devmachine sync` to publish it on %s.\n",
-					host, workspace, port, pending.reason, tgt.machine.Name)
+					host, workspace, port, pending.reason, serving.Name)
 			} else {
 				result.Note = applyErr.Error()
 				applyErr = fmt.Errorf("%w\nhttps://%s is recorded in the configuration and pending: fix it and run `devmachine sync`",
@@ -298,11 +421,20 @@ func newExposeAddCmd(opts *options) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&host, "host", "", "the public hostname this port answers to (required)")
+	c.Flags().StringVar(&via, "via", "", "publish through this machine's Caddy instead of the workspace's own")
 	c.Flags().BoolVar(&check, "check", false, "show the configuration and Caddy changes, and change nothing")
 	c.Flags().BoolVar(&yes, "yes", false, "skip local-write questions; never publish")
 	c.Flags().BoolVar(&publish, "publish", false, "publish the site without asking")
 	c.Flags().BoolVar(&noApply, "no-apply", false, "only record the route; the next sync publishes it")
 	return c
+}
+
+// routeLine is a route the way config.yml holds it.
+func routeLine(r config.Route) string {
+	if r.Via != "" {
+		return fmt.Sprintf("{host: %s, port: %d, via: %s}", r.Host, r.Port, r.Via)
+	}
+	return fmt.Sprintf("{host: %s, port: %d}", r.Host, r.Port)
 }
 
 // pointDNSAtMachine reuses the same dns.Choose and Upsert path `dns add`
@@ -334,6 +466,8 @@ type site struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
 	Workspace string `json:"workspace,omitempty"`
+	// From is the machine the port is on, for a site sent here with `via`.
+	From string `json:"from,omitempty"`
 	// Status is one of: published, pending, unmanaged, differs, unknown.
 	Status string `json:"status"`
 	Note   string `json:"note,omitempty"`
@@ -366,32 +500,42 @@ func listSites(ctx context.Context, client remote.Client, sitesDir string) ([]ex
 //
 // Reachable and empty are different answers: the machine side is nil when it
 // could not be asked, and then nothing is "pending", it is "unknown".
-func reconcile(cfg config.Config, machine string, onMachine []expose.Site, reachable bool) []site {
+func reconcile(cfg config.Config, machine string, onMachine []expose.Site, reachable bool, upstreams map[string]string) []site {
 	seen := map[string]bool{}
 	var rows []site
-	for _, w := range cfg.WorkspacesOn(machine) {
-		for _, r := range w.Routes {
-			seen[r.Host] = true
-			row := site{Host: r.Host, Port: r.Port, Workspace: w.Name}
-			switch {
-			case !reachable:
-				row.Status = "unknown"
-				row.Note = "the machine could not be asked"
-			default:
-				found, ok := find(onMachine, r.Host)
-				switch {
-				case !ok:
-					row.Status = "pending"
-					row.Note = "not on the machine yet: run `devmachine sync`"
-				case found.Port != r.Port || found.Workspace != w.Name:
-					row.Status = "differs"
-					row.Note = fmt.Sprintf("the machine has port %d for %s: run `devmachine sync`", found.Port, orDash(found.Workspace))
-				default:
-					row.Status = "published"
-				}
-			}
-			rows = append(rows, row)
+	for _, served := range cfg.RoutesServedBy(machine) {
+		w, r := served.Workspace, served.Route
+		seen[r.Host] = true
+		row := site{Host: r.Host, Port: r.Port, Workspace: w.Name}
+		if r.Via != "" {
+			row.From = w.Machine
 		}
+		switch {
+		case !reachable:
+			row.Status = "unknown"
+			row.Note = "the machine could not be asked"
+		default:
+			found, ok := find(onMachine, r.Host)
+			want, known := upstreams[row.From]
+			switch {
+			case !ok:
+				row.Status = "pending"
+				row.Note = "not on the machine yet: run `devmachine sync`"
+			case found.Port != r.Port || found.Workspace != w.Name:
+				row.Status = "differs"
+				row.Note = fmt.Sprintf("the machine has port %d for %s: run `devmachine sync`", found.Port, orDash(found.Workspace))
+			case row.From == "" && found.Upstream != "":
+				row.Status = "differs"
+				row.Note = fmt.Sprintf("the machine proxies to %s instead of itself: run `devmachine sync`", found.Upstream)
+			case row.From != "" && known && found.Upstream != want:
+				row.Status = "differs"
+				row.Note = fmt.Sprintf("the machine proxies to %s, and %s is at %s: run `devmachine sync`",
+					orDash(found.Upstream), row.From, want)
+			default:
+				row.Status = "published"
+			}
+		}
+		rows = append(rows, row)
 	}
 	for _, s := range onMachine {
 		if seen[s.Host] {
@@ -402,6 +546,28 @@ func reconcile(cfg config.Config, machine string, onMachine []expose.Site, reach
 				orDash(s.Workspace), s.Port, s.Host)})
 	}
 	return rows
+}
+
+// upstreamsFor is the address of every machine that sends a site to this one,
+// as sync would write it now. A machine whose address cannot be found is left
+// out, and its sites are not compared on it.
+func upstreamsFor(ctx context.Context, cfg config.Config, machine string) map[string]string {
+	out := map[string]string{}
+	for _, served := range cfg.RoutesServedBy(machine) {
+		if served.Route.Via == "" {
+			continue
+		}
+		from := served.Workspace.Machine
+		if _, done := out[from]; done {
+			continue
+		}
+		if m, err := cfg.Machine(from); err == nil {
+			if address, err := upstreamOf(ctx, m); err == nil {
+				out[from] = address
+			}
+		}
+	}
+	return out
 }
 
 func find(sites []expose.Site, host string) (expose.Site, bool) {
@@ -442,17 +608,17 @@ func newExposeListCmd(opts *options) *cobra.Command {
 			sitesDir, err := caddySitesDir(cmd.Context(), dir, cfg, tgt.machine)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "%s cannot be asked: %v\n", tgt.machine.Name, err)
-				rows = reconcile(cfg, tgt.machine.Name, nil, false)
+				rows = reconcile(cfg, tgt.machine.Name, nil, false, nil)
 			} else if client, _, err := dial(cmd.Context(), tgt.machine, ""); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "%s could not be reached (%v)\n", tgt.machine.Name, err)
-				rows = reconcile(cfg, tgt.machine.Name, nil, false)
+				rows = reconcile(cfg, tgt.machine.Name, nil, false, nil)
 			} else {
 				defer client.Close()
 				sites, err := listSites(cmd.Context(), client, sitesDir)
 				if err != nil {
 					return err
 				}
-				rows = reconcile(cfg, tgt.machine.Name, sites, true)
+				rows = reconcile(cfg, tgt.machine.Name, sites, true, upstreamsFor(cmd.Context(), cfg, tgt.machine.Name))
 			}
 
 			if opts.format == formatJSON {
@@ -468,6 +634,21 @@ func newExposeListCmd(opts *options) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// servingTarget is the machine whose Caddy serves a host: the one the route
+// names, whatever --machine says, or --machine for a host the configuration
+// does not know.
+func servingTarget(opts *options, cfg config.Config, host string) (target, error) {
+	owner, route, ok := cfg.RouteOwner(host)
+	if !ok {
+		return machineTarget(opts)
+	}
+	m, err := cfg.Machine(cfg.ServingMachine(owner, route))
+	if err != nil {
+		return target{}, err
+	}
+	return target{machine: m}, nil
 }
 
 func newExposeRmCmd(opts *options) *cobra.Command {
@@ -487,15 +668,15 @@ func newExposeRmCmd(opts *options) *cobra.Command {
 				return fmt.Errorf("%q is not a usable hostname", host)
 			}
 
-			tgt, err := machineTarget(opts)
-			if err != nil {
-				return err
-			}
 			dir, _, err := config.Dir(opts.configDir)
 			if err != nil {
 				return err
 			}
 			cfg, err := loadConfig(opts)
+			if err != nil {
+				return err
+			}
+			tgt, err := servingTarget(opts, cfg, host)
 			if err != nil {
 				return err
 			}

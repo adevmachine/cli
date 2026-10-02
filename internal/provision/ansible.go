@@ -87,8 +87,10 @@ func GenerateAt(plan packages.MachinePlan, base string) (map[string][]byte, erro
 		"host_vars/devmachine.yml": vars,
 		"site.yml":                 []byte(site),
 	}
-	for workspace, sites := range routesByWorkspace(plan) {
-		files["routes/"+workspace+".caddy"] = []byte(expose.RenderWorkspace(workspace, sites))
+	for _, f := range routeFiles(plan) {
+		if f.change.Content != nil && !f.unresolved {
+			files["routes/"+f.workspace+".caddy"] = f.change.Content
+		}
 	}
 	return files, nil
 }
@@ -98,7 +100,8 @@ func GenerateAt(plan packages.MachinePlan, base string) (map[string][]byte, erro
 func routesByWorkspace(plan packages.MachinePlan) map[string][]expose.Site {
 	out := map[string][]expose.Site{}
 	for _, r := range plan.Routes {
-		out[r.Workspace] = append(out[r.Workspace], expose.Site{Host: r.Host, Port: r.Port, Workspace: r.Workspace})
+		out[r.Workspace] = append(out[r.Workspace],
+			expose.Site{Host: r.Host, Port: r.Port, Workspace: r.Workspace, Upstream: r.Upstream})
 	}
 	return out
 }
@@ -662,22 +665,20 @@ func routeTasks(plan packages.MachinePlan, base string, siteChanges []string) st
 	if plan.SitesDir == "" {
 		return ""
 	}
-	files := routeFiles(plan)
-	var written []int
-	var absent []string
-	for i, f := range files {
-		if f.Content == nil {
-			absent = append(absent, f.Path)
-			continue
+	var written, absent []string
+	dest := map[string]string{}
+	for _, f := range routeFiles(plan) {
+		switch {
+		case f.unresolved:
+		case f.change.Content == nil:
+			absent = append(absent, f.change.Path)
+		default:
+			written = append(written, f.workspace)
+			dest[f.workspace] = f.change.Path
+			absent = append(absent, f.change.Stale...)
 		}
-		written = append(written, i)
 	}
-	sort.Slice(written, func(a, b int) bool {
-		return plan.Workspaces[written[a]].Target.Name < plan.Workspaces[written[b]].Target.Name
-	})
-	for _, i := range written {
-		absent = append(absent, files[i].Stale...)
-	}
+	sort.Strings(written)
 
 	var out strings.Builder
 	if len(written) > 0 {
@@ -685,9 +686,8 @@ func routeTasks(plan packages.MachinePlan, base string, siteChanges []string) st
 		out.WriteString("        src: \"{{ item.src }}\"\n        dest: \"{{ item.dest }}\"\n")
 		fmt.Fprintf(&out, "        owner: %s\n        group: %s\n        mode: %q\n      loop:\n",
 			routeFileOwner, routeFileGroup, routeFileMode)
-		for _, i := range written {
-			fmt.Fprintf(&out, "        - {src: %q, dest: %q}\n",
-				path.Join(base, "routes", plan.Workspaces[i].Target.Name+".caddy"), files[i].Path)
+		for _, name := range written {
+			fmt.Fprintf(&out, "        - {src: %q, dest: %q}\n", path.Join(base, "routes", name+".caddy"), dest[name])
 		}
 		out.WriteString("      register: devmachine_routes_written\n      tags: [routes]\n\n")
 	}
