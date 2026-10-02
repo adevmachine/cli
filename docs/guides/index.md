@@ -46,6 +46,14 @@ session. Only a reboot stops it.
   agent API and its dashboard, each on its own subdomain.
 - [Pi as your coding agent](pi-coding-agent.md) — install Pi in a workspace
   and use it for everyday work.
+- [opencode as your coding agent](opencode.md) — try it on its free models,
+  then connect your own provider.
+- [Antigravity CLI as your coding agent](antigravity-cli.md) — Google's
+  agent, signed in once from your own terminal.
+- [Kimi Code as your coding agent](kimi-code.md) — Moonshot AI's agent,
+  signed in with a device code.
+- [Cline as your coding agent](cline.md) — the Cline agent in the
+  terminal, with your Cline account or your own key.
 - [Claude 24/7 in Telegram](claude-24-7-in-telegram.md) — message Claude Code
   from Telegram, while it runs on your server around the clock.
 

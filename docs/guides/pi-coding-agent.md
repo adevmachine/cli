@@ -6,6 +6,7 @@ needs:
   - "A workspace"
 related:
   - hermes-agent-in-its-own-sandbox.md
+  - opencode.md
   - keep-sessions-running.md
   - shared-skills-for-every-workspace.md
 ---
@@ -35,40 +36,33 @@ does.
 
 ## By hand
 
-There's no devmachine package for Pi yet, so you install it the way Pi's own
-docs say, inside the workspace's account.
+### 1. Add the package
 
-### 1. Open the workspace
+```
+devmachine packages add pi --workspace acme
+devmachine sync
+```
+
+`sync` installs Pi's standalone release, not the npm package: one native
+program in `~/.local/share/pi`, linked from `~/.local/bin/pi`. It needs no
+Node, and a Node upgrade cannot break it. It also runs as a process called
+`pi`, which is how the Devmachine app tells a Pi session from any other.
+
+### 2. Sign in, once
+
+```
+devmachine login pi --workspace acme
+```
+
+This starts `pi` in a real terminal. Pi has no separate login command: type
+`/login` inside it to connect a subscription or an API key. Pi supports
+many providers — Anthropic, OpenAI, Google, and others — and you can
+switch models later with `/model`.
+
+### 3. Start working
 
 ```
 devmachine ssh acme
-```
-
-You land inside tmux. Anything you start here keeps running after you close
-the terminal.
-
-### 2. Install Pi
-
-The workspace already has Node through the `dev` package, which Pi needs
-(version 22.19 or newer). Install Pi with npm:
-
-```
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
-
-### 3. Sign in
-
-```
-pi
-```
-
-The first time you run `pi`, use the `/login` command inside it to connect a
-subscription or an API key. Pi supports many providers — Anthropic, OpenAI,
-Google, and others — and you can switch models later with `/model`.
-
-### 4. Start working
-
-```
 cd ~/dev/my-project
 pi
 ```
@@ -95,15 +89,14 @@ Open a session on your own computer (`devmachine skills add --agent pi`, or
 the plain `devmachine skills add`, taught it the CLI) and say:
 
 ```text
-SSH into my devmachine workspace acme and install the Pi coding agent
-there with npm, following pi.dev's own instructions.
+Install the Pi coding agent in my devmachine workspace acme.
 ```
 
-The agent runs `devmachine ssh acme`, then the npm install command, inside
-the workspace's tmux session. Signing in with `/login` is yours to do — that
-is your own account.
+The agent adds the `pi` package and runs `sync`. Signing in with `/login`
+is yours to do — that is your own account.
 
-**Check it:** inside the workspace, run `pi --version`; then start it in a
-project folder and ask it a question about the code there.
+**Check it:** `devmachine run --workspace acme -- pi --version` prints a
+version. Then start `pi` in a project folder and ask it a question about
+the code there.
 
 Source: [pi.dev](https://pi.dev/), [Pi coding agent on GitHub](https://github.com/earendil-works/pi)
