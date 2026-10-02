@@ -4,12 +4,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mydevmachine/devmachine/internal/config"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/remote"
+	agentskills "github.com/mydevmachine/devmachine/internal/skills"
 )
 
 func TestSkillsAddInstallsTheOfficialPackageWithoutDialing(t *testing.T) {
@@ -25,6 +27,42 @@ func TestSkillsAddInstallsTheOfficialPackageWithoutDialing(t *testing.T) {
 	if !strings.Contains(out, "use-devmachine") {
 		t.Fatalf("got %q", out)
 	}
+}
+
+func TestDetectAgentsFindsEveryHarnessHome(t *testing.T) {
+	home := t.TempDir()
+	for _, dir := range []string{".claude", ".codex", ".pi", filepath.Join(".config", "opencode"), filepath.Join(".gemini", "antigravity-cli"), ".kimi-code", ".cline"} {
+		if err := os.MkdirAll(filepath.Join(home, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := detectAgents(home)
+	want := []agentskills.Agent{agentskills.AgentClaude, agentskills.AgentCodex, agentskills.AgentPi, agentskills.AgentOpenCode, agentskills.AgentAntigravity, agentskills.AgentKimi, agentskills.AgentCline}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestDetectAgentsIgnoresGeminiWithoutAntigravity(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".gemini"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectAgents(home); len(got) != 0 {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestSkillsAddLinksAntigravityAndCline(t *testing.T) {
+	dir, home := skillConfig(t, "v9")
+	writeSkillPackage(t, filepath.Join(packages.CacheDir(dir, "v9"), "packages"), "devmachine-skills", "use-devmachine", "Use Devmachine.")
+	forbidDial(t)
+
+	if _, err := executeWithHome(t, home, "--config", dir, "skills", "add", "--agent", "antigravity", "--agent", "cline", "--agent", "kimi", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	assertCommandFile(t, filepath.Join(home, ".gemini", "antigravity-cli", "skills", "use-devmachine", "SKILL.md"))
+	assertCommandFile(t, filepath.Join(home, ".cline", "skills", "use-devmachine", "SKILL.md"))
 }
 
 func TestSkillsAddWithoutAPinExplainsSetupAndNeverDials(t *testing.T) {

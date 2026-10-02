@@ -25,9 +25,33 @@ const (
 	AgentPi Agent = "pi"
 	// AgentOpenCode identifies OpenCode's canonical skill directory.
 	AgentOpenCode Agent = "opencode"
+	// AgentAntigravity identifies Antigravity CLI's skill adapter.
+	AgentAntigravity Agent = "antigravity"
+	// AgentKimi identifies Kimi Code's canonical skill directory.
+	AgentKimi Agent = "kimi"
+	// AgentCline identifies Cline's skill adapter.
+	AgentCline Agent = "cline"
 )
 
-var supportedAgents = []Agent{AgentClaude, AgentCodex, AgentOpenCode, AgentPi}
+var supportedAgents = []Agent{AgentClaude, AgentCodex, AgentOpenCode, AgentPi, AgentAntigravity, AgentKimi, AgentCline}
+
+// linkedAgents maps each harness that does not read ~/.agents/skills to the
+// directory, under home, where it gets one relative link per skill.
+var linkedAgents = map[Agent][]string{
+	AgentClaude:      {".claude", "skills"},
+	AgentAntigravity: {".gemini", "antigravity-cli", "skills"},
+	AgentCline:       {".cline", "skills"},
+}
+
+func linkedIn(agents []Agent) []Agent {
+	var out []Agent
+	for _, agent := range agents {
+		if _, ok := linkedAgents[agent]; ok {
+			out = append(out, agent)
+		}
+	}
+	return out
+}
 
 // Source is one package's validated skill contribution.
 type Source struct {
@@ -93,8 +117,8 @@ func (i Installer) Install(source Source, agents []Agent) (InstallResult, error)
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return result, err
 		}
-		if slices.Contains(result.Agents, AgentClaude) {
-			if err := i.checkClaudeLink(skill.Name, source.ID, owner, hadPrevious && slices.Contains(previous.Agents, AgentClaude)); err != nil {
+		for _, agent := range linkedIn(result.Agents) {
+			if err := i.checkLink(agent, skill.Name, source.ID, owner, hadPrevious && slices.Contains(previous.Agents, agent)); err != nil {
 				return result, err
 			}
 		}
@@ -110,17 +134,22 @@ func (i Installer) Install(source Source, agents []Agent) (InstallResult, error)
 		}
 	}
 
-	if hadPrevious && slices.Contains(previous.Agents, AgentClaude) && !slices.Contains(result.Agents, AgentClaude) {
-		for _, name := range previous.Skills {
-			if err := i.removeManagedClaudeLink(name); err != nil {
-				return result, err
+	if hadPrevious {
+		for _, agent := range linkedIn(previous.Agents) {
+			if slices.Contains(result.Agents, agent) {
+				continue
 			}
-			result.Changed++
+			for _, name := range previous.Skills {
+				if err := i.removeManagedLink(agent, name); err != nil {
+					return result, err
+				}
+				result.Changed++
+			}
 		}
 	}
-	if slices.Contains(result.Agents, AgentClaude) {
+	for _, agent := range linkedIn(result.Agents) {
 		for _, skill := range found {
-			changed, err := i.ensureClaudeLink(skill.Name)
+			changed, err := i.ensureLink(agent, skill.Name)
 			if err != nil {
 				return result, err
 			}
@@ -177,8 +206,8 @@ func (i Installer) Remove(sourceID string, names []string) (InstallResult, error
 		}
 	}
 	for _, name := range names {
-		if slices.Contains(record.Agents, AgentClaude) {
-			if err := i.removeManagedClaudeLink(name); err != nil {
+		for _, agent := range linkedIn(record.Agents) {
+			if err := i.removeManagedLink(agent, name); err != nil {
 				return result, err
 			}
 			result.Changed++
@@ -212,7 +241,7 @@ func normalizeAgents(agents []Agent) ([]Agent, error) {
 	set := map[Agent]bool{}
 	for _, agent := range agents {
 		if !slices.Contains(supportedAgents, agent) {
-			return nil, fmt.Errorf("unknown agent %q: choose claude, codex, pi or opencode", agent)
+			return nil, fmt.Errorf("unknown agent %q: choose claude, codex, opencode, pi, antigravity, kimi or cline", agent)
 		}
 		set[agent] = true
 	}
@@ -248,12 +277,12 @@ func (i Installer) canonical(name string) string {
 	return filepath.Join(i.Home, ".agents", "skills", name)
 }
 
-func (i Installer) claudeLink(name string) string {
-	return filepath.Join(i.Home, ".claude", "skills", name)
+func (i Installer) link(agent Agent, name string) string {
+	return filepath.Join(append(append([]string{i.Home}, linkedAgents[agent]...), name)...)
 }
 
-func (i Installer) checkClaudeLink(name, source, owner string, previouslyManaged bool) error {
-	link := i.claudeLink(name)
+func (i Installer) checkLink(agent Agent, name, source, owner string, previouslyManaged bool) error {
+	link := i.link(agent, name)
 	_, err := os.Lstat(link)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -262,13 +291,13 @@ func (i Installer) checkClaudeLink(name, source, owner string, previouslyManaged
 		return err
 	}
 	if owner != source || !previouslyManaged {
-		return fmt.Errorf("claude adapter for skill %q collides with unmanaged path %s", name, link)
+		return fmt.Errorf("%s adapter for skill %q collides with unmanaged path %s", agent, name, link)
 	}
 	return nil
 }
 
-func (i Installer) ensureClaudeLink(name string) (bool, error) {
-	link := i.claudeLink(name)
+func (i Installer) ensureLink(agent Agent, name string) (bool, error) {
+	link := i.link(agent, name)
 	target, err := filepath.Rel(filepath.Dir(link), i.canonical(name))
 	if err != nil {
 		return false, err
@@ -288,8 +317,8 @@ func (i Installer) ensureClaudeLink(name string) (bool, error) {
 	return true, nil
 }
 
-func (i Installer) removeManagedClaudeLink(name string) error {
-	link := i.claudeLink(name)
+func (i Installer) removeManagedLink(agent Agent, name string) error {
+	link := i.link(agent, name)
 	target, err := filepath.Rel(filepath.Dir(link), i.canonical(name))
 	if err != nil {
 		return err
@@ -299,7 +328,7 @@ func (i Installer) removeManagedClaudeLink(name string) error {
 		return nil
 	}
 	if err != nil || current != target {
-		return fmt.Errorf("claude adapter for skill %q at %s is no longer managed", name, link)
+		return fmt.Errorf("%s adapter for skill %q at %s is no longer managed", agent, name, link)
 	}
 	return os.Remove(link)
 }

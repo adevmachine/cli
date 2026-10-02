@@ -78,7 +78,7 @@ func newSkillsAddCmd(opts *options) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&requested, "package", "", "install skills from this local package instead of the official package")
-	c.Flags().StringSliceVar(&agentNames, "agent", nil, "enable a harness adapter: claude, codex, pi or opencode (repeatable)")
+	c.Flags().StringSliceVar(&agentNames, "agent", nil, "enable a harness adapter: claude, codex, opencode, pi, antigravity, kimi or cline (repeatable)")
 	c.Flags().BoolVar(&yes, "yes", false, "do not ask")
 	return c
 }
@@ -306,7 +306,7 @@ func chooseAgents(cmd *cobra.Command, home string, names []string, yes bool) ([]
 	}
 	detected := detectAgents(home)
 	if len(detected) == 0 {
-		return nil, errors.New("no supported agent harness was detected; pass --agent claude, codex, pi or opencode")
+		return nil, errors.New("no supported agent harness was detected; pass --agent claude, codex, opencode, pi, antigravity, kimi or cline")
 	}
 	if yes {
 		return detected, nil
@@ -346,6 +346,9 @@ func detectAgents(home string) []agentskills.Agent {
 		{agentskills.AgentCodex, filepath.Join(home, ".codex")},
 		{agentskills.AgentPi, filepath.Join(home, ".pi")},
 		{agentskills.AgentOpenCode, filepath.Join(home, ".config", "opencode")},
+		{agentskills.AgentAntigravity, filepath.Join(home, ".gemini", "antigravity-cli")},
+		{agentskills.AgentKimi, filepath.Join(home, ".kimi-code")},
+		{agentskills.AgentCline, filepath.Join(home, ".cline")},
 	}
 	var found []agentskills.Agent
 	for _, candidate := range candidates {

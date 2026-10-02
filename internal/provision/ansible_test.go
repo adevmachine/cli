@@ -693,6 +693,80 @@ func TestGenerateCreatesClaudeLinksOnlyWhereClaudeCodeIsSelected(t *testing.T) {
 	t.Fatal("no Claude skill link task was generated")
 }
 
+func TestGenerateLinksSkillsForAntigravityAndCline(t *testing.T) {
+	plan := planWith(t, "main", nil, map[string][]string{
+		"alice": {"antigravity", "global-skills"},
+		"bob":   {"cline", "global-skills"},
+	})
+	files, err := Generate(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := "/home/{{ devmachine_workspace.user }}/"
+	type want struct {
+		workspace string
+		dirs      []string
+		src       string
+	}
+	cases := map[string]want{
+		home + ".gemini/antigravity-cli/skills/workflow": {"alice", []string{".gemini", ".gemini/antigravity-cli", ".gemini/antigravity-cli/skills"}, "../../../.agents/skills/workflow"},
+		home + ".cline/skills/workflow":                  {"bob", []string{".cline", ".cline/skills"}, "../../.agents/skills/workflow"},
+	}
+	tasks := tasksIn(t, files["site.yml"])
+	position := map[string]int{}
+	for index, task := range tasks {
+		file, ok := task["file"].(map[string]any)
+		if !ok {
+			continue
+		}
+		path, _ := file["path"].(string)
+		if dest, _ := file["dest"].(string); dest != "" {
+			path = dest
+		}
+		position[path] = index
+	}
+	for dest, w := range cases {
+		linkAt, ok := position[dest]
+		if !ok {
+			t.Fatalf("no link task for %s:\n%s", dest, files["site.yml"])
+		}
+		link := tasks[linkAt]
+		file := link["file"].(map[string]any)
+		if file["state"] != "link" || file["src"] != w.src || file["force"] != "{{ ansible_check_mode }}" {
+			t.Fatalf("link for %s = %#v", dest, file)
+		}
+		assertOnlyWorkspace(t, link, w.workspace)
+		previous := -1
+		for _, dir := range w.dirs {
+			at, ok := position[home+dir]
+			if !ok {
+				t.Fatalf("no task prepares %s:\n%s", dir, files["site.yml"])
+			}
+			if at <= previous || at >= linkAt {
+				t.Fatalf("%s is prepared out of order", dir)
+			}
+			previous = at
+			task := tasks[at]
+			prepared := task["file"].(map[string]any)
+			if prepared["state"] != "directory" || prepared["owner"] != "{{ devmachine_workspace.user }}" || prepared["group"] != "{{ devmachine_workspace.user }}" {
+				t.Fatalf("%s is not a directory the workspace user owns: %#v", dir, prepared)
+			}
+			assertOnlyWorkspace(t, task, w.workspace)
+		}
+	}
+	if strings.Contains(string(files["site.yml"]), ".claude/skills") {
+		t.Fatalf("Claude links generated without claude-code:\n%s", files["site.yml"])
+	}
+}
+
+func assertOnlyWorkspace(t *testing.T, task map[string]any, workspace string) {
+	t.Helper()
+	loop := task["loop"].([]any)
+	if len(loop) != 1 || loop[0].(map[string]any)["name"] != workspace {
+		t.Fatalf("%v loops over %#v, want only %s", task["name"], loop, workspace)
+	}
+}
+
 func TestGenerateSkillTasksFailOnAnUnmanagedCollision(t *testing.T) {
 	files, err := Generate(planWith(t, "main", nil, map[string][]string{"alice": {"global-skills"}}))
 	if err != nil {
