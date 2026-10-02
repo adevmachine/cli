@@ -1,0 +1,32 @@
+docs/guides/index.md
+  s_bd193e2d2e6bb0::t_875937a1de0a72 49-56
+docs/guides/cline.md
+  s_bd193e2d2e6bb0::t_d8b5905a57869a 1-91
+docs/guides/pi-coding-agent.md
+  s_bd193e2d2e6bb0::t_7b0f40d4c88988 9,39,42-43,46-49,51,54,57-60,62,65,92,95-96,98-100
+docs/guides/antigravity-cli.md
+  s_bd193e2d2e6bb0::t_c6fd342fffe352 1-61,65-102
+  s_bd193e2d2e6bb0::t_ef2ffa6f6625c0 62-64
+docs/guides/opencode.md
+  s_bd193e2d2e6bb0::t_0b8894a0befa94 1-92
+docs/index.md
+  s_bd193e2d2e6bb0::t_d88fc595b9b08e 49-52
+docs/guides/kimi-code.md
+  s_bd193e2d2e6bb0::t_bbb95e2e250c9a 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e865f08536a57d7dc14542ede0039e57b9fbb457",
+  "prompts": {},
+  "sessions": {
+    "s_bd193e2d2e6bb0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12d751aa-cf31-4b28-ba1c-670b2a613d1c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
