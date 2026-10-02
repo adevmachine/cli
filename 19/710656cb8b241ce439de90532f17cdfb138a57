@@ -1,0 +1,25 @@
+docs/guides/index.md
+  s_b040951662cf49::t_80b71d0ff3277c 58-60
+docs/index.md
+  s_b040951662cf49::t_80b71d0ff3277c 37
+docs/guides/expose-home-server-without-port-forwarding.md
+  s_b040951662cf49::t_acb75c31c72736 1-177,179-203,206-212
+  s_b040951662cf49::t_80b71d0ff3277c 178
+  s_b040951662cf49::t_53ee4c48d537dc 204-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "19710656cb8b241ce439de90532f17cdfb138a57",
+  "prompts": {},
+  "sessions": {
+    "s_b040951662cf49": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4e3d292-63fb-49a6-b181-1db1a3a0bccb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
