@@ -57,6 +57,19 @@ holds nothing for the gap between them**, so a resolver asking in that
 window gets NXDOMAIN — but that beats a write whose blast radius is the
 whole zone.
 
+### Why `expose rm` will not take one value out of several
+
+The same two-call path is why `expose rm` and `workspaces destroy` leave
+a name alone when it holds the machine's address **and** another one:
+taking one value out means deleting the RRset and writing the rest back,
+and a failure between the two calls would take down the value somebody
+else added. The command prints the record to remove by hand instead,
+and reports it in `dns_error`.
+
+Removing several names at once — `workspaces destroy` with many sites —
+asks each machine for its providers and each provider for its zones
+once, and lists each zone once, not once per name.
+
 ### A DNS-only token needs its zones configured
 
 Hostinger's DNS API answers about one zone at a time and has no

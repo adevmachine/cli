@@ -164,48 +164,74 @@ type Choice struct {
 // asked, and the answer is manual too.
 func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 	client remote.Client, out io.Writer) (Choice, error) {
+	return NewChooser(dir, machine, base, client, out).Choose(ctx, name, providerFlag)
+}
 
-	manual := Choice{Provider: NewManual(out), Name: ProviderManual, Zone: name}
+// Chooser is Choose for several names on one machine. It reads which
+// providers are installed once, and asks each provider for its zones once,
+// however many names it is asked about.
+type Chooser struct {
+	dir, machine, base string
+	client             remote.Client
+	out                io.Writer
+
+	loaded    bool
+	providers []*External
+	zoners    []Zoner
+	loadErr   error
+}
+
+// NewChooser returns a Chooser for one machine's providers.
+func NewChooser(dir, machine, base string, client remote.Client, out io.Writer) *Chooser {
+	return &Chooser{dir: dir, machine: machine, base: base, client: client, out: out}
+}
+
+// Choose is the package-level Choose, with what it learns kept for the next
+// name.
+func (c *Chooser) Choose(ctx context.Context, name, providerFlag string) (Choice, error) {
+	manual := Choice{Provider: NewManual(c.out), Name: ProviderManual, Zone: name}
 
 	if providerFlag == ProviderManual {
 		manual.Why = "the --dns-provider flag"
-		manual.Provider = newManualBecause(out, "--dns-provider manual was given.")
+		manual.Provider = newManualBecause(c.out, "--dns-provider manual was given.")
 		return manual, nil
 	}
-	if client == nil {
+	if c.client == nil {
 		// A provider runs on the machine. With no machine there is nothing
 		// to ask and nothing to write, but there is still a record to print.
 		manual.Why = "the machine could not be reached"
-		manual.Provider = newManualBecause(out,
-			fmt.Sprintf("%s could not be reached, so no DNS provider on it was asked.", machine))
+		manual.Provider = newManualBecause(c.out,
+			fmt.Sprintf("%s could not be reached, so no DNS provider on it was asked.", c.machine))
 		return manual, nil
 	}
 	if providerFlag != "" {
-		p, err := One(dir, machine, base, providerFlag, client)
+		p, err := One(c.dir, c.machine, c.base, providerFlag, c.client)
 		if err != nil {
 			return Choice{}, err
 		}
 		return Choice{Provider: p, Name: p.Name(), Zone: name, Why: "the --dns-provider flag"}, nil
 	}
 
-	providers, err := Installed(dir, machine, base, client)
-	if err != nil {
-		return Choice{}, err
+	if !c.loaded {
+		c.loaded = true
+		c.providers, c.loadErr = Installed(c.dir, c.machine, c.base, c.client)
+		for _, p := range c.providers {
+			c.zoners = append(c.zoners, &zonesOnce{External: p})
+		}
 	}
-	if len(providers) == 0 {
+	if c.loadErr != nil {
+		return Choice{}, c.loadErr
+	}
+	if len(c.providers) == 0 {
 		manual.Why = "no DNS provider is installed"
-		manual.Provider = newManualBecause(out, fmt.Sprintf("No DNS provider is installed on %s.", machine))
+		manual.Provider = newManualBecause(c.out, fmt.Sprintf("No DNS provider is installed on %s.", c.machine))
 		return manual, nil
 	}
-	zoners := make([]Zoner, 0, len(providers))
-	for _, p := range providers {
-		zoners = append(zoners, p)
-	}
 
-	holder, err := WhoHolds(ctx, zoners, name)
+	holder, err := WhoHolds(ctx, c.zoners, name)
 	switch {
 	case err == nil:
-		for _, p := range providers {
+		for _, p := range c.providers {
 			if p.Name() == holder.Provider {
 				return Choice{Provider: p, Name: p.Name(), Zone: holder.Zone,
 					Why: fmt.Sprintf("%s holds %s", holder.Provider, holder.Zone)}, nil
@@ -217,8 +243,25 @@ func Choose(ctx context.Context, dir, machine, base, name, providerFlag string,
 	default:
 		// Nobody holds it. That is ordinary — but saying nothing about a
 		// provider that could not be asked is not.
-		fmt.Fprintf(out, "No installed provider holds %s: %v\n", name, err)
+		fmt.Fprintf(c.out, "No installed provider holds %s: %v\n", name, err)
 		manual.Why = "no installed provider holds this zone"
 		return manual, nil
 	}
+}
+
+// zonesOnce asks a provider for its zones the first time, and answers from
+// that afterwards.
+type zonesOnce struct {
+	*External
+	asked bool
+	zones []string
+	err   error
+}
+
+func (z *zonesOnce) Zones(ctx context.Context) ([]string, error) {
+	if !z.asked {
+		z.asked = true
+		z.zones, z.err = z.External.Zones(ctx)
+	}
+	return z.zones, z.err
 }

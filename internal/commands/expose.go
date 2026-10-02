@@ -521,14 +521,76 @@ func nameAddress(m config.Machine) (address string, private bool, err error) {
 // that refuses says why, and the record to remove by hand is printed.
 func unpointDNS(ctx context.Context, dir string, machine config.Machine, host string, client remote.Client,
 	out io.Writer, dryRun bool) error {
+	return newDNSUnpointer(dir, out, dryRun).unpoint(ctx, machine, host, client)
+}
+
+// dnsUnpointer is unpointDNS for several names. What it learns is kept for
+// the next name: each machine's address and providers once, and each zone's
+// records once.
+type dnsUnpointer struct {
+	dir      string
+	out      io.Writer
+	dryRun   bool
+	machines map[string]*unpointMachine
+	zones    map[string]zoneListing
+}
+
+// unpointMachine is what one machine answers for every name it serves.
+type unpointMachine struct {
+	address string
+	err     error
+	chooser *dns.Chooser
+}
+
+type zoneListing struct {
+	records []dns.Record
+	err     error
+}
+
+func newDNSUnpointer(dir string, out io.Writer, dryRun bool) *dnsUnpointer {
+	return &dnsUnpointer{dir: dir, out: out, dryRun: dryRun,
+		machines: map[string]*unpointMachine{}, zones: map[string]zoneListing{}}
+}
+
+func (u *dnsUnpointer) machine(machine config.Machine, client remote.Client) *unpointMachine {
+	if known, ok := u.machines[machine.Name]; ok {
+		return known
+	}
+	m := &unpointMachine{}
+	u.machines[machine.Name] = m
+	if m.address, _, m.err = nameAddress(machine); m.err != nil {
+		return m
+	}
+	base, err := provision.Base(machine)
+	if err != nil {
+		m.err = err
+		return m
+	}
+	m.chooser = dns.NewChooser(u.dir, machine.Name, base, client, u.out)
+	return m
+}
+
+func (u *dnsUnpointer) list(ctx context.Context, machine string, choice dns.Choice) ([]dns.Record, error) {
+	key := machine + "\x00" + choice.Name + "\x00" + choice.Zone
+	listing, ok := u.zones[key]
+	if !ok {
+		listing.records, listing.err = choice.Provider.List(ctx, choice.Zone)
+		u.zones[key] = listing
+	}
+	return listing.records, listing.err
+}
+
+func (u *dnsUnpointer) unpoint(ctx context.Context, machine config.Machine, host string, client remote.Client) error {
 	if machine.Self {
 		return nil
 	}
-	address, _, err := nameAddress(machine)
-	if err != nil {
-		fmt.Fprintf(out, "warning: the DNS record for %s was not checked: %v\n", host, err)
-		return err
+	out, dryRun := u.out, u.dryRun
+	target := u.machine(machine, client)
+	if target.address == "" && target.err != nil {
+		fmt.Fprintf(out, "warning: the DNS record for %s was not checked: %v\n", host, target.err)
+		return target.err
 	}
+	address := target.address
 	byHand := func(zone string, why error) error {
 		name := host
 		if zone != host {
@@ -542,11 +604,10 @@ func unpointDNS(ctx context.Context, dir string, machine config.Machine, host st
 		fmt.Fprintf(out, "Remove this record by hand, if it is still there:\n\n  %s\tA\t%s\n\n", name, address)
 		return why
 	}
-	base, err := provision.Base(machine)
-	if err != nil {
-		return byHand(host, err)
+	if target.err != nil {
+		return byHand(host, target.err)
 	}
-	choice, err := dns.Choose(ctx, dir, machine.Name, base, host, "", client, out)
+	choice, err := target.chooser.Choose(ctx, host, "")
 	if err != nil {
 		return byHand(host, fmt.Errorf("the DNS provider setup is broken: %w", err))
 	}
@@ -567,7 +628,7 @@ func unpointDNS(ctx context.Context, dir string, machine config.Machine, host st
 		return fmt.Errorf("the DNS record was not removed: %s", reason)
 	}
 
-	records, err := choice.Provider.List(ctx, choice.Zone)
+	records, err := u.list(ctx, machine.Name, choice)
 	if err != nil {
 		return byHand(choice.Zone, fmt.Errorf("%s could not list %s, so nothing was deleted: %w", choice.Name, choice.Zone, err))
 	}
@@ -632,6 +693,7 @@ func unpointSites(ctx context.Context, out io.Writer, dir string, cfg config.Con
 			_ = c.Close()
 		}
 	}()
+	unpointer := newDNSUnpointer(dir, out, dryRun)
 	for _, r := range w.Routes {
 		m, err := cfg.Machine(cfg.ServingMachine(w, r))
 		if err != nil {
@@ -649,7 +711,7 @@ func unpointSites(ctx context.Context, out io.Writer, dir string, cfg config.Con
 			}
 			clients[m.Name] = client
 		}
-		_ = unpointDNS(ctx, dir, m, r.Host, client, out, dryRun)
+		_ = unpointer.unpoint(ctx, m, r.Host, client)
 	}
 }
 

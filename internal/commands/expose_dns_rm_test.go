@@ -145,3 +145,23 @@ func TestWorkspacesDestroyKeepDNSLeavesTheRecords(t *testing.T) {
 		t.Fatalf("%s", out)
 	}
 }
+
+func TestWorkspacesDestroyAsksTheProviderOncePerZone(t *testing.T) {
+	client := &exposeClient{zones: []string{"example.com"}, records: []dns.Record{
+		{Name: "app", Type: "A", Value: "203.0.113.10"},
+		{Name: "api", Type: "A", Value: "203.0.113.10"},
+	}}
+	dialExpose(t, client)
+	dir := configDestroying(t)
+
+	out, err := execute(t, "--config", dir, "workspaces", "destroy", "alice", "--confirm", "alice")
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if len(client.deleted) != 2 {
+		t.Fatalf("both records go: %q", client.deleted)
+	}
+	if client.lists != 1 || client.zoneLists != 1 {
+		t.Fatalf("two sites in one zone listed it %d times and its zones %d times", client.lists, client.zoneLists)
+	}
+}

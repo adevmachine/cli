@@ -80,6 +80,8 @@ type exposeClient struct {
 	records []dns.Record
 	lists   int
 	listErr error
+	// zoneLists is how many times the DNS provider was asked for its zones.
+	zoneLists int
 	// deleted is every record the DNS provider was asked to delete, as the
 	// command line carried it; deleteErr is what it answers with.
 	deleted   []string
@@ -169,6 +171,7 @@ func (c *exposeClient) Run(_ context.Context, command string) (string, error) {
 		}
 		return c.probe + "\n", nil
 	case strings.HasSuffix(strings.TrimSpace(command), " zones"):
+		c.zoneLists++
 		body, _ := json.Marshal(struct {
 			Zones []string `json:"zones"`
 		}{c.zones})
