@@ -358,9 +358,9 @@ var skillLinks = []struct {
 	title string
 	dir   []string
 }{
-	{"claude-code", "Claude", []string{".claude", "skills"}},
-	{"antigravity", "Antigravity", []string{".gemini", "antigravity-cli", "skills"}},
-	{"cline", "Cline", []string{".cline", "skills"}},
+	{"claude-code", "Claude", agentskills.LinkDir(agentskills.AgentClaude)},
+	{"antigravity", "Antigravity", agentskills.LinkDir(agentskills.AgentAntigravity)},
+	{"cline", "Cline", agentskills.LinkDir(agentskills.AgentCline)},
 }
 
 // skillTasks converges package skill contributions for only the workspaces

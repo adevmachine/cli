@@ -43,6 +43,12 @@ var linkedAgents = map[Agent][]string{
 	AgentCline:       {".cline", "skills"},
 }
 
+// LinkDir is the directory, as path elements under a home, where agent gets
+// one link per skill. It is nil for an agent that reads ~/.agents/skills.
+func LinkDir(agent Agent) []string {
+	return linkedAgents[agent]
+}
+
 func linkedIn(agents []Agent) []Agent {
 	var out []Agent
 	for _, agent := range agents {
