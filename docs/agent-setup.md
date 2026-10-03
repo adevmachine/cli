@@ -46,14 +46,15 @@ On macOS with Homebrew, that installs through the tap
 verifies the release binary for you.
 
 Then install the skills that teach you the whole CLI, naming your own
-harness — `claude`, `codex`, `pi` or `opencode`:
+harness — `claude`, `codex`, `pi`, `opencode`, `antigravity`, `kimi` or
+`cline`:
 
 ```
 devmachine skills add --agent claude --yes
 ```
 
 Without `--agent` and `--yes` it asks a question for each agent it finds, and
-you cannot answer it. If your harness is none of those four, skip this step.
+you cannot answer it. If your harness is none of those, skip this step.
 The skills take effect only in a new session, so keep following this page
 either way.
 
