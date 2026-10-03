@@ -46,7 +46,7 @@ if [ -z "${PACKAGES:-}" ] || [ ! -d "$PACKAGES/packages" ]; then
   die "PACKAGES must name a packages checkout"
 fi
 
-AGENTS="antigravity opencode pi kimi-code cline"
+AGENTS="antigravity opencode pi kimi-code cline codex"
 
 "$DEVMACHINE_ACCEPT_BIN" machines create-local "$VM" \
   >"$SCENARIO_LOG_DIR/create.log" 2>&1 || die "could not create $VM"
@@ -75,7 +75,7 @@ PACKAGE_LIST="workspace,zsh,mise,dev,devmachine-skills,$(printf '%s' "$AGENTS" |
 "$DEVMACHINE_ACCEPT_BIN" sync --yes >"$SCENARIO_LOG_DIR/sync.log" 2>&1 \
   || die "the sync failed; see $SCENARIO_LOG_DIR/sync.log"
 
-for cli in "agy --version" "opencode --version" "pi --version" "kimi --version" "cline --version"; do
+for cli in "agy --version" "opencode --version" "pi --version" "kimi --version" "cline --version" "codex --version"; do
   OUT=$("$DEVMACHINE_ACCEPT_BIN" run --workspace acme -- "$cli" 2>&1)
   printf '%s\n' "$OUT" >> "$SCENARIO_LOG_DIR/versions.log"
   if printf '%s' "$OUT" | grep -Eq '[0-9]+\.[0-9]+\.[0-9]+'; then
@@ -92,15 +92,15 @@ done
 
 CREDENTIALS=$("$DEVMACHINE_ACCEPT_BIN" credentials list 2>&1)
 printf '%s\n' "$CREDENTIALS" > "$SCENARIO_LOG_DIR/credentials.log"
-for name in antigravity opencode pi kimi cline; do
+for name in antigravity opencode pi kimi cline codex; do
   contains "$CREDENTIALS" "$name" "credentials list names the $name login" || true
 done
 
 AGAIN=$("$DEVMACHINE_ACCEPT_BIN" sync --yes 2>&1)
 printf '%s\n' "$AGAIN" > "$SCENARIO_LOG_DIR/sync-again.log"
-for task in "Install the Antigravity CLI" "Install the opencode CLI" "Install Pi" "Install the Kimi Code CLI" "Install the Cline CLI"; do
+for task in "Install the Antigravity CLI" "Install the opencode CLI" "Install Pi" "Install the Kimi Code CLI" "Install the Cline CLI" "Install the Codex CLI"; do
   CHANGED=$(printf '%s\n' "$AGAIN" | grep -A1 "TASK \[.*$task" | grep -c '^changed' || true)
   equals "$CHANGED" "0" "a second sync leaves \"$task\" alone" || true
 done
 
-scenario_done 18 "coding-agents"
+scenario_done 22 "coding-agents"
