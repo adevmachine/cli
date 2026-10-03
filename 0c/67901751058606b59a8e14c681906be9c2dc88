@@ -1,0 +1,20 @@
+docs/agent-setup.md
+  s_bd193e2d2e6bb0::t_c63a61e72acca9 49-50
+  s_bd193e2d2e6bb0::t_776e6133f61a66 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0c67901751058606b59a8e14c681906be9c2dc88",
+  "prompts": {},
+  "sessions": {
+    "s_bd193e2d2e6bb0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12d751aa-cf31-4b28-ba1c-670b2a613d1c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Djalma Araujo <djalma@nossomos.cc>"
+    }
+  }
+}
