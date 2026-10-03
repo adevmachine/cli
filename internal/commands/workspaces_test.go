@@ -685,3 +685,92 @@ func TestWorkspacesEditUnsetTakesASettingOut(t *testing.T) {
 		t.Fatalf("the setting survived: %#v", w.Settings)
 	}
 }
+
+func TestWorkspaceDefaultsWithNoFlagPrintsTheList(t *testing.T) {
+	dir := configWithKey(t, "defaults:\n  workspace: [workspace, dev]\n")
+	path := filepath.Join(dir, config.FileName)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := execute(t, "--config", dir, "workspaces", "defaults")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "workspace") || !strings.Contains(out, "dev") {
+		t.Fatalf("got %q", out)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(before, after) {
+		t.Fatalf("reading the defaults rewrote config.yml:\n%s", after)
+	}
+}
+
+func TestWorkspaceDefaultsWithNoFlagAsJSON(t *testing.T) {
+	dir := configWithKey(t, "defaults:\n  workspace: [workspace, dev]\n")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "workspaces", "defaults")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []string `json:"packages"`
+		Changed  bool     `json:"changed"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	if !slices.Equal(got.Packages, []string{"workspace", "dev"}) || got.Changed {
+		t.Fatalf("got %s", out)
+	}
+}
+
+func TestWorkspaceDefaultsEmptyIsAnEmptyList(t *testing.T) {
+	dir := configWithKey(t, "")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "workspaces", "defaults")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"packages": []`) {
+		t.Fatalf("an empty default list is not []: %s", out)
+	}
+
+	out, err = execute(t, "--config", dir, "workspaces", "defaults")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "no package") {
+		t.Fatalf("an empty list should say so: %q", out)
+	}
+}
+
+func TestWorkspacesListAsJSONSaysWhichLoginsAreShared(t *testing.T) {
+	dir := configWithKey(t, "workspaces:\n  - name: alice\n    machine: main\n"+
+		"    credentials:\n      claude: own\n  - name: bob\n    machine: main\n")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "workspaces", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Workspaces []map[string]any `json:"workspaces"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	alice, bob := got.Workspaces[0], got.Workspaces[1]
+	if alice["user"] != "alice" {
+		t.Fatalf("user is missing: %s", out)
+	}
+	if creds, ok := alice["credentials"].(map[string]any); !ok || creds["claude"] != "own" {
+		t.Fatalf("alice's own login is not reported: %s", out)
+	}
+	if creds, ok := bob["credentials"].(map[string]any); !ok || len(creds) != 0 {
+		t.Fatalf("a workspace with no answer should report {}: %s", out)
+	}
+}

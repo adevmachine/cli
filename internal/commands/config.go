@@ -116,10 +116,25 @@ type sizeJSON struct {
 }
 
 type configJSON struct {
-	Machines    []machineJSON   `json:"machines"`
-	Workspaces  []workspaceJSON `json:"workspaces"`
-	Domain      string          `json:"domain,omitempty"`
-	DNSProvider string          `json:"dns_provider,omitempty"`
+	Machines    []machineJSON     `json:"machines"`
+	Workspaces  []workspaceJSON   `json:"workspaces"`
+	Defaults    defaultsJSON      `json:"defaults"`
+	Credentials map[string]string `json:"credentials"`
+	Domain      string            `json:"domain,omitempty"`
+	DNSProvider string            `json:"dns_provider,omitempty"`
+}
+
+type defaultsJSON struct {
+	Workspace []string `json:"workspace"`
+}
+
+// credentialsOrNone keeps a credentials answer an object in the JSON, never
+// null.
+func credentialsOrNone(answers map[string]string) map[string]string {
+	if answers == nil {
+		return map[string]string{}
+	}
+	return answers
 }
 
 type workspaceJSON struct {
@@ -131,7 +146,9 @@ type workspaceJSON struct {
 func asJSON(cfg config.Config) configJSON {
 	out := configJSON{
 		Machines: []machineJSON{}, Workspaces: []workspaceJSON{},
-		Domain: cfg.Domain, DNSProvider: cfg.DNSProvider,
+		Defaults:    defaultsJSON{Workspace: onOrNone(cfg.Defaults.Workspace)},
+		Credentials: credentialsOrNone(cfg.Credentials),
+		Domain:      cfg.Domain, DNSProvider: cfg.DNSProvider,
 	}
 
 	for _, m := range cfg.Machines {

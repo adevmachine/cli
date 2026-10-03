@@ -477,3 +477,40 @@ func TestAnswersGoToStdoutByDefault(t *testing.T) {
 		t.Fatal("diagnostics must stay on stderr")
 	}
 }
+
+func TestConfigShowAsJSONCarriesTheDefaultsAndCredentials(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n"+
+		"defaults:\n  workspace: [workspace, dev]\ncredentials:\n  claude: machine\n")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "config", "show")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Defaults struct {
+			Workspace []string `json:"workspace"`
+		} `json:"defaults"`
+		Credentials map[string]string `json:"credentials"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	if len(got.Defaults.Workspace) != 2 || got.Defaults.Workspace[1] != "dev" {
+		t.Fatalf("defaults = %s", out)
+	}
+	if got.Credentials["claude"] != "machine" {
+		t.Fatalf("credentials = %s", out)
+	}
+}
+
+func TestConfigShowJSONDefaultsAreNeverNull(t *testing.T) {
+	dir := writeConfigDir(t, "machines:\n  - name: main\n    hosts: [203.0.113.10]\n")
+
+	out, err := execute(t, "--config", dir, "--format", "json", "config", "show")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"workspace": []`) || !strings.Contains(out, `"credentials": {}`) {
+		t.Fatalf("empty defaults or credentials are not [] / {}: %s", out)
+	}
+}

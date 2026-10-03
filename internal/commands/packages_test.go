@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -541,5 +542,75 @@ func TestPackagesListSaysWhereAPackageRunsAndWhatItBringsIn(t *testing.T) {
 	if !slices.Equal(essentials.Needs, []string{"base", "git"}) ||
 		essentials.Platforms == nil || len(essentials.Platforms) != 0 {
 		t.Fatalf("essentials: %s", out)
+	}
+}
+
+func TestPackagesListReportsEachVariable(t *testing.T) {
+	dir := configDir(t)
+	pkgDir := filepath.Join(packages.LocalDir(dir), "zsh")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "format: 1\nname: zsh\nscope: workspace\nsummary: A shell.\nvariables:\n" +
+		"  theme:\n    summary: The prompt theme.\n    default: plain\n" +
+		"  plugins:\n    summary: Plugins to load.\n    default: [git]\n" +
+		"  history:\n    summary: Lines kept.\n    default: 1000\n" +
+		"  vi_mode:\n    summary: Vi keys.\n    default: false\n" +
+		"  token:\n    summary: No default.\n"
+	if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeLocalPackage(t, dir, "docker", packages.ScopeMachine)
+
+	out, err := execute(t, "--config", dir, "--format", "json", "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []struct {
+			Name      string           `json:"name"`
+			Variables []map[string]any `json:"variables"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	byName := map[string][]map[string]any{}
+	for _, p := range got.Packages {
+		byName[p.Name] = p.Variables
+	}
+	if v := byName["docker"]; v == nil || len(v) != 0 {
+		t.Fatalf("a package with no variables should list []: %s", out)
+	}
+	vars := byName["zsh"]
+	names := make([]string, 0, len(vars))
+	for _, v := range vars {
+		names = append(names, v["name"].(string))
+	}
+	if !slices.Equal(names, []string{"history", "plugins", "theme", "token", "vi_mode"}) {
+		t.Fatalf("variables are not listed by name: %v", names)
+	}
+	want := map[string]struct {
+		def  any
+		kind string
+	}{
+		"history": {float64(1000), "number"},
+		"plugins": {[]any{"git"}, "list"},
+		"theme":   {"plain", "string"},
+		"token":   {nil, ""},
+		"vi_mode": {false, "boolean"},
+	}
+	for _, v := range vars {
+		w := want[v["name"].(string)]
+		if fmt.Sprint(v["default"]) != fmt.Sprint(w.def) {
+			t.Fatalf("%s default = %#v, want %#v", v["name"], v["default"], w.def)
+		}
+		kind, _ := v["type"].(string)
+		if kind != w.kind {
+			t.Fatalf("%s type = %q, want %q", v["name"], kind, w.kind)
+		}
+		if v["summary"] == "" {
+			t.Fatalf("%s has no summary", v["name"])
+		}
 	}
 }

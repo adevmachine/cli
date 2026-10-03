@@ -44,9 +44,10 @@ func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
 	var check, yes bool
 	c := &cobra.Command{
 		Use:   "defaults",
-		Short: "Change the packages inherited by future workspaces",
-		Long:  "Edits only defaults.workspace in the local configuration. Existing workspaces and every machine are unchanged.",
-		Args:  cobra.NoArgs,
+		Short: "Print or change the packages inherited by future workspaces",
+		Long: "With no flag, it prints defaults.workspace. With --add or --rm, it edits only " +
+			"defaults.workspace in the local configuration. Existing workspaces and every machine are unchanged.",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _, err := config.Dir(opts.configDir)
 			if err != nil {
@@ -60,6 +61,9 @@ func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
 				if slices.Contains(add, name) {
 					return fmt.Errorf("--add %s and --rm %s say two different things: pass one of them", name, name)
 				}
+			}
+			if len(add) == 0 && len(remove) == 0 {
+				return printWorkspaceDefaults(cmd, opts, cfg.Defaults.Workspace)
 			}
 			wanted := slices.Clone(cfg.Defaults.Workspace)
 			var changes []string
@@ -76,7 +80,8 @@ func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
 				}
 			}
 			if len(changes) == 0 {
-				return errors.New("nothing to change in future workspace defaults: pass --add or --rm")
+				return errors.New("nothing to change in future workspace defaults: " +
+					"every package to add is there already, and every one to take off is not")
 			}
 			if check {
 				for _, line := range changes {
@@ -99,10 +104,7 @@ func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
 			}
 			repo.AutoCommit(cmd.Context(), dir, "chore(config): update future workspace defaults")
 			if opts.format == formatJSON {
-				return writeJSON(cmd.OutOrStdout(), struct {
-					Packages []string `json:"packages"`
-					Changed  bool     `json:"changed"`
-				}{wanted, true})
+				return writeJSON(cmd.OutOrStdout(), workspaceDefaultsJSON{onOrNone(wanted), true})
 			}
 			for _, line := range changes {
 				cmd.Printf("future workspaces: %s\n", line)
@@ -118,6 +120,23 @@ func newWorkspacesDefaultsCmd(opts *options) *cobra.Command {
 	return c
 }
 
+type workspaceDefaultsJSON struct {
+	Packages []string `json:"packages"`
+	Changed  bool     `json:"changed"`
+}
+
+func printWorkspaceDefaults(cmd *cobra.Command, opts *options, list []string) error {
+	if opts.format == formatJSON {
+		return writeJSON(cmd.OutOrStdout(), workspaceDefaultsJSON{onOrNone(list), false})
+	}
+	if len(list) == 0 {
+		cmd.Println("Future workspaces get no package by default. `devmachine workspaces defaults --add <package>` adds one.")
+		return nil
+	}
+	cmd.Printf("Future workspaces get: %s\n", strings.Join(list, ", "))
+	return nil
+}
+
 // workspaceRow is the output contract, kept apart from the configuration
 // struct so a change to how config.yml is written does not silently change
 // what every consumer reads.
@@ -127,6 +146,10 @@ type workspaceRow struct {
 	User     string         `json:"user"`
 	Packages []string       `json:"packages"`
 	Settings map[string]any `json:"settings,omitempty"`
+	// Credentials is the workspace's own answer about each login, "machine"
+	// or "own", as `edit --share` writes it. A login it leaves out follows
+	// the configuration's `credentials:`, then the package.
+	Credentials map[string]string `json:"credentials"`
 }
 
 func newWorkspacesListCmd(opts *options) *cobra.Command {
@@ -144,7 +167,8 @@ func newWorkspacesListCmd(opts *options) *cobra.Command {
 			for _, w := range cfg.Workspaces {
 				rows = append(rows, workspaceRow{
 					Name: w.Name, Machine: machineNameOf(cfg, w), User: w.LinuxUser(),
-					Packages: w.Packages, Settings: w.Settings,
+					Packages: onOrNone(w.Packages), Settings: w.Settings,
+					Credentials: credentialsOrNone(w.Credentials),
 				})
 			}
 

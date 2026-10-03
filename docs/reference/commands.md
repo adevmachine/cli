@@ -246,7 +246,13 @@ as it prints, so it is the quickest way to find what is wrong.
 
 With no `config.yml` yet, `show` is not an error: it says there is no
 configuration, and `--format json` prints `{"machines": [], "workspaces":
-[]}`. `machines` and `workspaces` are always arrays, never `null`.
+[], "defaults": {"workspace": []}, "credentials": {}}`. `machines`,
+`workspaces` and `defaults.workspace` are always arrays, never `null`.
+
+`defaults.workspace` is the package list a new workspace gets (see
+[workspaces](#workspaces)). `credentials` is the top-level answer per
+login, `machine` or `own`; a workspace's own `credentials` (in `workspaces
+list --format json`) wins over it.
 
 ## machines
 
@@ -427,7 +433,7 @@ subdomains do not work on it.
 devmachine workspaces list
 devmachine workspaces new <name> [--machine m] [--like w] [--packages a,b] [--user u] [--check] [--yes]
 devmachine workspaces edit <name> [--machine m] [--user u] [--add p] [--rm p] [--set k=v] [--unset k] [--share c=machine|own] [--check] [--yes]
-devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]
+devmachine workspaces defaults [--add p] [--rm p] [--check] [--yes]   no flag: print the list
 devmachine workspaces rm <name> [--yes]
 devmachine workspaces destroy <name> [--confirm <name>] [--check] [--keep-dns]
 ```
@@ -442,6 +448,34 @@ changes the account.
 `config.yml`. `--packages` overrides it for one workspace; `--like
 <name>` copies another workspace's package list instead — packages only,
 never the account or the machine.
+
+`defaults` with no flag prints that list and changes nothing. With `--add`
+or `--rm` it edits it; existing workspaces keep their own lists. With
+`--format json`, both print `{"packages": ["dev", "zsh"], "changed":
+false}` — `changed` is `true` after an edit, and `packages` is `[]` when
+the list is empty.
+
+`list --format json` prints `{"workspaces": [...]}`, one entry per
+workspace:
+
+```json
+{
+  "name": "alice",
+  "machine": "main",
+  "user": "alice",
+  "packages": ["workspace", "dev"],
+  "settings": {"zsh.theme": "plain"},
+  "credentials": {"claude": "own"}
+}
+```
+
+`user` is the Linux account. `packages` is `[]` when there are none, and
+`settings` is left out. `credentials` is the workspace's own
+`credentials:` answer per login — `own` keeps its own login, `machine`
+shares the machine's — exactly what `edit --share` writes, and `{}` when
+it has none. A login it does not name follows the top-level
+`credentials:` (in `config show --format json`), then the package's own
+`scope`.
 
 **`new` refuses on a machine with no key**, since a workspace is reached
 through the copied admin key. Run `devmachine setup` first. With several
@@ -1113,6 +1147,9 @@ per package:
   "credentials": [
     {"name": "hostinger", "kind": "secret", "scope": "machine", "env": "HOSTINGER_API_TOKEN"}
   ],
+  "variables": [
+    {"name": "zones", "summary": "Zones to manage.", "default": [], "type": "list"}
+  ],
   "installed_on": ["machine main"]
 }
 ```
@@ -1128,7 +1165,14 @@ has none. `credentials` lists what the package declares, always an array:
 each one's `name`, `kind` (`secret`, `file` or `manual`), `scope`, and
 `env` or `path` where the value is delivered. **It never carries a
 value** — it is there so a client knows the name to store with `secrets
-set` before the package is added. `installed_on` is `[]` when nothing
+set` before the package is added. `variables` lists the settings the
+manifest declares, sorted by name, always an array: each one's `name`,
+`summary`, the manifest's `default` (`null` when it has none) and `type`
+(`string`, `number`, `boolean`, `list` or `map`), read off the default and
+left out when there is no default. It is what `--set <package>.<name>=…`
+on `machines edit` or `workspaces edit` accepts. **It carries the
+manifest's default, never a value you set** — your values are in
+`workspaces list` and `config.yml`. `installed_on` is `[]` when nothing
 uses the package.
 
 With no `config.yml` yet, `list` reads the **latest** packages release —

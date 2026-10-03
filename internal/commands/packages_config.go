@@ -241,7 +241,46 @@ type packageRow struct {
 	// bundle such as essentials is made of.
 	Needs       []string            `json:"needs"`
 	Credentials []packageCredential `json:"credentials"`
+	Variables   []packageVariable   `json:"variables"`
 	Installed   []string            `json:"installed_on"`
+}
+
+// packageVariable is a setting a package reads, as its manifest declares it.
+// Default is the manifest's own fallback, never a value the operator set.
+type packageVariable struct {
+	Name    string `json:"name"`
+	Summary string `json:"summary,omitempty"`
+	Default any    `json:"default"`
+	// Type is read off the default, so it is left out when there is none.
+	Type string `json:"type,omitempty"`
+}
+
+func variablesOf(m packages.Manifest) []packageVariable {
+	out := make([]packageVariable, 0, len(m.Variables))
+	for _, name := range slices.Sorted(maps.Keys(m.Variables)) {
+		v := m.Variables[name]
+		out = append(out, packageVariable{Name: name, Summary: v.Summary, Default: v.Default, Type: typeOf(v.Default)})
+	}
+	return out
+}
+
+func typeOf(value any) string {
+	switch value.(type) {
+	case nil:
+		return ""
+	case string:
+		return "string"
+	case bool:
+		return "boolean"
+	case int, int64, uint64, float64:
+		return "number"
+	case []any:
+		return "list"
+	case map[string]any:
+		return "map"
+	default:
+		return ""
+	}
 }
 
 // packageCredential is a credential a package declares: where its value goes,
@@ -338,6 +377,7 @@ func listPackages(ctx context.Context, opts *options) (string, []packageRow, err
 			Platforms:   onOrNone(found.Manifest.Platforms),
 			Needs:       onOrNone(found.Manifest.Needs),
 			Credentials: credentialsOf(found.Manifest),
+			Variables:   variablesOf(found.Manifest),
 			Installed:   onOrNone(installed[found.Manifest.Name]),
 		})
 		delete(installed, found.Manifest.Name)
@@ -345,7 +385,7 @@ func listPackages(ctx context.Context, opts *options) (string, []packageRow, err
 	for _, name := range slices.Sorted(maps.Keys(installed)) {
 		rows = append(rows, packageRow{
 			Name: name, Source: sourceMissing, Platforms: []string{}, Needs: []string{},
-			Credentials: []packageCredential{}, Installed: installed[name],
+			Credentials: []packageCredential{}, Variables: []packageVariable{}, Installed: installed[name],
 		})
 	}
 
