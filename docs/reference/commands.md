@@ -475,7 +475,7 @@ inherit; existing ones are unchanged.
 ## skills
 
 ```text
-devmachine skills add [--package name] [--agent claude|codex|pi|opencode] [--yes]
+devmachine skills add [--package name] [--agent claude|codex|opencode|pi|antigravity|kimi|cline] [--yes]
 devmachine skills list
 devmachine skills update [--yes]
 devmachine skills remove <name> [--yes]
@@ -490,8 +490,17 @@ package. Without `--agent`, it detects installed agent tools and asks.
 `list` shows each source, its skills and agent tools. `update` reinstalls
 every recorded source. `remove` takes one exact skill name.
 
-Real copy: `~/.agents/skills/<name>`. Claude's is a link:
-`~/.claude/skills/<name> -> ../../.agents/skills/<name>`.
+Real copy: `~/.agents/skills/<name>`. Codex, OpenCode, Pi and Kimi read
+it there. Claude, Antigravity and Cline get a link to it:
+
+| Agent | Link |
+| --- | --- |
+| `claude` | `~/.claude/skills/<name> -> ../../.agents/skills/<name>` |
+| `antigravity` | `~/.gemini/antigravity-cli/skills/<name> -> ../../../.agents/skills/<name>` |
+| `cline` | `~/.cline/skills/<name> -> ../../.agents/skills/<name>` |
+
+Detection looks for `~/.claude`, `~/.codex`, `~/.config/opencode`,
+`~/.pi`, `~/.gemini/antigravity-cli`, `~/.kimi-code` and `~/.cline`.
 
 ## aliases
 

@@ -87,6 +87,16 @@ name: claude-code
 scope: workspace
 summary: Claude Code, logged in per workspace.
 `,
+	"antigravity": `format: 1
+name: antigravity
+scope: workspace
+summary: Antigravity CLI.
+`,
+	"cline": `format: 1
+name: cline
+scope: workspace
+summary: Cline CLI.
+`,
 	"global-skills": `format: 1
 name: global-skills
 scope: workspace

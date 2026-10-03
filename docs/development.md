@@ -100,6 +100,17 @@ scripts/accept/run.sh headscale
 Lima's `user-v2` network, because `vzNAT` keeps two VMs from reaching each
 other.
 
+`coding-agents` is not in the default list either: it downloads every
+coding-agent CLI the packages offer (Antigravity, opencode, Pi, Kimi Code
+and Cline, close to a gigabyte). It syncs one workspace with all of them,
+checks each one answers its version, checks Antigravity's and Cline's
+skill folders reach the shared skills, and checks a second sync installs
+nothing again. Nobody logs in. Run it by name:
+
+```
+scripts/accept/run.sh coding-agents
+```
+
 Every run creates uniquely named `devmachine-accept-*` VMs and removes them by
 default, including when a scenario fails. For investigation only,
 `KEEP_ACCEPT_VM=1 make accept` retains its disposable acceptance VM; delete it

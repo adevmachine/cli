@@ -139,8 +139,8 @@ devmachine sync
 ```
 
 This sends `team-skills` to both workspaces. A workspace that also has
-`claude-code` gets a Claude link to the same files; Codex, Pi, and
-OpenCode read them directly.
+`claude-code`, `antigravity` or `cline` gets a link to the same files for
+that agent; Codex, Pi, OpenCode and Kimi Code read them directly.
 
 ### 7. Install it on your own computer too
 

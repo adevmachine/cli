@@ -347,7 +347,20 @@ type contributedSkills struct {
 	found      packages.Found
 	skills     []agentskills.Skill
 	workspaces []packages.Resolved
-	claude     []packages.Resolved
+	// linked holds, per entry of skillLinks, the workspaces that get links.
+	linked [][]packages.Resolved
+}
+
+// skillLinks lists the harness packages that do not read ~/.agents/skills, and
+// the directory under the workspace home where each gets one link per skill.
+var skillLinks = []struct {
+	pkg   string
+	title string
+	dir   []string
+}{
+	{"claude-code", "Claude", agentskills.LinkDir(agentskills.AgentClaude)},
+	{"antigravity", "Antigravity", agentskills.LinkDir(agentskills.AgentAntigravity)},
+	{"cline", "Cline", agentskills.LinkDir(agentskills.AgentCline)},
 }
 
 // skillTasks converges package skill contributions for only the workspaces
@@ -368,11 +381,13 @@ func skillTasks(plan packages.MachinePlan, base string) (string, error) {
 				}
 				index = len(contributions)
 				byPackage[found.Manifest.Name] = index
-				contributions = append(contributions, contributedSkills{found: found, skills: discovered})
+				contributions = append(contributions, contributedSkills{found: found, skills: discovered, linked: make([][]packages.Resolved, len(skillLinks))})
 			}
 			contributions[index].workspaces = append(contributions[index].workspaces, workspace)
-			if has(workspace, "claude-code") {
-				contributions[index].claude = append(contributions[index].claude, workspace)
+			for link, harness := range skillLinks {
+				if has(workspace, harness.pkg) {
+					contributions[index].linked[link] = append(contributions[index].linked[link], workspace)
+				}
 			}
 		}
 	}
@@ -404,11 +419,26 @@ func writeSkillDirectories(out *strings.Builder, contribution contributedSkills)
 		writeSkillLoop(out, contribution.workspaces, false)
 		fmt.Fprintf(out, "      tags: [%s]\n\n", name)
 	}
-	if len(contribution.claude) > 0 {
-		fmt.Fprintf(out, "    - name: %s prepares the Claude skill directory\n", name)
-		out.WriteString("      file:\n        path: \"/home/{{ devmachine_workspace.user }}/.claude/skills\"\n        state: directory\n")
+	for link, harness := range skillLinks {
+		workspaces := contribution.linked[link]
+		if len(workspaces) == 0 {
+			continue
+		}
+		// Ansible would create missing parents as root; each level is created
+		// on its own so the workspace user owns all of them. Parents get no
+		// mode, so one that already exists keeps its own.
+		for level := 1; level < len(harness.dir); level++ {
+			parent := strings.Join(harness.dir[:level], "/")
+			fmt.Fprintf(out, "    - name: %s prepares ~/%s for %s skills\n", name, parent, harness.title)
+			fmt.Fprintf(out, "      file:\n        path: %q\n        state: directory\n", "/home/{{ devmachine_workspace.user }}/"+parent)
+			out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n")
+			writeSkillLoop(out, workspaces, false)
+			fmt.Fprintf(out, "      tags: [%s]\n\n", name)
+		}
+		fmt.Fprintf(out, "    - name: %s prepares the %s skill directory\n", name, harness.title)
+		fmt.Fprintf(out, "      file:\n        path: %q\n        state: directory\n", "/home/{{ devmachine_workspace.user }}/"+strings.Join(harness.dir, "/"))
 		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n        mode: \"0755\"\n")
-		writeSkillLoop(out, contribution.claude, false)
+		writeSkillLoop(out, workspaces, false)
 		fmt.Fprintf(out, "      tags: [%s]\n\n", name)
 	}
 }
@@ -462,12 +492,18 @@ func writeSkillConvergence(out *strings.Builder, contribution contributedSkills,
 	writeSkillLoop(out, contribution.workspaces, false)
 	fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
 
-	if len(contribution.claude) > 0 {
-		fmt.Fprintf(out, "    - name: %s links the %s skill for Claude\n", pkg, skill.Name)
-		fmt.Fprintf(out, "      file:\n        src: %q\n        dest: %q\n        state: link\n", "../../.agents/skills/"+skill.Name, "/home/{{ devmachine_workspace.user }}/.claude/skills/"+skill.Name)
+	for link, harness := range skillLinks {
+		workspaces := contribution.linked[link]
+		if len(workspaces) == 0 {
+			continue
+		}
+		src := strings.Repeat("../", len(harness.dir)) + ".agents/skills/" + skill.Name
+		dest := "/home/{{ devmachine_workspace.user }}/" + strings.Join(harness.dir, "/") + "/" + skill.Name
+		fmt.Fprintf(out, "    - name: %s links the %s skill for %s\n", pkg, skill.Name, harness.title)
+		fmt.Fprintf(out, "      file:\n        src: %q\n        dest: %q\n        state: link\n", src, dest)
 		out.WriteString("        force: \"{{ ansible_check_mode }}\"\n")
 		out.WriteString("        owner: \"{{ devmachine_workspace.user }}\"\n        group: \"{{ devmachine_workspace.user }}\"\n")
-		writeSkillLoop(out, contribution.claude, false)
+		writeSkillLoop(out, workspaces, false)
 		fmt.Fprintf(out, "      tags: [%s]\n\n", pkg)
 	}
 }
