@@ -614,3 +614,49 @@ func TestPackagesListReportsEachVariable(t *testing.T) {
 		}
 	}
 }
+
+func TestPackagesListSaysWhichLoginCanBeSharedFromTheMachine(t *testing.T) {
+	dir := configDir(t)
+	pkgDir := filepath.Join(packages.LocalDir(dir), "agent")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "format: 1\nname: agent\nscope: workspace\nsummary: A coding agent.\ncredentials:\n" +
+		"  - name: copies\n    kind: manual\n    scope: machine\n    shareable: true\n" +
+		"    command: agent login\n    stored_at: .agent/session.json\n" +
+		"  - name: bound\n    kind: manual\n    scope: workspace\n" +
+		"    command: other login\n    stored_at: .other/token\n" +
+		"  - name: key\n    kind: secret\n    scope: workspace\n    env: AGENT_KEY\n"
+	if err := os.WriteFile(packages.ManifestPath(pkgDir), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := execute(t, "--config", dir, "--format", "json", "packages", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Packages []struct {
+			Name        string           `json:"name"`
+			Credentials []map[string]any `json:"credentials"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("not JSON: %v (%q)", err, out)
+	}
+	shareable := map[string]any{}
+	for _, p := range got.Packages {
+		if p.Name != "agent" {
+			continue
+		}
+		for _, c := range p.Credentials {
+			shareable[c["name"].(string)] = c["shareable"]
+		}
+	}
+	want := map[string]any{"copies": true, "bound": false, "key": false}
+	for name, value := range want {
+		if shareable[name] != value {
+			t.Fatalf("%s shareable = %#v, want %v: %s", name, shareable[name], value, out)
+		}
+	}
+}

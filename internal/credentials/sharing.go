@@ -21,7 +21,7 @@ import (
 func Resolve(pkg string, c packages.Credential, prefer map[string]string) (string, error) {
 	asked := prefer[c.Name]
 
-	if !c.Shareable {
+	if !CanShare(c) {
 		if asked == config.CredentialMachine {
 			return packages.ScopeWorkspace, fmt.Errorf(
 				"credential %q cannot be shared: the package %q does not say `shareable: true` about it, "+
@@ -39,6 +39,12 @@ func Resolve(pkg string, c packages.Credential, prefer map[string]string) (strin
 	default:
 		return c.Scope, nil
 	}
+}
+
+// CanShare says whether a workspace may take this login from the machine, the
+// question Resolve refuses on. Clients ask it before offering the choice.
+func CanShare(c packages.Credential) bool {
+	return c.Shareable
 }
 
 // scopeOf is Resolve with the refusal dropped, for the callers that only

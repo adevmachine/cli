@@ -1145,7 +1145,7 @@ per package:
   "platforms": [],
   "needs": [],
   "credentials": [
-    {"name": "hostinger", "kind": "secret", "scope": "machine", "env": "HOSTINGER_API_TOKEN"}
+    {"name": "hostinger", "kind": "secret", "scope": "machine", "env": "HOSTINGER_API_TOKEN", "shareable": false}
   ],
   "variables": [
     {"name": "zones", "summary": "Zones to manage.", "default": [], "type": "list"}
@@ -1165,7 +1165,13 @@ has none. `credentials` lists what the package declares, always an array:
 each one's `name`, `kind` (`secret`, `file` or `manual`), `scope`, and
 `env` or `path` where the value is delivered. **It never carries a
 value** — it is there so a client knows the name to store with `secrets
-set` before the package is added. `variables` lists the settings the
+set` before the package is added. `shareable` is `true` when a workspace
+can take that login from the machine — `workspaces edit --share
+<name>=machine` — because the package says a copy of its session works on
+another account. When it is `false`, `sync` refuses that choice (see
+[troubleshooting](../troubleshooting.md#credential-x-cannot-be-shared)), so
+the only answer is `own`; it is always `false` for a secret or a file.
+`variables` lists the settings the
 manifest declares, sorted by name, always an array: each one's `name`,
 `summary`, the manifest's `default` (`null` when it has none) and `type`
 (`string`, `number`, `boolean`, `list` or `map`), read off the default and

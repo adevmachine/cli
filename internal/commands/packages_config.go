@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mydevmachine/devmachine/internal/config"
+	"github.com/mydevmachine/devmachine/internal/credentials"
 	"github.com/mydevmachine/devmachine/internal/packages"
 	"github.com/mydevmachine/devmachine/internal/repo"
 	"github.com/spf13/cobra"
@@ -292,12 +293,17 @@ type packageCredential struct {
 	Scope string `json:"scope,omitempty"`
 	Env   string `json:"env,omitempty"`
 	Path  string `json:"path,omitempty"`
+	// Shareable is whether a run obeys `workspaces edit --share <name>=machine`
+	// rather than refusing it, so a client offers that choice only where it works.
+	Shareable bool `json:"shareable"`
 }
 
 func credentialsOf(m packages.Manifest) []packageCredential {
 	out := make([]packageCredential, 0, len(m.Credentials))
 	for _, c := range m.Credentials {
-		out = append(out, packageCredential{Name: c.Name, Kind: c.Kind, Scope: c.Scope, Env: c.Env, Path: c.Path})
+		out = append(out, packageCredential{
+			Name: c.Name, Kind: c.Kind, Scope: c.Scope, Env: c.Env, Path: c.Path, Shareable: credentials.CanShare(c),
+		})
 	}
 	return out
 }
