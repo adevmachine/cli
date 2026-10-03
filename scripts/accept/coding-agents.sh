@@ -103,4 +103,4 @@ for task in "Install the Antigravity CLI" "Install the opencode CLI" "Install Pi
   equals "$CHANGED" "0" "a second sync leaves \"$task\" alone" || true
 done
 
-scenario_done 22 "coding-agents"
+scenario_done 21 "coding-agents"
